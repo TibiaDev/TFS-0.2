@@ -63,7 +63,7 @@ bool readXMLFloat(xmlNodePtr node, const char* tag, float& value);
 bool readXMLString(xmlNodePtr node, const char* tag, std::string& value);
 bool readXMLContentString(xmlNodePtr node, std::string& value);
 
-std::vector<std::string> explodeString(const std::string& inString, const std::string& separator);
+std::vector<std::string> explodeString(const std::string& inString, const std::string& separator, int32_t limit = -1);
 std::vector<int32_t> vectorAtoi(std::vector<std::string> stringVector);
 bool hasBitSet(uint32_t flag, uint32_t flags);
 
@@ -93,7 +93,6 @@ std::string parseParams(tokenizer::iterator &it, tokenizer::iterator end);
 std::string formatDate(time_t time);
 std::string formatDateShort(time_t time);
 std::string convertIPToString(uint32_t ip);
-std::string formatTime(int32_t hours, int32_t minutes);
 
 std::string trimString(std::string& str);
 
@@ -107,6 +106,8 @@ std::string getCombatName(CombatType_t combatType);
 std::string getSkillName(uint16_t skillid);
 skills_t getSkillId(std::string param);
 
+int32_t actionStringToInt(std::string action);
+int32_t reasonStringToInt(std::string reason);
 std::string getReason(int32_t reasonId);
 std::string getAction(int32_t actionId, bool IPBanishment);
 

@@ -113,7 +113,8 @@ CONDITION_REGENERATION = 8192
 CONDITION_SOUL = 16384
 CONDITION_DROWN = 32768
 CONDITION_MUTED = 65536
-CONDITION_TRADETICKS = 131072
+CONDITION_ADVERTISINGTICKS = 131072
+CONDITION_TRADETICKS = CONDITION_ADVERTISINGTICKS
 CONDITION_YELLTICKS = 262144
 CONDITION_ATTRIBUTES = 524288
 CONDITION_FREEZING = 1048576
@@ -258,27 +259,30 @@ TALKTYPE_PRIVATE_NP = 5
 TALKTYPE_PRIVATE = 6
 TALKTYPE_CHANNEL_Y = 7
 TALKTYPE_CHANNEL_W = 8
-TALKTYPE_RVR_CHANNEL = 9
-TALKTYPE_RVR_ANSWER = 10
-TALKTYPE_RVR_CONTINUE = 11
-TALKTYPE_BROADCAST = 12
-TALKTYPE_CHANNEL_R1 = 13
-TALKTYPE_PRIVATE_RED = 14
-TALKTYPE_CHANNEL_O = 15
-TALKTYPE_CHANNEL_R2 = 17
-TALKTYPE_ORANGE_1 = 19
-TALKTYPE_ORANGE_2 = 20
+TALKTYPE_BROADCAST = 9
+TALKTYPE_CHANNEL_R1 = 10
+TALKTYPE_PRIVATE_RED = 11
+TALKTYPE_CHANNEL_O = 12
+TALKTYPE_ORANGE_1 = 13
+TALKTYPE_ORANGE_2 = 14
 
-MESSAGE_STATUS_CONSOLE_RED = 18
-MESSAGE_EVENT_ORANGE = 19
-MESSAGE_STATUS_CONSOLE_ORANGE = 20
-MESSAGE_STATUS_WARNING = 21
-MESSAGE_EVENT_ADVANCE = 22
-MESSAGE_EVENT_DEFAULT = 23
-MESSAGE_STATUS_DEFAULT = 24
-MESSAGE_INFO_DESCR = 25
-MESSAGE_STATUS_SMALL = 26
-MESSAGE_STATUS_CONSOLE_BLUE = 27
+-- for internal use
+TALKTYPE_RVR_CHANNEL = 256
+TALKTYPE_RVR_ANSWER = 257
+TALKTYPE_RVR_CONTINUE = 258
+TALKTYPE_CHANNEL_R2 = 259
+--
+
+MESSAGE_EVENT_ORANGE = 13
+MESSAGE_STATUS_CONSOLE_ORANGE = 14
+MESSAGE_STATUS_WARNING = 15
+MESSAGE_EVENT_ADVANCE = 16
+MESSAGE_EVENT_DEFAULT = 17
+MESSAGE_STATUS_DEFAULT = 18
+MESSAGE_INFO_DESCR = 19
+MESSAGE_STATUS_SMALL = 20
+MESSAGE_STATUS_CONSOLE_BLUE = 21
+MESSAGE_STATUS_CONSOLE_RED = 22
 
 TEXTCOLOR_BLUE = 5
 TEXTCOLOR_LIGHTBLUE = 35
@@ -558,10 +562,9 @@ function isPremium(cid)
 	return (isPlayer(cid) == TRUE and (getPlayerPremiumDays(cid) > 0 or getConfigInfo('freePremium') == "yes")) and TRUE or FALSE
 end
 
-function rows(connection, sql_statement)
-	local cursor = assert(connection:execute(sql_statement))
+function rows(result)
 	return function ()
-		return cursor:fetch()
+		return result:fetch()
 	end
 end
 
@@ -610,14 +613,14 @@ function doPlayerAddAddons(cid, addon)
 	end
 end
 
-function numRows(cursor)
-	local row = cursor:fetch()
+function numRows(result)
+	local row = result:fetch()
 	local rows = 0
 	while row do
 		rows = rows + 1
-		row = cursor:fetch()
+		row = result:fetch()
 	end
-	cursor:close()
+	result:close()
 	return rows
 end
 
@@ -689,4 +692,30 @@ function doPlayerBuyItemContainer(cid, containerid, itemid, count, cost, charges
 		return LUA_NO_ERROR
 	end
 	return LUA_ERROR
+end
+
+string.trim = function (str)
+	return str:gsub("^%s*(.-)%s*$", "%1")
+end
+
+string.explode = function (str, sep, limit)
+	if(type(sep) ~= 'string' or isInArray({tostring(str):len(), sep:len()}, 0)) then
+		return {}
+	end
+
+	local i, pos, tmp, t = 0, 1, "", {}
+	for s, e in function() return string.find(str, sep, pos) end do
+		tmp = str:sub(pos, s - 1):trim()
+		table.insert(t, tmp)
+		pos = e + 1
+
+		i = i + 1
+		if(limit ~= nil and i == limit) then
+			break
+		end
+	end
+
+	tmp = str:sub(pos):trim()
+	table.insert(t, tmp)
+	return t
 end

@@ -25,6 +25,8 @@
 #include "movement.h"
 #include "weapons.h"
 
+#include <libxml/xmlschemas.h>
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -94,7 +96,6 @@ ItemType::ItemType()
 	stopTime = false;
 	corpseType = RACE_NONE;
 	fluidSource = FLUID_NONE;
-	clientCharges = false;
 	allowDistRead = false;
 
 	isVertical = false;
@@ -160,7 +161,12 @@ bool Items::reload()
 
 	this->items->reset();
 	loadFromOtb("data/items/items.otb");
-	return loadFromXml();
+	if(!loadFromXml())
+		return false;
+
+	g_moveEvents->reload();
+	g_weapons->reload();
+	return true;
 }
 
 int32_t Items::loadFromOtb(std::string file)
@@ -207,7 +213,7 @@ int32_t Items::loadFromOtb(std::string file)
 		std::cout << "Old version detected, a newer version of items.otb is required." << std::endl;
 		return ERROR_INVALID_FORMAT;
 	}
-	else if(Items::dwMinorVersion < CLIENT_VERSION_854)
+	else if(Items::dwMinorVersion < CLIENT_VERSION_854_BAD)
 	{
 		std::cout << "A newer version of items.otb is required." << std::endl;
 		return ERROR_INVALID_FORMAT;
@@ -270,7 +276,6 @@ int32_t Items::loadFromOtb(std::string file)
 		iType->allowDistRead = hasBitSet(FLAG_ALLOWDISTREAD, flags);
 		iType->rotable = hasBitSet(FLAG_ROTABLE, flags);
 		iType->canReadText = hasBitSet(FLAG_READABLE, flags);
-		iType->clientCharges = hasBitSet(FLAG_CLIENTCHARGES, flags);
 		iType->lookThrough = hasBitSet(FLAG_LOOKTHROUGH, flags);
 
 		attribute_t attrib;
@@ -372,6 +377,7 @@ int32_t Items::loadFromOtb(std::string file)
 bool Items::loadFromXml()
 {
 	std::string filename = "data/items/items.xml";
+	std::string xmlSchema = "data/items/items.xsd";
 	xmlDocPtr doc = xmlParseFile(filename.c_str());
 
 	std::string strValue;
@@ -382,6 +388,36 @@ bool Items::loadFromXml()
 
 	if(!doc)
 		return false;
+
+	//validation against xml-schema
+	xmlDocPtr schemaDoc = xmlReadFile(xmlSchema.c_str(), NULL, XML_PARSE_NONET);
+	if(schemaDoc != NULL)
+	{
+		xmlSchemaParserCtxtPtr schemaParserContext = xmlSchemaNewDocParserCtxt(schemaDoc);
+		if(schemaParserContext != NULL)
+		{
+			xmlSchemaPtr schema = xmlSchemaParse(schemaParserContext);
+			if(schema != NULL)
+			{
+				xmlSchemaValidCtxtPtr validContext = xmlSchemaNewValidCtxt(schema);
+				if(validContext != NULL)
+				{
+					int returnVal = xmlSchemaValidateDoc(validContext, doc);
+					if(returnVal != 0)
+					{
+						if(returnVal > 0)
+							std::cout << std::endl << "Warning: [XMLSCHEMA] items.xml could not be validated against XSD" << std::endl;
+						else
+							std::cout << std::endl << "Warning: [XMLSCHEMA] validation generated an internal error." << std::endl;
+					}
+					xmlSchemaFreeValidCtxt(validContext);
+				}
+				xmlSchemaFree(schema);
+			}
+			xmlSchemaFreeParserCtxt(schemaParserContext);
+		}
+		xmlFreeDoc(schemaDoc);
+	}
 
 	xmlNodePtr root = xmlDocGetRootElement(doc);
 	if(xmlStrcmp(root->name,(const xmlChar*)"items") != 0)
@@ -407,7 +443,7 @@ bool Items::loadFromXml()
 				intVector = vectorAtoi(explodeString(strValue, ";"));
 				endVector = vectorAtoi(explodeString(endString, ";"));
 
-				if(intVector.size() > 0 && intVector.size() == endVector.size())
+				if(!intVector.empty() && intVector.size() == endVector.size())
 				{
 					size_t vec_size = intVector.size();
 					for(size_t i = 0; i < vec_size; i++)
@@ -500,6 +536,8 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 						it.type = ITEM_TYPE_DOOR;
 					else if(tmpStrValue == "bed")
 						it.type = ITEM_TYPE_BED;
+					else if(tmpStrValue == "rune")
+						it.type = ITEM_TYPE_RUNE;
 					else
 						std::cout << "Warning: [Items::loadFromXml] " << "Unknown type " << strValue << std::endl;
 				}
@@ -574,7 +612,7 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 					it.blockProjectile = (intValue == 1);
 			}
-			else if(tmpStrValue == "allowpickupable")
+			else if(tmpStrValue == "allowpickupable" || tmpStrValue == "pickupable")
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 					it.allowPickupable = (intValue != 0);
@@ -993,7 +1031,7 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 					it.abilities.statsPercent[STAT_MAGICPOINTS] = intValue;
 			}
-			else if(tmpStrValue == "absorbpercentall")
+			else if(tmpStrValue == "absorbpercentall" || tmpStrValue == "absorbpercentallelements")
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 				{
@@ -1239,7 +1277,7 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 				if(readXMLString(itemAttributesNode, "value", strValue))
 					it.bedPartnerDir = getDirection(strValue);
 			}
-			else if(tmpStrValue == "maletransformto")
+			else if(tmpStrValue == "maletransformto" || tmpStrValue == "malesleeper")
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 				{
@@ -1252,7 +1290,7 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 						it.transformToOnUse[PLAYERSEX_FEMALE] = intValue;
 				}
 			}
-			else if(tmpStrValue == "femaletransformto")
+			else if(tmpStrValue == "femaletransformto" || tmpStrValue == "femalesleeper")
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 					it.transformToOnUse[PLAYERSEX_FEMALE] = intValue;

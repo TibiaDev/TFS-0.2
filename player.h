@@ -166,6 +166,8 @@ class Player : public Creature, public Cylinder
 		int8_t getGuildLevel() const {return guildLevel;}
 		void setGuildLevel(GuildLevel_t newGuildLevel);
 
+		bool isGuildMate(const Player* player) const;
+
 		bool hasRequestedOutfit() const {return requestedOutfit;}
 		void hasRequestedOutfit(bool newValue) {requestedOutfit = newValue;}
 
@@ -185,6 +187,8 @@ class Player : public Creature, public Cylinder
 		bool addPartyInvitation(Party* party);
 		bool removePartyInvitation(Party* party);
 		void clearPartyInvitations();
+
+		GuildEmblems_t getGuildEmblem(const Player* player) const;
 
 		uint64_t getSpentMana() const {return manaSpent;}
 		const std::string& getGuildName() const {return guildName;}
@@ -349,6 +353,7 @@ class Player : public Creature, public Cylinder
 
 		//follow functions
 		virtual bool setFollowCreature(Creature* creature, bool fullPathSearch = false);
+		virtual void goToFollowCreature();
 
 		//follow events
 		virtual void onFollowCreature(const Creature* creature);
@@ -423,7 +428,7 @@ class Player : public Creature, public Cylinder
 		virtual void onAttackedCreatureDrainHealth(Creature* target, int32_t points);
 		virtual void onTargetCreatureGainHealth(Creature* target, int32_t points);
 		virtual bool onKilledCreature(Creature* target, bool lastHit = true);
-		virtual void onGainExperience(uint64_t gainExp);
+		virtual void onGainExperience(uint64_t gainExp, Creature* target);
 		virtual void onGainSharedExperience(uint64_t gainExp);
 		virtual void onAttackedCreatureBlockHit(Creature* target, BlockType_t blockType);
 		virtual void onBlockHit(BlockType_t blockType);
@@ -604,14 +609,6 @@ class Player : public Creature, public Cylinder
 			{if(client) client->sendCloseContainer(cid);}
 		void sendChannel(uint16_t channelId, const std::string& channelName)
 			{if(client) client->sendChannel(channelId, channelName);}
-		void sendRuleViolationsChannel(uint16_t channelId)
-			{if(client) client->sendRuleViolationsChannel(channelId);}
-		void sendRemoveReport(const std::string& name)
-			{if(client) client->sendRemoveReport(name);}
-		void sendLockRuleViolation()
-			{if(client) client->sendLockRuleViolation();}
-		void sendRuleViolationCancel(const std::string& name)
-			{if(client) client->sendRuleViolationCancel(name);}
 		void sendTutorial(uint8_t tutorialId)
 			{if(client) client->sendTutorial(tutorialId);}
 		void sendAddMarker(const Position& pos, uint8_t markType, const std::string& desc)
@@ -689,8 +686,8 @@ class Player : public Creature, public Cylinder
 		virtual int32_t __getIndexOfThing(const Thing* thing) const;
 		virtual int32_t __getFirstIndex() const;
 		virtual int32_t __getLastIndex() const;
-		virtual uint32_t __getItemTypeCount(uint16_t itemId, int32_t subType = -1, bool itemCount = true) const;
-		virtual std::map<uint32_t, uint32_t>& __getAllItemTypeCount(std::map<uint32_t, uint32_t>& countMap, bool itemCount = true) const;
+		virtual uint32_t __getItemTypeCount(uint16_t itemId, int32_t subType = -1) const;
+		virtual std::map<uint32_t, uint32_t>& __getAllItemTypeCount(std::map<uint32_t, uint32_t>& countMap) const;
 		virtual Thing* __getThing(uint32_t index) const;
 
 		virtual void __internalAddThing(Thing* thing);

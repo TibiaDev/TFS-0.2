@@ -336,7 +336,7 @@ bool Combat::isProtected(const Player* attacker, const Player* target)
 	if(attacker->getVocationId() == 0 || target->getVocationId() == 0)
 		return true;
 
-	if(attacker->getName() == "Account Manager" || target->getName() == "Account Manager")
+	if(g_config.getBoolean(ConfigManager::ACCOUNT_MANAGER) && (attacker->getName() == "Account Manager" || target->getName() == "Account Manager"))
 		return true;
 
 	return false;
@@ -1419,7 +1419,7 @@ void AreaCombat::setupExtArea(const std::list<uint32_t>& list, uint32_t rows)
 void MagicField::onStepInField(Creature* creature)
 {
 	//remove magic walls/wild growth
-	if(isBlocking())
+	if(id == ITEM_MAGICWALL || id == ITEM_WILDGROWTH || id == ITEM_MAGICWALL_SAFE || id == ITEM_WILDGROWTH_SAFE || isBlocking())
 	{
 		if(!creature->isInGhostMode())
 			 g_game.internalRemoveItem(this, 1);
@@ -1431,16 +1431,16 @@ void MagicField::onStepInField(Creature* creature)
 	if(it.condition)
 	{
 		Condition* conditionCopy = it.condition->clone();
-		uint32_t owner = getOwner();
-		if(owner != 0)
+		uint32_t ownerId = getOwner();
+		if(ownerId)
 		{
 			bool harmfulField = true;
 			if(g_game.getWorldType() == WORLD_TYPE_NO_PVP || getTile()->hasFlag(TILESTATE_NOPVPZONE))
 			{
-				Creature* creature = g_game.getCreatureByID(owner);
-				if(creature)
+				Creature* owner = g_game.getCreatureByID(ownerId);
+				if(owner)
 				{
-					if(creature->getPlayer() || (creature->isSummon() && creature->getMaster()->getPlayer()))
+					if(owner->getPlayer() || (owner->isSummon() && owner->getMaster()->getPlayer()))
 						harmfulField = false;
 				}
 			}
@@ -1448,7 +1448,7 @@ void MagicField::onStepInField(Creature* creature)
 			Player* targetPlayer = creature->getPlayer();
 			if(targetPlayer)
 			{
-				Player* attackerPlayer = g_game.getPlayerByID(owner);
+				Player* attackerPlayer = g_game.getPlayerByID(ownerId);
 				if(attackerPlayer)
 				{
 					if(Combat::isProtected(attackerPlayer, targetPlayer))
@@ -1456,8 +1456,8 @@ void MagicField::onStepInField(Creature* creature)
 				}
 			}
 
-			if(!harmfulField || (OTSYS_TIME() - createTime <= 5000) || creature->hasBeenAttacked(owner))
-				conditionCopy->setParam(CONDITIONPARAM_OWNER, owner);
+			if(!harmfulField || (OTSYS_TIME() - createTime <= 5000) || creature->hasBeenAttacked(ownerId))
+				conditionCopy->setParam(CONDITIONPARAM_OWNER, ownerId);
 		}
 
 		creature->addCondition(conditionCopy);
