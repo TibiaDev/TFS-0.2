@@ -129,15 +129,29 @@ bool Spells::registerEvent(Event* event, xmlNodePtr p)
 {
 	InstantSpell* instant = dynamic_cast<InstantSpell*>(event);
 	RuneSpell* rune = dynamic_cast<RuneSpell*>(event);
-	if(!instant && !rune)
-		return false;
 	if(instant)
+	{
+		if(instants.find(instant->getWords()) != instants.end())
+		{
+			std::cout << "[Warning - Spells::registerEvent] Duplicate registered instant spell with words: " << instant->getWords() << std::endl;
+			return false;
+		}
+
 		instants[instant->getWords()] = instant;
+		return true;
+	}
 	else if(rune)
+	{
+		if(runes.find(rune->getRuneItemId()) != runes.end())
+		{
+			std::cout << "[Warning - Spells::registerEvent] Duplicate registered rune with id: " << rune->getRuneItemId() << std::endl;
+			return false;
+		}
+
 		runes[rune->getRuneItemId()] = rune;
-	else
-		return false;
-	return true;
+		return true;
+	}
+	return false;
 }
 
 Spell* Spells::getSpellByName(const std::string& name)
@@ -1518,7 +1532,21 @@ bool InstantSpell::SummonMonster(const InstantSpell* spell, Creature* creature, 
 		}
 	}
 
-	ReturnValue ret = Commands::placeSummon(creature, param);
+	ReturnValue ret = RET_NOERROR;
+	Monster* monster = Monster::createMonster(param);
+	if(monster)
+	{
+		// Place the monster
+		creature->addSummon(monster);
+		if(!g_game.placeCreature(monster, creature->getPosition(), true))
+		{
+			creature->removeSummon(monster);
+			ret = RET_NOTENOUGHROOM;
+		}
+	}
+	else
+		ret = RET_NOTPOSSIBLE;
+
 	if(ret == RET_NOERROR)
 	{
 		spell->postCastSpell(player, (uint32_t)manaCost, (uint32_t)spell->getSoulCost());

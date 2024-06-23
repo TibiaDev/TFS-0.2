@@ -148,10 +148,6 @@ class Player : public Creature, public Cylinder
 
 		static uint64_t getExpForLevel(int32_t level)
 		{
-			/* Talaturen's formula
-			  *uint64_t x = level;
-			  *return (x > 1 ? ((50 * x / 3 - 100) * x + 850 / 3) * x - 200 : 0);
-			  */
 			level--;
 			return ((50ULL * level * level * level) - (150ULL * level * level) + (400ULL * level))/3ULL;
 		}
@@ -262,18 +258,22 @@ class Player : public Creature, public Cylinder
 
 		double getCapacity() const
 		{
-			if(!hasFlag(PlayerFlag_HasInfiniteCapacity))
-				return capacity;
+			if(hasFlag(PlayerFlag_CannotPickupItem))
+				return 0.00;
+			else if(hasFlag(PlayerFlag_HasInfiniteCapacity))
+				return 10000.00;
 			else
-				return 5000.00;
+				return capacity;
 		}
 
 		double getFreeCapacity() const
 		{
-			if(!hasFlag(PlayerFlag_HasInfiniteCapacity))
-				return std::max(0.00, capacity - inventoryWeight);
+			if(hasFlag(PlayerFlag_CannotPickupItem))
+				return 0.00;
+			else if(hasFlag(PlayerFlag_HasInfiniteCapacity))
+				return 10000.00;
 			else
-				return 5000.00;
+				return std::max(0.00, capacity - inventoryWeight);
 		}
 
 		virtual int32_t getMaxHealth() const {return getPlayerInfo(PLAYERINFO_MAXHEALTH);}
@@ -394,7 +394,7 @@ class Player : public Creature, public Cylinder
 		void addWeaponExhaust(uint32_t ticks);
 		void addCombatExhaust(uint32_t ticks);
 		void addHealExhaust(uint32_t ticks);
-		void addInFightTicks();
+		void addInFightTicks(bool pzlock = false);
 		void addDefaultRegeneration(uint32_t addTicks);
 
 		virtual uint64_t getGainedExperience(Creature* attacker) const;
@@ -661,7 +661,7 @@ class Player : public Creature, public Cylinder
 			uint32_t flags) const;
 		virtual ReturnValue __queryMaxCount(int32_t index, const Thing* thing, uint32_t count, uint32_t& maxQueryCount,
 			uint32_t flags) const;
-		virtual ReturnValue __queryRemove(const Thing* thing, uint32_t count) const;
+		virtual ReturnValue __queryRemove(const Thing* thing, uint32_t count, uint32_t flags) const;
 		virtual Cylinder* __queryDestination(int32_t& index, const Thing* thing, Item** destItem,
 			uint32_t& flags);
 
