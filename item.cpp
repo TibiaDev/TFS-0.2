@@ -848,6 +848,7 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 	if(it.showCharges)
 		s << " that has " << subType << " charge" << (subType != 1 ? "s" : "") << " left";
 
+
 	if(it.showDuration)
 	{
 		if(item && item->hasAttribute(ATTR_ITEM_DURATION))
@@ -860,7 +861,7 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 			else if(duration > 60)
 				s << "1 minute left";
 			else
-				s << " less than a minute left";
+				s << "less than a minute left";
 		}
 		else
 			s << " that is brand-new";

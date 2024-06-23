@@ -28,6 +28,9 @@
 #include "position.h"
 #include <map>
 
+#include <libxml/xmlmemory.h>
+#include <libxml/parser.h>
+
 #define SLOTP_WHEREEVER 0xFFFFFFFF
 #define SLOTP_HEAD 1
 #define	SLOTP_NECKLACE 2
@@ -205,7 +208,9 @@ class ItemType
 		bool floorChangeDown;
 		bool floorChangeNorth;
 		bool floorChangeSouth;
+		bool floorChangeSouthAlt;
 		bool floorChangeEast;
+		bool floorChangeEastAlt;
 		bool floorChangeWest;
 		bool hasHeight;
 
@@ -244,6 +249,8 @@ class Array
 		const A getElement(uint32_t id) const;
 		void addElement(A a, uint32_t pos);
 
+		void reset();
+
 		uint32_t size() {return m_size;}
 
 	private:
@@ -274,17 +281,18 @@ class Items
 		static uint32_t dwBuildNumber;
 
 		bool loadFromXml();
+		bool parseItemNode(xmlNodePtr itemNode, uint32_t id);
 
 		void addItemType(ItemType* iType);
 
-		const ItemType* getElement(uint32_t id) const {return items.getElement(id);}
-		uint32_t size() {return items.size();}
+		const ItemType* getElement(uint32_t id) const { return items->getElement(id);}
+		uint32_t size() { return items->size();}
 
 	protected:
 		typedef std::map<int32_t, int32_t> ReverseItemMap;
 		ReverseItemMap reverseItemMap;
 
-		Array<ItemType*> items;
+		Array<ItemType*>* items;
 };
 
 template<typename A>
@@ -332,4 +340,14 @@ void Array<A>::addElement(A a, uint32_t pos)
 	m_data[pos] = a;
 }
 
+template<typename A>
+void Array<A>::reset()
+{
+	for(uint32_t i = 0; i < m_size; i++)
+	{
+		delete m_data[i];
+		m_data[i] = NULL;
+ 	}
+	memset(this->m_data, 0, sizeof(A)*this->m_size);
+}
 #endif
