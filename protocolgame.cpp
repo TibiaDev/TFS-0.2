@@ -65,9 +65,12 @@ uint32_t ProtocolGame::protocolGameCount = 0;
 
 // Helping templates to add dispatcher tasks
 template<class FunctionType>
-void ProtocolGame::addGameTaskInternal(const FunctionType& func)
+void ProtocolGame::addGameTaskInternal(bool droppable, uint32_t delay, const FunctionType& func)
 {
-	g_dispatcher.addTask(createTask(func));
+	if(droppable)
+		g_dispatcher.addTask(createTask(delay, func));
+	else
+		g_dispatcher.addTask(createTask(func));
 }
 
 ProtocolGame::ProtocolGame(Connection_ptr connection) :
@@ -212,14 +215,14 @@ bool ProtocolGame::login(const std::string& name, uint32_t accnumber, const std:
 				uint64_t timeNow = time(NULL);
 				if((deletion && banTime != 0) || banTime > timeNow)
 				{
-					std::string name_;
+					std::string bannedByName;
 					if(bannedBy == 0)
-						name_ = (deletion ? "Automatic deletion" : "Automatic banishment");
+						bannedByName = (deletion ? "Automatic deletion" : "Automatic banishment");
 					else
-						IOLoginData::getInstance()->getNameByGuid(bannedBy, name_);
+						IOLoginData::getInstance()->getNameByGuid(bannedBy, bannedByName);
 
 					std::ostringstream ss;
-					ss << "Your account has been " << (deletion ? "deleted" : "banished") << " by:\n" << name << ", for the following reason:\n" << getReason(reason) << ".\nThe action taken was:\n" << getAction(action, false) << ".\nThe comment given was:\n" << comment << "\nYour " << (deletion ? "account was deleted on" : "banishment will be lifted at") << ":\n" << formatDateShort(banTime) << ".";
+					ss << "Your account has been " << (deletion ? "deleted" : "banished") << " by:\n" << bannedByName << ", for the following reason:\n" << getReason(reason) << ".\nThe action taken was:\n" << getAction(action, false) << ".\nThe comment given was:\n" << comment << "\nYour " << (deletion ? "account was deleted on" : "banishment will be lifted at") << ":\n" << formatDateShort(banTime) << ".";
 					disconnectClient(0x14, ss.str().c_str());
 					return false;
 				}
@@ -572,7 +575,7 @@ void ProtocolGame::parsePacket(NetworkMessage &msg)
 		}
 
 		if(msg.isOverrun())
-			player->kickPlayer(true);
+			disconnect();
 
 		return;
 	}
@@ -697,8 +700,12 @@ void ProtocolGame::parsePacket(NetworkMessage &msg)
 			parseHouseWindow(msg);
 			break;
 
-		case 0x8C: // throw item
+		case 0x8C:
 			parseLookAt(msg);
+			break;
+
+		case 0x8D:
+			parseLookInBattleList(msg);
 			break;
 
 		case 0x96: // say something
@@ -851,7 +858,7 @@ void ProtocolGame::parsePacket(NetworkMessage &msg)
 	}
 
 	if(msg.isOverrun())
-		player->kickPlayer(true);
+		disconnect();
 }
 
 void ProtocolGame::GetTileDescription(const Tile* tile, NetworkMessage_ptr msg)
@@ -1186,7 +1193,7 @@ void ProtocolGame::parseMove(NetworkMessage& msg, Direction dir)
 
 void ProtocolGame::parseTurn(NetworkMessage& msg, Direction dir)
 {
-	addGameTask(&Game::playerTurn, player->getID(), dir);
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerTurn, player->getID(), dir);
 }
 
 void ProtocolGame::parseRequestOutfit(NetworkMessage& msg)
@@ -1220,7 +1227,7 @@ void ProtocolGame::parseUseItem(NetworkMessage& msg)
 	uint8_t stackpos = msg.GetByte();
 	uint8_t index = msg.GetByte();
 	bool isHotkey = (pos.x == 0xFFFF && pos.y == 0 && pos.z == 0);
-	addGameTask(&Game::playerUseItem, player->getID(), pos, stackpos, index, spriteId, isHotkey);
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerUseItem, player->getID(), pos, stackpos, index, spriteId, isHotkey);
 }
 
 void ProtocolGame::parseUseItemEx(NetworkMessage& msg)
@@ -1232,7 +1239,7 @@ void ProtocolGame::parseUseItemEx(NetworkMessage& msg)
 	uint16_t toSpriteId = msg.GetU16();
 	uint8_t toStackPos = msg.GetByte();
 	bool isHotkey = (fromPos.x == 0xFFFF && fromPos.y == 0 && fromPos.z == 0);
-	addGameTask(&Game::playerUseItemEx, player->getID(), fromPos, fromStackPos, fromSpriteId, toPos, toStackPos, toSpriteId, isHotkey);
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerUseItemEx, player->getID(), fromPos, fromStackPos, fromSpriteId, toPos, toStackPos, toSpriteId, isHotkey);
 }
 
 void ProtocolGame::parseBattleWindow(NetworkMessage& msg)
@@ -1242,7 +1249,7 @@ void ProtocolGame::parseBattleWindow(NetworkMessage& msg)
 	uint8_t fromStackPos = msg.GetByte();
 	uint32_t creatureId = msg.GetU32();
 	bool isHotkey = (fromPos.x == 0xFFFF && fromPos.y == 0 && fromPos.z == 0);
-	addGameTask(&Game::playerUseBattleWindow, player->getID(), fromPos, fromStackPos, creatureId, spriteId, isHotkey);
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerUseBattleWindow, player->getID(), fromPos, fromStackPos, creatureId, spriteId, isHotkey);
 }
 
 void ProtocolGame::parseCloseContainer(NetworkMessage& msg)
@@ -1277,7 +1284,7 @@ void ProtocolGame::parseThrow(NetworkMessage& msg)
 	Position toPos = msg.GetPosition();
 	uint8_t count = msg.GetByte();
 	if(toPos != fromPos)
-		addGameTask(&Game::playerMoveThing, player->getID(), fromPos, spriteId, fromStackpos, toPos, count);
+		addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerMoveThing, player->getID(), fromPos, spriteId, fromStackpos, toPos, count);
 }
 
 void ProtocolGame::parseLookAt(NetworkMessage& msg)
@@ -1285,7 +1292,13 @@ void ProtocolGame::parseLookAt(NetworkMessage& msg)
 	Position pos = msg.GetPosition();
 	uint16_t spriteId = msg.GetSpriteId();
 	uint8_t stackpos = msg.GetByte();
-	addGameTask(&Game::playerLookAt, player->getID(), pos, spriteId, stackpos);
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerLookAt, player->getID(), pos, spriteId, stackpos);
+}
+
+void ProtocolGame::parseLookInBattleList(NetworkMessage& msg)
+{
+	uint32_t creatureId = msg.GetU32();
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerLookInBattleList, player->getID(), creatureId);
 }
 
 void ProtocolGame::parseSay(NetworkMessage& msg)
@@ -1343,14 +1356,14 @@ void ProtocolGame::parseFightModes(NetworkMessage& msg)
 void ProtocolGame::parseAttack(NetworkMessage& msg)
 {
 	uint32_t creatureId = msg.GetU32();
-	msg.GetU32();
-	msg.GetU32();
+	// msg.GetU32(); seq
 	addGameTask(&Game::playerSetAttackedCreature, player->getID(), creatureId);
 }
 
 void ProtocolGame::parseFollow(NetworkMessage& msg)
 {
 	uint32_t creatureId = msg.GetU32();
+	// msg.GetU32(); seq
 	addGameTask(&Game::playerFollowCreature, player->getID(), creatureId);
 }
 
@@ -1373,7 +1386,7 @@ void ProtocolGame::parseLookInShop(NetworkMessage &msg)
 {
 	uint16_t id = msg.GetU16();
 	uint8_t count = msg.GetByte();
-	addGameTask(&Game::playerLookInShop, player->getID(), id, count);
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerLookInShop, player->getID(), id, count);
 }
 
 void ProtocolGame::parsePlayerPurchase(NetworkMessage &msg)
@@ -1383,7 +1396,7 @@ void ProtocolGame::parsePlayerPurchase(NetworkMessage &msg)
 	uint8_t amount = msg.GetByte();
 	bool ignoreCap = msg.GetByte() == 0x01;
 	bool inBackpacks = msg.GetByte() == 0x01;
-	addGameTask(&Game::playerPurchaseItem, player->getID(), id, count, amount, ignoreCap, inBackpacks);
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerPurchaseItem, player->getID(), id, count, amount, ignoreCap, inBackpacks);
 }
 
 void ProtocolGame::parsePlayerSale(NetworkMessage &msg)
@@ -1391,7 +1404,7 @@ void ProtocolGame::parsePlayerSale(NetworkMessage &msg)
 	uint16_t id = msg.GetU16();
 	uint8_t count = msg.GetByte();
 	uint8_t amount = msg.GetByte();
-	addGameTask(&Game::playerSellItem, player->getID(), id, count, amount);
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerSellItem, player->getID(), id, count, amount);
 }
 
 void ProtocolGame::parseCloseShop(NetworkMessage &msg)
@@ -1417,7 +1430,7 @@ void ProtocolGame::parseLookInTrade(NetworkMessage& msg)
 {
 	bool counterOffer = (msg.GetByte() == 0x01);
 	uint8_t index = msg.GetByte();
-	addGameTask(&Game::playerLookInTrade, player->getID(), counterOffer, index);
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerLookInTrade, player->getID(), counterOffer, index);
 }
 
 void ProtocolGame::parseCloseTrade()
@@ -1442,7 +1455,7 @@ void ProtocolGame::parseRotateItem(NetworkMessage& msg)
 	Position pos = msg.GetPosition();
 	uint16_t spriteId = msg.GetSpriteId();
 	uint8_t stackpos = msg.GetByte();
-	addGameTask(&Game::playerRotateItem, player->getID(), pos, stackpos, spriteId);
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerRotateItem, player->getID(), pos, stackpos, spriteId);
 }
 
 void ProtocolGame::parseDebugAssert(NetworkMessage& msg)
@@ -1502,7 +1515,7 @@ void ProtocolGame::parseEnableSharedPartyExperience(NetworkMessage& msg)
 
 void ProtocolGame::parseQuestLog(NetworkMessage& msg)
 {
-	addGameTask(&Game::playerShowQuestLog, player->getID());
+	addGameTaskTimed(DISPATCHER_TASK_EXPIRATION, &Game::playerShowQuestLog, player->getID());
 }
 
 void ProtocolGame::parseQuestLine(NetworkMessage& msg)
@@ -2686,7 +2699,7 @@ void ProtocolGame::sendPingBack()
 
 void ProtocolGame::sendDistanceShoot(const Position& from, const Position& to, uint8_t type)
 {
-	if(type > NM_SHOOT_LAST || type == NM_SHOOT_UNK1 || type == NM_SHOOT_UNK2)
+	if(type > NM_SHOOT_LAST || type == NM_SHOOT_UNK1 || type == NM_SHOOT_UNK2 || type == NM_SHOOT_UNK3)
 		return;
 
 	if(!canSee(from) && !canSee(to))
@@ -3142,7 +3155,13 @@ void ProtocolGame::sendOutfitWindow()
 
 	TRACK_MESSAGE(msg);
 	msg->AddByte(0xC8);
-	AddCreatureOutfit(msg, player, player->getDefaultOutfit());
+
+	Outfit_t currentOutfit = player->getDefaultOutfit();
+	Mount* currentMount = Mounts::getInstance()->getMountByID(player->getCurrentMount());
+	if(currentMount)
+		currentOutfit.lookMount = currentMount->getClientID();
+
+	AddCreatureOutfit(msg, player, currentOutfit);
 
 	const OutfitListType& globalOutfits = Outfits::getInstance()->getOutfits(player->getSex());
 	std::list<Outfit> outfits;
@@ -3443,6 +3462,8 @@ void ProtocolGame::AddPlayerStats(NetworkMessage_ptr msg)
 
 	Condition* condition = player->getCondition(CONDITION_REGENERATION);
 	msg->AddU16(condition ? condition->getTicks() / 1000 : 0x00);
+
+	msg->AddU16(player->getOfflineTrainingTime() / 60 / 1000);
 }
 
 void ProtocolGame::AddPlayerSkills(NetworkMessage_ptr msg)

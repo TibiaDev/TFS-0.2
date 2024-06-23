@@ -90,6 +90,8 @@ Item* Item::CreateItem(const uint16_t _type, uint16_t _count /*= 0*/)
 			newItem = new Item(6132, _count);
 		else if(it.id == 6301)
 			newItem = new Item(6300, _count);
+		else if(it.id == 18528)
+			newItem = new Item(18408, _count);
 		else
 			newItem = new Item(_type, _count);
 
@@ -771,29 +773,32 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 			if(it.attack != 0)
 				s << ", Atk " << std::showpos << it.attack << std::noshowpos;
 
-			if(it.hitChance > 0)
+			if(it.hitChance != 0)
 				s << ", Hit% " << std::showpos << it.hitChance << std::noshowpos;
 
 			s << ")";
 		}
 		else if(it.weaponType != WEAPON_AMMO && it.weaponType != WEAPON_WAND)
 		{
-			s << " (";
 			bool begin = true;
 			if(it.attack != 0)
 			{
 				begin = false;
-				s << "Atk:" << it.attack;
+				s << " (Atk:" << it.attack;
 				if(it.abilities && it.abilities->elementType != COMBAT_NONE && it.abilities->elementDamage != 0)
 					s << " physical + " << it.abilities->elementDamage << " " << getCombatName(it.abilities->elementType);
 			}
 
 			if(it.defense != 0 || it.extraDefense != 0)
 			{
-				if(!begin)
+				if(begin)
+				{
+					begin = false;
+					s << " (";
+				}
+				else
 					s << ", ";
 
-				begin = false;
 				s << "Def:" << it.defense;
 				if(it.extraDefense != 0 || (item && item->getExtraDefense() != 0))
 					s << " " << std::showpos << it.extraDefense << std::noshowpos;
@@ -894,7 +899,8 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 				}
 			}
 
-			s << ")";
+			if(!begin)
+				s << ")";
 		}
 	}
 	else if(it.armor || (item && item->getArmor()) || it.showAttributes)

@@ -869,7 +869,11 @@ ShootTypeNames shootTypeNames[] =
 	{"explosion",		NM_SHOOT_EXPLOSION},
 	{"cake",		NM_SHOOT_CAKE},
 	{"tarsalarrow",		NM_SHOOT_TARSALARROW},
-	{"vortexbolt",		NM_SHOOT_VORTEXBOLT}
+	{"vortexbolt",		NM_SHOOT_VORTEXBOLT},
+	{"prismaticbolt",	NM_SHOOT_PRISMATICBOLT},
+	{"crystallinearrow",	NM_SHOOT_CRYSTALLINEARROW},
+	{"drillbolt",		NM_SHOOT_DRILLBOLT},
+	{"envenomedarrow",	NM_SHOOT_ENVENOMEDARROW}
 };
 
 CombatTypeNames combatTypeNames[] =
@@ -1211,6 +1215,21 @@ std::string ucfirst(std::string str)
 			str[i] = upchar(str[i]);
 			break;
 		}
+	}
+	return str;
+}
+
+std::string ucwords(std::string str)
+{
+	uint32_t strLength = str.length();
+	if(strLength == 0)
+		return str;
+
+	str[0] = upchar(str[0]);
+	for(uint32_t i = 1; i < strLength; ++i)
+	{
+		if(str[i - 1] == ' ')
+			str[i] = upchar(str[i]);
 	}
 	return str;
 }
