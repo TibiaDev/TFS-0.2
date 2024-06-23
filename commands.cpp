@@ -105,9 +105,7 @@ s_defcommands Commands::defined_commands[] =
 	{"/ghost", &Commands::ghost},
 	{"/clean", &Commands::clean},
 	{"/mccheck", &Commands::multiClientCheck},
-#ifdef __ENABLE_SERVER_DIAGNOSTIC__
 	{"/serverdiag", &Commands::serverDiag},
-#endif
 
 	// player commands - TODO: make them talkactions
 	{"!online", &Commands::whoIsOnline},
@@ -129,6 +127,8 @@ Commands::Commands()
 		Command* cmd = new Command;
 		cmd->loadedGroupId = false;
 		cmd->loadedAccountType = false;
+		cmd->loadedLogging = false;
+		cmd->logged = true;
 		cmd->groupId = 1;
 		cmd->f = defined_commands[i].f;
 		std::string key = defined_commands[i].name;
@@ -164,6 +164,7 @@ bool Commands::loadFromXml()
 					CommandMap::iterator it = commandMap.find(strCmd);
 					int32_t gId;
 					int32_t aTypeLevel;
+					std::string strValue;
 					if(it != commandMap.end())
 					{
 						Command* command = it->second;
@@ -192,12 +193,21 @@ bool Commands::loadFromXml()
 						}
 						else
 							std::cout << "missing acctype tag for " << strCmd << std::endl;
+
+						if(readXMLString(p, "log", strValue))
+						{
+							if(!command->loadedLogging)
+							{
+								command->logged = booleanString(strValue);
+								command->loadedLogging = true;
+							}
+							else
+								std::cout << "Duplicated log tag for " << strCmd << std::endl;
+						}
+						else
+							std::cout << "Missing log tag for " << strCmd << std::endl;
 					}
-					#ifdef __ENABLE_SERVER_DIAGNOSTIC__
 					else
-					#else
-					else if(strCmd != "/serverdiag")
-					#endif
 						std::cout << "Unknown command " << strCmd << std::endl;
 				}
 				else
@@ -210,11 +220,15 @@ bool Commands::loadFromXml()
 
 	for(CommandMap::iterator it = commandMap.begin(), end = commandMap.end(); it != end; ++it)
 	{
-		if(!it->second->loadedGroupId)
+		Command* command = it->second;
+		if(!command->loadedGroupId)
 			std::cout << "Warning: Missing group id for command " << it->first << std::endl;
 
-		if(!it->second->loadedAccountType)
+		if(!command->loadedAccountType)
 			std::cout << "Warning: Missing acctype level for command " << it->first << std::endl;
+
+		if(!command->loadedLogging)
+			std::cout << "Warning: Missing log command " << it->first << std::endl;
 
 		g_game.addCommandTag(it->first.substr(0, 1));
 	}
@@ -224,13 +238,15 @@ bool Commands::loadFromXml()
 bool Commands::reload()
 {
 	loaded = false;
-	for(CommandMap::iterator it = commandMap.begin(); it != commandMap.end(); ++it)
+	for(CommandMap::iterator it = commandMap.begin(), end = commandMap.end(); it != end; ++it)
 	{
 		Command* command = it->second;
 		command->groupId = 1;
 		command->accountType = ACCOUNT_TYPE_GOD;
 		command->loadedGroupId = false;
 		command->loadedAccountType = false;
+		command->logged = true;
+		command->loadedLogging = false;
 	}
 	g_game.resetCommandTag();
 	return loadFromXml();
@@ -274,25 +290,27 @@ bool Commands::exeCommand(Creature* creature, const std::string& cmd)
 	//execute command
 	CommandFunc cfunc = command->f;
 	(this->*cfunc)(player, str_command, str_param);
-	if(player->accessLevel)
+	if(command->logged)
 	{
 		player->sendTextMessage(MSG_STATUS_CONSOLE_RED, cmd.c_str());
-		time_t ticks = time(NULL);
-		const tm* now = localtime(&ticks);
-		char buf[32], buffer[100];
-		strftime(buf, sizeof(buf), "%d/%m/%Y %H:%M", now);
 		if(dirExists("data/logs") || createDir("data/logs"))
-			sprintf(buffer, "data/logs/%s commands.log", player->name.c_str());
+		{
+			std::ostringstream ss;
+			ss << "data/logs/" << player->getName() << " commands.log";
+
+			std::ofstream out(ss.str().c_str(), std::ios::app);
+
+			time_t ticks = time(NULL);
+			const tm* now = localtime(&ticks);
+			char buf[32];
+			strftime(buf, sizeof(buf), "%d/%m/%Y %H:%M", now);
+
+			out << "[" << buf << "] " << cmd << std::endl;
+
+			out.close();
+		}
 		else
 			std::cout << "[Warning - Commands::exeCommand] Cannot access \"data/logs\" for writing: " << strerror(errno) << "." << std::endl;
-
-		//avoid seg fault from std::ofstream just incase the directory does not exist
-		if (*buffer == '\0')
-			return true;
-
-		std::ofstream out(buffer, std::ios::app);
-		out << "[" << buf << "] " << cmd << std::endl;
-		out.close();
 	}
 	return true;
 }
@@ -415,9 +433,9 @@ void Commands::teleportHere(Player* player, const std::string& cmd, const std::s
 		Position newPosition = g_game.getClosestFreeTile(player, paramCreature, player->getPosition(), false);
 		if(newPosition.x == 0)
 		{
-			char buffer[100];
-			sprintf(buffer, "You can not teleport %s to you.", paramCreature->getName().c_str());
-			player->sendCancel(buffer);
+			std::ostringstream ss;
+			ss << "You can not teleport " << paramCreature->getName() << std::endl;
+			player->sendCancel(ss.str());
 		}
 		else if(g_game.internalTeleport(paramCreature, newPosition) == RET_NOERROR)
 		{
@@ -441,7 +459,7 @@ void Commands::createItemById(Player* player, const std::string& cmd, const std:
 	int32_t count = 1;
 	if(pos < tmp.size())
 	{
-		tmp.erase(0, pos+1);
+		tmp.erase(0, pos + 1);
 		count = std::max(1, std::min(atoi(tmp.c_str()), 100));
 	}
 
@@ -516,17 +534,17 @@ void Commands::subtractMoney(Player* player, const std::string& cmd, const std::
 {
 	int32_t count = atoi(param.c_str());
 	uint32_t money = g_game.getMoney(player);
-	if(!count)
+	if(count <= 0)
 	{
-		char info[50];
-		sprintf(info, "You have %u gold.", money);
-		player->sendCancel(info);
+		std::ostringstream ss;
+		ss << "You have " << money << " gold.";
+		player->sendCancel(ss.str());
 	}
 	else if(count > (int32_t)money)
 	{
-		char info[80];
-		sprintf(info, "You have %u gold and is not sufficient.", money);
-		player->sendCancel(info);
+		std::ostringstream ss;
+		ss << "You have " << money << " gold which is not sufficient.";
+		player->sendCancel(ss.str());
 	}
 	else if(!g_game.removeMoney(player, count))
 		player->sendCancel("Can not subtract money!");
@@ -666,9 +684,9 @@ void Commands::teleportTo(Player* player, const std::string& cmd, const std::str
 		}
 		else
 		{
-			char buffer[100];
-			sprintf(buffer, "You can not teleport to %s.", paramCreature->getName().c_str());
-			player->sendCancel(buffer);
+			std::ostringstream ss;
+			ss << "You can not teleport to " << paramCreature->getName() << ".";
+			player->sendCancel(ss.str());
 		}
 	}
 }
@@ -685,7 +703,7 @@ void Commands::getInfo(Player* player, const std::string& cmd, const std::string
 		}
 
 		Account account = IOLoginData::getInstance()->loadAccount(paramPlayer->getAccount());
-		std::stringstream info;
+		std::ostringstream info;
 		info << "name: " << paramPlayer->name << std::endl <<
 			"access: " << paramPlayer->accessLevel << std::endl <<
 			"level: " << paramPlayer->level << std::endl <<
@@ -846,7 +864,7 @@ void Commands::getHouse(Player* player, const std::string& cmd, const std::strin
 	if(!IOLoginData::getInstance()->getGuidByName(guid, name))
 		return;
 
-	std::stringstream str;
+	std::ostringstream str;
 	str << name;
 
 	House* house = Houses::getInstance().getHouseByPlayerId(guid);
@@ -860,7 +878,7 @@ void Commands::getHouse(Player* player, const std::string& cmd, const std::strin
 
 void Commands::serverInfo(Player* player, const std::string& cmd, const std::string& param)
 {
-	std::stringstream text;
+	std::ostringstream text;
 	text << "Server Info:";
 	text << "\nExp Rate: " << g_game.getExperienceStage(player->level);
 	text << "\nSkill Rate: " << g_config.getNumber(ConfigManager::RATE_SKILL);
@@ -931,8 +949,11 @@ void Commands::buyHouse(Player* player, const std::string& cmd, const std::strin
 
 void Commands::whoIsOnline(Player* player, const std::string& cmd, const std::string& param)
 {
-	std::stringstream ss;
-	ss << "Players online:" << std::endl;
+	std::ostringstream ss;
+	ss << Player::listPlayer.list.size() << " players online:" << std::endl;
+	player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, ss.str());
+
+	ss.str("");
 
 	uint32_t i = 0;
 	AutoList<Player>::listiterator it = Player::listPlayer.list.begin();
@@ -1006,9 +1027,31 @@ void Commands::changeFloor(Player* player, const std::string& cmd, const std::st
 
 void Commands::showPosition(Player* player, const std::string& cmd, const std::string& param)
 {
+	if(param != "" && player->isAccessPlayer())
+	{
+		StringVec exploded = explodeString(param, ", ", 2);
+		if(!exploded.size() || exploded.size() < 3)
+		{
+			player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Not enough params.");
+			return;
+		}
+
+		uint16_t x = atoi(exploded[0].c_str());
+		uint16_t y = atoi(exploded[1].c_str());
+		uint8_t z = atoi(exploded[2].c_str());
+
+		Position oldPosition = player->getPosition();
+		if(g_game.internalTeleport(player, Position(x, y, z)) == RET_NOERROR)
+		{
+			g_game.addMagicEffect(oldPosition, NM_ME_POFF, player->isInGhostMode());
+			g_game.addMagicEffect(player->getPosition(), NM_ME_TELEPORT, player->isInGhostMode());
+			return;
+		}
+	}
+
 	const Position& pos = player->getPosition();
 
-	std::stringstream ss;
+	std::ostringstream ss;
 	ss << "Your current position is [X: " << pos.x << " | Y: " << pos.y << " | Z: " << pos.z << "].";
 	player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, ss.str());
 }
@@ -1048,7 +1091,7 @@ void Commands::removeThing(Player* player, const std::string& cmd, const std::st
 				return;
 			}
 
-			g_game.internalRemoveItem(item, std::max(1, std::min(atoi(param.c_str()), 100)));
+			g_game.internalRemoveItem(item, std::max(1, std::min(atoi(param.c_str()), (int32_t)item->getItemCount())));
 			g_game.addMagicEffect(pos, NM_ME_MAGIC_BLOOD);
 		}
 	}
@@ -1057,7 +1100,7 @@ void Commands::removeThing(Player* player, const std::string& cmd, const std::st
 void Commands::newType(Player* player, const std::string& cmd, const std::string& param)
 {
 	int32_t lookType = atoi(param.c_str());
-	if(lookType >= 0 && lookType != 1 && lookType != 135 && lookType != 411 && lookType != 415 && lookType != 424 && (lookType <= 160 || lookType >= 192) && lookType != 439 && lookType != 440 && lookType != 468 && lookType != 469 && lookType != 474 && lookType <= 484)
+	if(lookType >= 0 && lookType != 1 && lookType != 135 && lookType != 411 && lookType != 415 && lookType != 424 && (lookType <= 160 || lookType >= 192) && lookType != 439 && lookType != 440 && lookType != 468 && lookType != 469 && lookType <= 473)
 	{
 		Outfit_t newOutfit = player->getDefaultOutfit();
 		newOutfit.lookType = lookType;
@@ -1158,12 +1201,15 @@ void Commands::joinGuild(Player* player, const std::string& cmd, const std::stri
 
 	player->sendTextMessage(MSG_INFO_DESCR, "You have joined the guild.");
 	IOGuild::getInstance()->joinGuild(player, guildId);
-	char buffer[80];
-	sprintf(buffer, "%s has joined the guild.", player->name.c_str());
 
 	ChatChannel* guildChannel = g_chat.getChannel(player, CHANNEL_GUILD);
 	if(guildChannel)
-		guildChannel->sendToAll(buffer, SPEAK_CHANNEL_R1);
+	{
+		std::ostringstream ss;
+		ss << player->getName() << " has joined the guild.";
+		guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
+	}
+	player->setGuildWarList(IOGuild::getInstance()->getWarList(player->getGuildId()));
 }
 
 void Commands::createGuild(Player* player, const std::string& cmd, const std::string& param)
@@ -1177,14 +1223,14 @@ void Commands::createGuild(Player* player, const std::string& cmd, const std::st
 	trimString((std::string&)param);
 	if(param.length() < (uint32_t)g_config.getNumber(ConfigManager::MIN_GUILD_NAME))
 	{
-		std::stringstream ss;
+		std::ostringstream ss;
 		ss << "That guild name is too short, it has to be at least " << g_config.getNumber(ConfigManager::MIN_GUILD_NAME) << " characters.";
 		player->sendCancel(ss.str());
 		return;
 	}
 	else if(param.length() > (uint32_t)g_config.getNumber(ConfigManager::MAX_GUILD_NAME))
 	{
-		std::stringstream ss;
+		std::ostringstream ss;
 		ss << "That guild name is too long, it can not be longer than " << g_config.getNumber(ConfigManager::MAX_GUILD_NAME) << " characters.";
 		player->sendCancel(ss.str());
 		return;
@@ -1205,7 +1251,7 @@ void Commands::createGuild(Player* player, const std::string& cmd, const std::st
 
 	if(player->level < (uint32_t)g_config.getNumber(ConfigManager::LEVEL_TO_CREATE_GUILD))
 	{
-		std::stringstream ss;
+		std::ostringstream ss;
 		ss << "You have to be atleast Level " << g_config.getNumber(ConfigManager::LEVEL_TO_CREATE_GUILD) << " to form a guild.";
 		player->sendCancel(ss.str());
 		return;
@@ -1217,9 +1263,9 @@ void Commands::createGuild(Player* player, const std::string& cmd, const std::st
 		return;
 	}
 
-	char buffer[80];
-	sprintf(buffer, "You have formed the guild: %s!", param.c_str());
-	player->sendTextMessage(MSG_INFO_DESCR, buffer);
+	std::ostringstream ss;
+	ss << "You have formed the guild: " << param << "!";
+	player->sendTextMessage(MSG_INFO_DESCR, ss.str());
 	player->setGuildName(param);
 
 	IOGuild::getInstance()->createGuild(player);
@@ -1281,25 +1327,25 @@ void Commands::unban(Player* player, const std::string& cmd, const std::string& 
 	{
 		if(IOBan::getInstance()->removeAccountBan(accountNumber))
 		{
-			char buffer[70];
-			sprintf(buffer, "%s has been unbanned.", name.c_str());
-			player->sendTextMessage(MSG_INFO_DESCR, buffer);
+			std::ostringstream ss;
+			ss << name << " has been unbanned.";
+			player->sendTextMessage(MSG_INFO_DESCR, ss.str());
 		}
 	}
 	else if(deleted)
 	{
 		if(IOBan::getInstance()->removeAccountDeletion(accountNumber))
 		{
-			char buffer[70];
-			sprintf(buffer, "%s has been undeleted.", name.c_str());
-			player->sendTextMessage(MSG_INFO_DESCR, buffer);
+			std::ostringstream ss;
+			ss << name << " has been undeleted.";
+			player->sendTextMessage(MSG_INFO_DESCR, ss.str());
 		}
 	}
 	else if(removedIPBan)
 	{
-		char buffer[80];
-		sprintf(buffer, "IPBan on %s has been lifted.", name.c_str());
-		player->sendTextMessage(MSG_INFO_DESCR, buffer);
+		std::ostringstream ss;
+		ss << "The IP banishment on " << name << " has been lifted.";
+		player->sendTextMessage(MSG_INFO_DESCR, ss.str());
 	}
 	else
 	{
@@ -1311,9 +1357,9 @@ void Commands::unban(Player* player, const std::string& cmd, const std::string& 
 				IOBan::getInstance()->isPlayerNamelocked(name) &&
 				IOBan::getInstance()->removePlayerNamelock(guid))
 			{
-				char buffer[85];
-				sprintf(buffer, "Namelock on %s has been lifted.", name.c_str());
-				player->sendTextMessage(MSG_INFO_DESCR, buffer);
+				std::ostringstream ss;
+				ss << "Namelock on " << name << " has been lifted.";
+				player->sendTextMessage(MSG_INFO_DESCR, ss.str());
 				removedNamelock = true;
 			}
 		}
@@ -1326,14 +1372,14 @@ void Commands::unban(Player* player, const std::string& cmd, const std::string& 
 void Commands::playerKills(Player* player, const std::string& cmd, const std::string& param)
 {
 	int32_t fragTime = g_config.getNumber(ConfigManager::FRAG_TIME);
-	if(player->redSkullTicks && fragTime > 0)
+	if(player->skullTicks && fragTime > 0)
 	{
-		int32_t frags = (int32_t)ceil(player->redSkullTicks / (double)fragTime);
-		int32_t remainingTime = (player->redSkullTicks % fragTime) / 1000;
+		int32_t frags = (int32_t)ceil(player->skullTicks / (double)fragTime);
+		int32_t remainingTime = (player->skullTicks % fragTime) / 1000;
 		int32_t hours = remainingTime / 3600;
 		int32_t minutes = (remainingTime % 3600) / 60;
 
-		std::stringstream ss;
+		std::ostringstream ss;
 		ss << "You have " << frags << " unjustified kill" << (frags > 1 ? "s" : "") << ". The amount of unjustified kills will decrease after: " << hours << " hour" << (hours != 1 ? "s" : "") << " and " << minutes << " minute" << (minutes != 1 ? "s" : "") << ".";
 		player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, ss.str());
 	}
@@ -1344,19 +1390,20 @@ void Commands::playerKills(Player* player, const std::string& cmd, const std::st
 void Commands::clean(Player* player, const std::string& cmd, const std::string& param)
 {
 	uint32_t count = g_game.getMap()->clean();
-	std::stringstream ss;
-	if(count == 1)
-		ss << "Deleted 1 item.";
+	if(count != 1)
+	{
+		std::ostringstream ss;
+		ss << "Cleaned " << count << " items from the map.";
+		g_game.broadcastMessage(ss.str(), MSG_STATUS_WARNING);
+	}
 	else
-		ss << "Deleted " << count << " items.";
-
-	player->sendCancel(ss.str());
+		g_game.broadcastMessage("Cleaned 1 item from the map.", MSG_STATUS_WARNING);
 }
 
-#ifdef __ENABLE_SERVER_DIAGNOSTIC__
 void Commands::serverDiag(Player* player, const std::string& cmd, const std::string& param)
 {
-	std::stringstream text;
+#ifdef __ENABLE_SERVER_DIAGNOSTIC__
+	std::ostringstream text;
 	text << "Server diagonostic:\n";
 	text << "World:" << "\n";
 	text << "Player: " << g_game.getPlayersOnline() << " (" << Player::playerCount << ")\n";
@@ -1383,11 +1430,11 @@ void Commands::serverDiag(Player* player, const std::string& cmd, const std::str
 	text << "libxml: " << XML_DEFAULT_VERSION << "\n";
 	text << "lua: " << LUA_VERSION << "\n";
 
-	//TODO: more information that could be useful
-
 	player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, text.str().c_str());
-}
+#else
+	player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "This command requires the server to be compiled with the __ENABLE_SERVER_DIAGNOSTIC__ flag.");
 #endif
+}
 
 void Commands::ghost(Player* player, const std::string& cmd, const std::string& param)
 {
@@ -1454,13 +1501,13 @@ void Commands::multiClientCheck(Player* player, const std::string& cmd, const st
 	std::map< uint32_t, std::vector<Player*> > ipMap;
 	for(AutoList<Player>::listiterator it = Player::listPlayer.list.begin(); it != Player::listPlayer.list.end(); ++it)
 	{
-		if (it->second->isRemoved() || it->second->getIP() == 0)
+		if(it->second->isRemoved() || it->second->getIP() == 0)
 			continue;
 
 		ipMap[it->second->getIP()].push_back(it->second);
 	}
 
-	std::stringstream ss;
+	std::ostringstream ss;
 	for(std::map< uint32_t, std::vector<Player*> >::const_iterator it = ipMap.begin(), end = ipMap.end(); it != end; ++it)
 	{
 		if(it->second.size() < 2)

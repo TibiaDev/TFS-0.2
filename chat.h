@@ -46,9 +46,9 @@ class ChatChannel
 		bool talk(Player* fromPlayer, SpeakClasses type, const std::string& text);
 		void sendToAll(std::string message, SpeakClasses type);
 
-		const std::string& getName() {return m_name;}
-		uint16_t getId() {return m_id;}
-		const UsersMap& getUsers() {return m_users;}
+		const std::string& getName() const {return m_name;}
+		uint16_t getId() const {return m_id;}
+		const UsersMap& getUsers() const {return m_users;}
 
 		virtual uint32_t getOwner() {return 0;}
 
@@ -98,7 +98,7 @@ class Chat
 		bool removeUserFromChannel(Player* player, uint16_t channelId);
 		void removeUserFromAllChannels(Player* player);
 
-		bool talkToChannel(Player* player, SpeakClasses type, const std::string& text, unsigned short channelId);
+		bool talkToChannel(Player* player, SpeakClasses type, const std::string& text, uint16_t channelId);
 
 		std::string getChannelName(Player* player, uint16_t channelId);
 		ChannelList getChannelList(Player* player);

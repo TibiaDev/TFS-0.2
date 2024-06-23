@@ -78,6 +78,7 @@ Game::Game()
 	lastStageLevel = 0;
 	lastPlayersRecord = 0;
 	useLastStageLevel = false;
+	stagesEnabled = false;
 	stateTime = OTSYS_TIME();
 	for(int16_t i = 0; i < 3; i++)
 		serverSaveMessage[i] = false;
@@ -102,8 +103,8 @@ Game::~Game()
 {
 	blacklist.clear();
 	whitelist.clear();
-	if(map)
-		delete map;
+
+	delete map;
 
 	g_scheduler.stopEvent(checkLightEvent);
 	g_scheduler.stopEvent(checkCreatureEvent);
@@ -125,7 +126,7 @@ void Game::start(ServiceManager* servicer)
 		boost::bind(&Game::checkDecay, this)));
 }
 
-GameState_t Game::getGameState()
+GameState_t Game::getGameState() const
 {
 	return gameState;
 }
@@ -302,7 +303,7 @@ void Game::refreshMap()
 		for(ItemVector::reverse_iterator it = list.rbegin(); it != list.rend(); ++it)
 		{
 			Item* item = (*it)->clone();
-			ReturnValue ret = internalAddItem(tile, item , INDEX_WHEREEVER, FLAG_NOLIMIT);
+			ReturnValue ret = internalAddItem(tile, item, INDEX_WHEREEVER, FLAG_NOLIMIT);
 			if(ret == RET_NOERROR)
 			{
 				if(item->getUniqueId() != 0)
@@ -1323,7 +1324,6 @@ ReturnValue Game::internalMoveItem(Cylinder* fromCylinder, Cylinder* toCylinder,
 		return retMaxCount;
 
 	uint32_t m = 0;
-	uint32_t n = 0;
 
 	if(item->isStackable())
 		m = std::min((uint32_t)count, maxQueryCount);
@@ -1346,12 +1346,15 @@ ReturnValue Game::internalMoveItem(Cylinder* fromCylinder, Cylinder* toCylinder,
 	//update item(s)
 	if(item->isStackable())
 	{
+		uint32_t n;
 		if(toItem && toItem->getID() == item->getID())
 		{
 			n = std::min((uint32_t)100 - toItem->getItemCount(), m);
 			toCylinder->__updateThing(toItem, toItem->getID(), toItem->getItemCount() + n);
 			updateItem = toItem;
 		}
+		else
+			n = 0;
 
 		int32_t count = m - n;
 		if(count > 0)
@@ -1471,6 +1474,10 @@ ReturnValue Game::internalAddItem(Cylinder* toCylinder, Item* item, int32_t inde
 			//fully merged with toItem, item will be destroyed
 			item->onRemoved();
 			FreeThing(item);
+
+			int32_t itemIndex = toCylinder->__getIndexOfThing(toItem);
+			if(itemIndex != -1)
+				toCylinder->postAddNotification(toItem, NULL, itemIndex);
 		}
 	}
 	else
@@ -1908,15 +1915,35 @@ Item* Game::transformItem(Item* item, uint16_t newId, int32_t newCount /*= -1*/)
 				if(curType.id == newType.id)
 					newItemId = curType.decayTo;
 
-				if(newItemId != -1)
-				{
-					item = transformItem(item, newItemId);
-					return item;
-				}
-				else
+				if(newItemId == -1)
 				{
 					internalRemoveItem(item);
 					return NULL;
+				}
+				else if(newItemId != newId)
+				{
+					//Replacing the the old item with the new while maintaining the old position
+					Item* newItem = Item::CreateItem(newItemId, 1);
+					if(newItem == NULL)
+					{
+						#ifdef __DEBUG__
+						std::cout << "Error: [Game::transformItem] Item of type " << item->getID() << " transforming into invalid type " << newItemId << std::endl;
+						#endif
+						return NULL;
+					}
+
+					cylinder->__replaceThing(itemIndex, newItem);
+					cylinder->postAddNotification(newItem, cylinder, itemIndex);
+
+					item->setParent(NULL);
+					cylinder->postRemoveNotification(item, cylinder, itemIndex, true);
+					FreeThing(item);
+					return newItem;
+				}
+				else
+				{
+					item = transformItem(item, newItemId);
+					return item;
 				}
 			}
 		}
@@ -2149,6 +2176,16 @@ bool Game::playerReceivePing(uint32_t playerId)
 		return false;
 
 	player->receivePing();
+	return true;
+}
+
+bool Game::playerReceivePingBack(uint32_t playerId)
+{
+	Player* player = getPlayerByID(playerId);
+	if(!player || player->isRemoved())
+		return false;
+
+	player->sendPingBack();
 	return true;
 }
 
@@ -2598,7 +2635,7 @@ bool Game::playerRequestTrade(uint32_t playerId, const Position& pos, uint8_t st
 
 	if(!Position::areInRange<2,2,0>(tradePartner->getPosition(), player->getPosition()))
 	{
-		std::stringstream ss;
+		std::ostringstream ss;
 		ss << tradePartner->getName() << " tells you to move closer.";
 		player->sendTextMessage(MSG_INFO_DESCR, ss.str());
 		return false;
@@ -2694,9 +2731,9 @@ bool Game::internalStartTrade(Player* player, Player* tradePartner, Item* tradeI
 
 	if(tradePartner->tradeState == TRADE_NONE)
 	{
-		char buffer[100];
-		sprintf(buffer, "%s wants to trade with you", player->getName().c_str());
-		tradePartner->sendTextMessage(MSG_INFO_DESCR, buffer);
+		std::ostringstream ss;
+		ss << player->getName() << " wants to trade with you";
+		tradePartner->sendTextMessage(MSG_INFO_DESCR, ss.str());
 		tradePartner->tradeState = TRADE_ACKNOWLEDGE;
 		tradePartner->tradePartner = player;
 	}
@@ -2814,7 +2851,7 @@ bool Game::playerAcceptTrade(uint32_t playerId)
 
 std::string Game::getTradeErrorDescription(ReturnValue ret, Item* item)
 {
-	std::stringstream ss;
+	std::ostringstream ss;
 	if(item)
 	{
 		if(ret == RET_NOTENOUGHCAPACITY)
@@ -2867,7 +2904,7 @@ bool Game::playerLookInTrade(uint32_t playerId, bool lookAtCounterOffer, int ind
 	int32_t lookDistance = std::max(std::abs(playerPosition.x - tradeItemPosition.x),
 		std::abs(playerPosition.y - tradeItemPosition.y));
 
-	std::stringstream ss;
+	std::ostringstream ss;
 	if(index == 0)
 	{
 		ss << "You see " << tradeItem->getDescription(lookDistance);
@@ -2977,7 +3014,7 @@ bool Game::internalCloseTrade(Player* player)
 bool Game::playerPurchaseItem(uint32_t playerId, uint16_t spriteId, uint8_t count, uint8_t amount,
 	bool ignoreCap/* = false*/, bool inBackpacks/* = false*/)
 {
-	if(amount == 0)
+	if(amount == 0 || amount > 100)
 		return false;
 
 	Player* player = getPlayerByID(playerId);
@@ -2995,9 +3032,11 @@ bool Game::playerPurchaseItem(uint32_t playerId, uint16_t spriteId, uint8_t coun
 	if(it.id == 0)
 		return false;
 
-	uint8_t subType = count;
-	if(it.isFluidContainer() && count < uint8_t(sizeof(reverseFluidMap) / sizeof(int8_t)))
-		subType = reverseFluidMap[count];
+	uint8_t subType;
+	if(it.isSplash() || it.isFluidContainer())
+		subType = clientFluidToServer(count);
+	else
+		subType = count;
 
 	if(!player->hasShopItemForSale(it.id, subType))
 		return false;
@@ -3009,6 +3048,9 @@ bool Game::playerPurchaseItem(uint32_t playerId, uint16_t spriteId, uint8_t coun
 bool Game::playerSellItem(uint32_t playerId, uint16_t spriteId, uint8_t count,
 	uint8_t amount)
 {
+	if(amount == 0 || amount > 100)
+		return false;
+
 	Player* player = getPlayerByID(playerId);
 	if(player == NULL || player->isRemoved())
 		return false;
@@ -3024,9 +3066,11 @@ bool Game::playerSellItem(uint32_t playerId, uint16_t spriteId, uint8_t count,
 	if(it.id == 0)
 		return false;
 
-	uint8_t subType = count;
-	if(it.isFluidContainer() && count < uint8_t(sizeof(reverseFluidMap) / sizeof(int8_t)))
-		subType = reverseFluidMap[count];
+	uint8_t subType;
+	if(it.isSplash() || it.isFluidContainer())
+		subType = clientFluidToServer(count);
+	else
+		subType = count;
 
 	merchant->onPlayerTrade(player, SHOPEVENT_SELL, onSell, it.id, subType, amount);
 	return true;
@@ -3052,16 +3096,13 @@ bool Game::playerLookInShop(uint32_t playerId, uint16_t spriteId, uint8_t count)
 	if(it.id == 0)
 		return false;
 
-	int32_t subType = count;
-	if(it.isFluidContainer())
-	{
-		if(subType == 3) // FIXME: hack
-			subType = 11;
-		else if(count < uint8_t(sizeof(reverseFluidMap) / sizeof(int8_t)))
-			subType = reverseFluidMap[count];
-	}
+	int32_t subType;
+	if(it.isFluidContainer() || it.isSplash())
+		subType = clientFluidToServer(count);
+	else
+		subType = count;
 
-	std::stringstream ss;
+	std::ostringstream ss;
 	ss << "You see " << Item::getDescription(it, 1, NULL, subType);
 	player->sendTextMessage(MSG_INFO_DESCR, ss.str());
 	return true;
@@ -3099,22 +3140,43 @@ bool Game::playerLookAt(uint32_t playerId, const Position& pos, uint16_t spriteI
 			lookDistance = lookDistance + 9 + 6;
 	}
 
-	std::stringstream ss;
-	ss << "You see " << thing->getDescription(lookDistance) << std::endl;
+	std::ostringstream ss;
+	ss << "You see " << thing->getDescription(lookDistance);
 	if(player->isAccessPlayer())
 	{
 		Item* item = thing->getItem();
 		if(item)
 		{
-			ss << "ItemID: [" << item->getID() << "].";
+			ss << std::endl << "ItemID: [" << item->getID() << "]";
 			if(item->getActionId() > 0)
-				ss << std::endl << "ActionID: [" << item->getActionId() << "].";
+				ss << ", ActionID: [" << item->getActionId() << "]";
+
 			if(item->getUniqueId() > 0)
-				ss << std::endl << "UniqueID: [" << item->getUniqueId() << "].";
-			ss << std::endl;
+				ss << ", UniqueID: [" << item->getUniqueId() << "]";
+
+			ss << ".";
+			const ItemType& it = Item::items[item->getID()];
+			if(it.transformEquipTo)
+				ss << std::endl << "TransformTo: [" << it.transformEquipTo << "] (onEquip).";
+			else if(it.transformDeEquipTo)
+				ss << std::endl << "TransformTo: [" << it.transformDeEquipTo << "] (onDeEquip).";
+
+			if(it.decayTo != -1)
+				ss << std::endl << "DecayTo: [" << it.decayTo << "].";
 		}
-		ss << "Position: [X: " << thingPos.x << "] [Y: " << thingPos.y << "] [Z: " << thingPos.z << "].";
+
+		if(const Creature* creature = thing->getCreature())
+		{
+			ss << std::endl << "Health: [" << creature->getHealth() << " / " << creature->getMaxHealth() << "]";
+			if(creature->getMaxMana() > 0)
+				ss << ", Mana: [" << creature->getMana() << " / " << creature->getMaxMana() << "]";
+
+			ss << ".";
+		}
+
+		ss << std::endl << "Position: [X: " << thingPos.x << "] [Y: " << thingPos.y << "] [Z: " << thingPos.z << "].";
 	}
+
 	player->sendTextMessage(MSG_INFO_DESCR, ss.str());
 	return true;
 }
@@ -3345,9 +3407,9 @@ bool Game::playerSay(uint32_t playerId, uint16_t channelId, SpeakClasses type,
 	uint32_t muteTime = player->isMuted();
 	if(muteTime > 0)
 	{
-		char buffer[75];
-		sprintf(buffer, "You are still muted for %u seconds.", muteTime);
-		player->sendTextMessage(MSG_STATUS_SMALL, buffer);
+		std::ostringstream ss;
+		ss << "You are still muted for " << muteTime << " seconds.";
+		player->sendTextMessage(MSG_STATUS_SMALL, ss.str());
 		return false;
 	}
 
@@ -3499,14 +3561,14 @@ bool Game::playerSpeakTo(Player* player, SpeakClasses type, const std::string& r
 		player->sendTextMessage(MSG_STATUS_SMALL, "A player with this name is not online.");
 	else
 	{
-		char buffer[80];
-		sprintf(buffer, "Message sent to %s.", toPlayer->getName().c_str());
-		player->sendTextMessage(MSG_STATUS_SMALL, buffer);
+		std::ostringstream ss;
+		ss << "Message sent to " << toPlayer->getName() << ".";
+		player->sendTextMessage(MSG_STATUS_SMALL, ss.str());
 	}
 	return true;
 }
 
-bool Game::playerTalkToChannel(Player* player, SpeakClasses type, const std::string& text, unsigned short channelId)
+bool Game::playerTalkToChannel(Player* player, SpeakClasses type, const std::string& text, uint16_t channelId)
 {
 	switch(type)
 	{
@@ -3551,10 +3613,9 @@ bool Game::playerSpeakToNpc(Player* player, const std::string& text)
 	getSpectators(list, player->getPosition());
 
 	//send to npcs only
-	Npc* tmpNpc = NULL;
 	for(it = list.begin(); it != list.end(); ++it)
 	{
-		if((tmpNpc = (*it)->getNpc()))
+		if((*it)->getNpc())
 			(*it)->onCreatureSay(player, SPEAK_PRIVATE_PN, text);
 	}
 	return true;
@@ -3965,15 +4026,21 @@ bool Game::combatChangeHealth(CombatType_t combatType, Creature* attacker, Creat
 			attackerPlayer = attacker->getPlayer();
 
 		Player* targetPlayer = target->getPlayer();
-		if(g_config.getBoolean(ConfigManager::CANNOT_ATTACK_SAME_LOOKFEET) && attackerPlayer && targetPlayer && attacker->defaultOutfit.lookFeet == target->defaultOutfit.lookFeet && combatType != COMBAT_HEALING)
-			return false;
+		if(attackerPlayer && targetPlayer)
+		{
+			if(g_config.getBoolean(ConfigManager::CANNOT_ATTACK_SAME_LOOKFEET) && attacker->defaultOutfit.lookFeet == target->defaultOutfit.lookFeet && combatType != COMBAT_HEALING)
+				return false;
+
+			if(attackerPlayer->getSkull() == SKULL_BLACK && attackerPlayer->getSkullClient(targetPlayer) == SKULL_NONE)
+				return false;
+		}
 
 		int32_t realHealthChange = target->getHealth();
 		target->changeHealth(healthChange);
 		realHealthChange = target->getHealth() - realHealthChange;
 		if(realHealthChange > 0 && !target->isInGhostMode())
 		{
-			std::stringstream ss;
+			std::ostringstream ss;
 			if(!attacker)
 				ss << ucfirst(target->getNameDescription()) << " was healed for " << realHealthChange << " hitpoint" << (realHealthChange != 1 ? "s." : ".");
 			else if(attacker == target)
@@ -3992,13 +4059,13 @@ bool Game::combatChangeHealth(CombatType_t combatType, Creature* attacker, Creat
 				{
 					if(tmpPlayer == attackerPlayer && attackerPlayer != targetPlayer)
 					{
-						std::stringstream tmpSs;
+						std::ostringstream tmpSs;
 						tmpSs << "You heal " << target->getNameDescription() << " for " << realHealthChange << " hitpoint" << (realHealthChange != 1 ? "s." : ".");
 						tmpPlayer->sendHealMessage(MSG_HEALED, tmpSs.str(), targetPos, realHealthChange, TEXTCOLOR_MAYABLUE);
 					}
 					else if(tmpPlayer == targetPlayer)
 					{
-						std::stringstream tmpSs;
+						std::ostringstream tmpSs;
 						if(!attacker)
 							tmpSs << "You were healed for " << realHealthChange << " hitpoint" << (realHealthChange != 1 ? "s." : ".");
 						else if(targetPlayer == attackerPlayer)
@@ -4028,8 +4095,14 @@ bool Game::combatChangeHealth(CombatType_t combatType, Creature* attacker, Creat
 			attackerPlayer = attacker->getPlayer();
 
 		Player* targetPlayer = target->getPlayer();
-		if(g_config.getBoolean(ConfigManager::CANNOT_ATTACK_SAME_LOOKFEET) && attackerPlayer && targetPlayer && attacker->defaultOutfit.lookFeet == target->defaultOutfit.lookFeet && combatType != COMBAT_HEALING)
-			return false;
+		if(attackerPlayer && targetPlayer)
+		{
+			if(g_config.getBoolean(ConfigManager::CANNOT_ATTACK_SAME_LOOKFEET) && attacker->defaultOutfit.lookFeet == target->defaultOutfit.lookFeet && combatType != COMBAT_HEALING)
+				return false;
+
+			if(attackerPlayer->getSkull() == SKULL_BLACK && attackerPlayer->getSkullClient(targetPlayer) == SKULL_NONE)
+				return false;
+		}
 
 		int32_t damage = -healthChange;
 		if(damage != 0)
@@ -4043,7 +4116,7 @@ bool Game::combatChangeHealth(CombatType_t combatType, Creature* attacker, Creat
 					target->drainMana(attacker, manaDamage);
 					addMagicEffect(list, targetPos, NM_ME_LOSE_ENERGY);
 
-					std::stringstream ss;
+					std::ostringstream ss;
 					if(!attacker)
 						ss << ucfirst(target->getNameDescription()) << " loses " << manaDamage << " mana.";
 					else if(attacker == target)
@@ -4062,13 +4135,13 @@ bool Game::combatChangeHealth(CombatType_t combatType, Creature* attacker, Creat
 						{
 							if(tmpPlayer == attackerPlayer && attackerPlayer != targetPlayer)
 							{
-								std::stringstream tmpSs;
+								std::ostringstream tmpSs;
 								tmpSs << ucfirst(target->getNameDescription()) << " loses " << manaDamage << " mana blocking your attack.";
 								tmpPlayer->sendDamageMessage(MSG_DAMAGE_DEALT, tmpSs.str(), targetPos, manaDamage, TEXTCOLOR_BLUE);
 							}
 							else if(tmpPlayer == targetPlayer)
 							{
-								std::stringstream tmpSs;
+								std::ostringstream tmpSs;
 								if(!attacker)
 									tmpSs << "You lose " << manaDamage << " mana.";
 								else if(targetPlayer == attackerPlayer)
@@ -4215,7 +4288,7 @@ bool Game::combatChangeHealth(CombatType_t combatType, Creature* attacker, Creat
 				{
 					addMagicEffect(list, targetPos, hitEffect);
 
-					std::stringstream ss;
+					std::ostringstream ss;
 					if(!attacker)
 						ss << ucfirst(target->getNameDescription()) << " loses " << damage << " hitpoint" << (damage != 1 ? "s." : ".");
 					else if(attacker == target)
@@ -4234,13 +4307,13 @@ bool Game::combatChangeHealth(CombatType_t combatType, Creature* attacker, Creat
 						{
 							if(tmpPlayer == attackerPlayer && attackerPlayer != targetPlayer)
 							{
-								std::stringstream tmpSs;
+								std::ostringstream tmpSs;
 								tmpSs << ucfirst(target->getNameDescription()) << " loses " << damage << " hitpoint" << (damage != 1 ? "s" : "") << " due to your attack.";
 								tmpPlayer->sendDamageMessage(MSG_DAMAGE_DEALT, tmpSs.str(), targetPos, damage, textColor);
 							}
 							else if(tmpPlayer == targetPlayer)
 							{
-								std::stringstream tmpSs;
+								std::ostringstream tmpSs;
 								if(!attacker)
 									tmpSs << "You lose " << damage << " hitpoint" << (damage != 1 ? "s." : ".");
 								else if(targetPlayer == attackerPlayer)
@@ -4265,9 +4338,19 @@ bool Game::combatChangeMana(Creature* attacker, Creature* target, int32_t manaCh
 {
 	if(manaChange > 0)
 	{
-		if(g_config.getBoolean(ConfigManager::CANNOT_ATTACK_SAME_LOOKFEET) && attacker && attacker->getPlayer() && target->getPlayer() && attacker->defaultOutfit.lookFeet == target->defaultOutfit.lookFeet)
-			return false;
+		if(attacker)
+		{
+			Player* attackerPlayer = attacker->getPlayer();
+			Player* targetPlayer = target->getPlayer();
+			if(attackerPlayer && targetPlayer)
+			{
+				if(g_config.getBoolean(ConfigManager::CANNOT_ATTACK_SAME_LOOKFEET) && attacker->defaultOutfit.lookFeet == target->defaultOutfit.lookFeet)
+					return false;
 
+				if(attackerPlayer->getSkull() == SKULL_BLACK && attackerPlayer->getSkullClient(targetPlayer) == SKULL_NONE)
+					return false;
+			}
+		}
 		target->changeMana(manaChange);
 	}
 	else
@@ -4284,8 +4367,14 @@ bool Game::combatChangeMana(Creature* attacker, Creature* target, int32_t manaCh
 			attackerPlayer = attacker->getPlayer();
 
 		Player* targetPlayer = target->getPlayer();
-		if(g_config.getBoolean(ConfigManager::CANNOT_ATTACK_SAME_LOOKFEET) && attackerPlayer && targetPlayer && attacker->defaultOutfit.lookFeet == target->defaultOutfit.lookFeet)
-			return false;
+		if(attackerPlayer && targetPlayer)
+		{
+			if(g_config.getBoolean(ConfigManager::CANNOT_ATTACK_SAME_LOOKFEET) && attacker->defaultOutfit.lookFeet == target->defaultOutfit.lookFeet)
+				return false;
+
+			if(attackerPlayer->getSkull() == SKULL_BLACK && attackerPlayer->getSkullClient(targetPlayer) == SKULL_NONE)
+				return false;
+		}
 
 		int32_t manaLoss = std::min(target->getMana(), -manaChange);
 		BlockType_t blockType = target->blockHit(attacker, COMBAT_MANADRAIN, manaLoss);
@@ -4300,7 +4389,7 @@ bool Game::combatChangeMana(Creature* attacker, Creature* target, int32_t manaCh
 		{
 			target->drainMana(attacker, manaLoss);
 
-			std::stringstream ss;
+			std::ostringstream ss;
 			if(!attacker)
 				ss << ucfirst(target->getNameDescription()) << " loses " << manaLoss << " mana.";
 			else if(attacker == target)
@@ -4319,13 +4408,13 @@ bool Game::combatChangeMana(Creature* attacker, Creature* target, int32_t manaCh
 				{
 					if(tmpPlayer == attackerPlayer && attackerPlayer != targetPlayer)
 					{
-						std::stringstream tmpSs;
+						std::ostringstream tmpSs;
 						tmpSs << ucfirst(target->getNameDescription()) << " loses " << manaLoss << " mana blocking your attack.";
 						tmpPlayer->sendDamageMessage(MSG_DAMAGE_DEALT, tmpSs.str(), targetPos, manaLoss, TEXTCOLOR_BLUE);
 					}
 					else if(tmpPlayer == targetPlayer)
 					{
-						std::stringstream tmpSs;
+						std::ostringstream tmpSs;
 						if(!attacker)
 							tmpSs << "You lose " << manaLoss << " mana.";
 						else if(targetPlayer == attackerPlayer)
@@ -4539,7 +4628,7 @@ void Game::checkLight()
 	}
 }
 
-void Game::getWorldLightInfo(LightInfo& lightInfo)
+void Game::getWorldLightInfo(LightInfo& lightInfo) const
 {
 	lightInfo.level = lightLevel;
 	lightInfo.color = 0xD7;
@@ -4629,7 +4718,7 @@ void Game::timedHighscoreUpdate()
 std::string Game::getHighscoreString(uint16_t skill)
 {
 	Highscore hs = highscoreStorage[skill];
-	std::stringstream ss;
+	std::ostringstream ss;
 	ss << "Highscore for " << getSkillName(skill) << "\n\nRank Level - Player Name";
 	for(uint32_t i = 0; i < hs.size(); ++i)
 		ss << "\n" << (i + 1) << ".  " << hs[i].second << "  -  " << hs[i].first;
@@ -5051,9 +5140,9 @@ bool Game::playerInviteToParty(uint32_t playerId, uint32_t invitedId)
 
 	if(invitedPlayer->getParty())
 	{
-		char buffer[90];
-		sprintf(buffer, "%s is already in a party.", invitedPlayer->getName().c_str());
-		player->sendTextMessage(MSG_INFO_DESCR, buffer);
+		std::ostringstream ss;
+		ss << invitedPlayer->getName() << " is already in a party.";
+		player->sendTextMessage(MSG_INFO_DESCR, ss.str());
 		return false;
 	}
 
@@ -5954,24 +6043,25 @@ bool Game::violationWindow(Player* player, std::string targetPlayerName, int32_t
 		}
 	}
 
-	char buffer[800];
 	if(g_config.getBoolean(ConfigManager::BROADCAST_BANISHMENTS))
 	{
+		std::ostringstream ss;
 		if(isNotation)
-			sprintf(buffer, "%s has received a notation by %s (%d more to ban).", targetPlayerName.c_str(), player->getName().c_str(), (3 - IOBan::getInstance()->getNotationsCount(account.id)));
+			ss << targetPlayerName << " has received a notation by " << player->getName() << " (" << (3 - IOBan::getInstance()->getNotationsCount(account.id)) << " more to ban).";
 		else
-			sprintf(buffer, "%s has taken the action \"%s\" against: %s (Warnings: %u), with reason: \"%s\", and comment: \"%s\".", player->getName().c_str(), getAction(action, IPBanishment).c_str(), targetPlayerName.c_str(), account.warnings, getReason(reason).c_str(), banComment.c_str());
+			ss << player->getName() << " has taken the action \"" << getAction(action, IPBanishment) << "\" against: " << targetPlayerName << " (Warnings: " << account.warnings << "), with reason: \"" << getReason(reason) << "\", and comment: \"" << banComment << "\".";
 
-		broadcastMessage(buffer, MSG_STATUS_WARNING);
+		broadcastMessage(ss.str(), MSG_STATUS_WARNING);
 	}
 	else
 	{
+		std::ostringstream ss;
 		if(isNotation)
-			sprintf(buffer, "You have taken the action notation against %s (%d more to ban).", targetPlayerName.c_str(), (3 - IOBan::getInstance()->getNotationsCount(account.id)));
+			ss << "You have taken the action notation against " << targetPlayerName << " (" << (3 - IOBan::getInstance()->getNotationsCount(account.id)) << " more to ban).";
 		else
-			sprintf(buffer, "You have taken the action \"%s\" against: %s (Warnings: %u), with reason: \"%s\", and comment: \"%s\".", getAction(action, IPBanishment).c_str(), targetPlayerName.c_str(), account.warnings, getReason(reason).c_str(), banComment.c_str());
+			ss << "You have taken the action \"" << getAction(action, IPBanishment) << "\" against: " << targetPlayerName << " (Warnings: " << account.warnings << "), with reason: \"" << getReason(reason) << "\", and comment: \"" << banComment << "\".";
 
-		player->sendTextMessage(MSG_STATUS_CONSOLE_RED, buffer);
+		player->sendTextMessage(MSG_STATUS_CONSOLE_RED, ss.str());
 	}
 
 	if(targetPlayer)

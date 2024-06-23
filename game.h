@@ -124,16 +124,15 @@ class Game
 		  * \param width width of the map
 		  * \param height height of the map
 		  */
-		void getMapDimensions(uint32_t& width, uint32_t& height)
+		void getMapDimensions(uint32_t& width, uint32_t& height) const
 		{
 			width = map->mapWidth;
 			height = map->mapHeight;
-			return;
 		}
 
 		void setWorldType(WorldType_t type);
 		WorldType_t getWorldType() const {return worldType;}
-		int32_t getInFightTicks() {return inFightTicks;}
+		int32_t getInFightTicks() const {return inFightTicks;}
 
 		Cylinder* internalGetCylinder(Player* player, const Position& pos);
 		Thing* internalGetThing(Player* player, const Position& pos, int32_t index,
@@ -258,9 +257,9 @@ class Game
 		uint32_t getMonstersOnline() {return (uint32_t)Monster::listMonster.list.size();}
 		uint32_t getNpcsOnline() {return (uint32_t)Npc::listNpc.list.size();}
 		uint32_t getCreaturesOnline() {return (uint32_t)listCreature.list.size();}
-		uint32_t getLastPlayersRecord() {return lastPlayersRecord;}
+		uint32_t getLastPlayersRecord() const {return lastPlayersRecord;}
 
-		void getWorldLightInfo(LightInfo& lightInfo);
+		void getWorldLightInfo(LightInfo& lightInfo) const;
 
 		void getSpectators(SpectatorVec& list, const Position& centerPos, bool checkforduplicate = false, bool multifloor = false,
 			int32_t minRangeX = 0, int32_t maxRangeX = 0,
@@ -406,6 +405,7 @@ class Game
 		bool playerOpenPrivateChannel(uint32_t playerId, std::string& receiver);
 		bool playerCloseNpcChannel(uint32_t playerId);
 		bool playerReceivePing(uint32_t playerId);
+		bool playerReceivePingBack(uint32_t playerId);
 		bool playerAutoWalk(uint32_t playerId, std::list<Direction>& listDir);
 		bool playerStopAutoWalk(uint32_t playerId);
 		bool playerUseItemEx(uint32_t playerId, const Position& fromPos, uint8_t fromStackPos,
@@ -490,7 +490,7 @@ class Game
 
 		void sendPublicSquare(Player* sender, SquareColor_t color);
 
-		GameState_t getGameState();
+		GameState_t getGameState() const;
 		void setGameState(GameState_t newState);
 		void saveGameState();
 		void loadGameState();
@@ -528,7 +528,7 @@ class Game
 		void resetCommandTag();
 
 		void startDecay(Item* item);
-		int32_t getLightHour() {return lightHour;}
+		int32_t getLightHour() const {return lightHour;}
 		bool npcSpeakToPlayer(Npc* npc, Player* player, const std::string& text, bool publicize);
 
 		bool loadExperienceStages();
@@ -548,7 +548,7 @@ class Game
 		bool playerWhisper(Player* player, const std::string& text);
 		bool playerYell(Player* player, const std::string& text);
 		bool playerSpeakTo(Player* player, SpeakClasses type, const std::string& receiver, const std::string& text);
-		bool playerTalkToChannel(Player* player, SpeakClasses type, const std::string& text, unsigned short channelId);
+		bool playerTalkToChannel(Player* player, SpeakClasses type, const std::string& text, uint16_t channelId);
 		bool playerSpeakToNpc(Player* player, const std::string& text);
 
 		Highscore highscoreStorage[9];

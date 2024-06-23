@@ -85,9 +85,9 @@ bool Raids::loadFromXml()
 					file = strValue;
 				else
 				{
-					char buffer[100];
-					sprintf(buffer, "raids/%s.xml", name.c_str());
-					file = buffer;
+					std::ostringstream ss;
+					ss << "raids/" << name << ".xml";
+					file = ss.str();
 					std::cout << "[Warning] Raids: file tag missing for raid " << name << ". Using default: " << file << std::endl;
 				}
 
@@ -157,7 +157,6 @@ bool Raids::startup()
 	started = true;
 	return started;
 }
-
 
 void Raids::checkRaids()
 {
@@ -371,6 +370,7 @@ bool RaidEvent::configureRaidEvent(xmlNodePtr eventNode)
 		m_delay = intValue;
 		if(m_delay < RAID_MINTICKS)
 			m_delay = RAID_MINTICKS;
+
 		return true;
 	}
 	else
@@ -413,10 +413,7 @@ bool AnnounceEvent::configureRaidEvent(xmlNodePtr eventNode)
 		else if(tmpStrValue == "redconsole")
 			m_messageType = MSG_STATUS_CONSOLE_RED;
 		else
-		{
-			m_messageType = MSG_EVENT_ADVANCE;
 			std::cout << "[Notice] Raid: Unknown type tag missing for announce event. Using default: " << (int32_t)m_messageType << std::endl;
-		}
 	}
 	else
 	{
@@ -490,7 +487,6 @@ bool SingleSpawnEvent::executeEvent()
 		std::cout << "[Error] Raids: Cant place monster " << m_monsterName << std::endl;
 		return false;
 	}
-
 	return true;
 }
 

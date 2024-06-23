@@ -30,7 +30,6 @@
 
 #include <sstream>
 #include <iomanip>
-#include <cmath>
 
 #if defined __GNUC__ && __GNUC__ > 3
 #include <ctype.h>
@@ -42,7 +41,7 @@ std::string transformToSHA1(std::string plainText, bool upperCase /*= false*/)
 {
 	SHA1 sha1;
 	unsigned sha1Hash[5];
-	std::stringstream hexStream;
+	std::ostringstream hexStream;
 
 	sha1.Input((const unsigned char*)plainText.c_str(), plainText.length());
 	sha1.Result(sha1Hash);
@@ -61,7 +60,7 @@ std::string transformToSHA1(std::string plainText, bool upperCase /*= false*/)
 std::string transformToMD5(std::string plainText, bool upperCase /*= false*/)
 {
 	MD5_CTX m_md5;
-	std::stringstream hexStream;
+	std::ostringstream hexStream;
 
 	MD5Init(&m_md5, 0);
 	MD5Update(&m_md5, (const unsigned char*)plainText.c_str(), plainText.length());
@@ -190,7 +189,7 @@ bool utf8ToLatin1(char* intext, std::string& outtext)
 	if(inlen == 0)
 		return false;
 
-	int32_t outlen = inlen * 2;
+	int32_t outlen = (inlen << 1) + 1;
 	unsigned char* outbuf = new uint8_t[outlen];
 	int32_t res = UTF8Toisolat1(outbuf, &outlen, (unsigned char*)intext, &inlen);
 	if(res < 0)
@@ -199,8 +198,7 @@ bool utf8ToLatin1(char* intext, std::string& outtext)
 		return false;
 	}
 
-	outbuf[outlen] = '\0';
-	outtext = (char*)outbuf;
+	outtext = std::string((char*)outbuf, outlen);
 	delete[] outbuf;
 	return true;
 }
@@ -208,30 +206,27 @@ bool utf8ToLatin1(char* intext, std::string& outtext)
 bool readXMLString(xmlNodePtr node, const char* tag, std::string& value)
 {
 	char* nodeValue = (char*)xmlGetProp(node, (xmlChar*)tag);
-	if(nodeValue)
-	{
-		if(!utf8ToLatin1(nodeValue, value))
-			value = nodeValue;
+	if(!nodeValue)
+		return false;
 
-		xmlFreeOTSERV(nodeValue);
-		return true;
-	}
-	return false;
+	if(!utf8ToLatin1(nodeValue, value))
+		value = nodeValue;
+
+	xmlFreeOTSERV(nodeValue);
+	return true;
 }
 
 bool readXMLContentString(xmlNodePtr node, std::string& value)
 {
 	char* nodeValue = (char*)xmlNodeGetContent(node);
-	if(nodeValue)
-	{
-		if(!utf8ToLatin1(nodeValue, value))
-			value = nodeValue;
+	if(!nodeValue)
+		return false;
 
-		xmlFreeOTSERV(nodeValue);
-		return true;
-	}
+	if(!utf8ToLatin1(nodeValue, value))
+		value = nodeValue;
 
-	return false;
+	xmlFreeOTSERV(nodeValue);
+	return true;
 }
 
 StringVec explodeString(const std::string& inString, const std::string& separator, int32_t limit/* = -1*/)
@@ -274,7 +269,7 @@ float box_muller(float m, float s)
 	// normal random variate generator
 	// mean m, standard deviation s
 
-	float x1, x2, w, y1;
+	float y1;
 	static float y2;
 	static int use_last = 0;
 
@@ -285,6 +280,7 @@ float box_muller(float m, float s)
 	}
 	else
 	{
+		float x1, x2, w;
 		do
 		{
 			double r1 = (((float)(rand()) / RAND_MAX));
@@ -485,9 +481,9 @@ bool checkText(std::string text, const std::string& str)
 	return asLowerCaseString(text) == str;
 }
 
-std::string generateRecoveryKey(int32_t fieldCount, int32_t fieldLenght)
+std::string generateRecoveryKey(int32_t fieldCount, int32_t fieldLength)
 {
-	std::stringstream key;
+	std::ostringstream key;
 	int32_t i(0);
 	int32_t j(0);
 	int32_t lastNumber = 99;
@@ -525,7 +521,7 @@ std::string generateRecoveryKey(int32_t fieldCount, int32_t fieldLenght)
 				}
 			}
 		}
-		while((!madeCharacter && !madeNumber) ? true : ++j && j < fieldLenght);
+		while((!madeCharacter && !madeNumber) ? true : ++j && j < fieldLength);
 		if(i < fieldCount - 1)
 			key << "-";
 		character = 0;
@@ -570,31 +566,46 @@ std::string parseParams(tokenizer::iterator &it, tokenizer::iterator end)
 std::string convertIPToString(uint32_t ip)
 {
 	char buffer[17];
-	sprintf(buffer, "%u.%u.%u.%u", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24));
+	int res = sprintf(buffer, "%u.%u.%u.%u", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24));
+	if(res < 0)
+		return "";
+
 	return buffer;
 }
 
 std::string formatDate(time_t time)
 {
-	char buffer[21];
+	char buffer[24];
 	const tm* tms = localtime(&time);
+	int res;
 	if(tms)
-		sprintf(buffer, "%02d/%02d/%04d %02d:%02d:%02d", tms->tm_mday, tms->tm_mon + 1, tms->tm_year + 1900, tms->tm_hour, tms->tm_min, tms->tm_sec);
+		res = sprintf(buffer, "%02d/%02d/%04d %02d:%02d:%02d", tms->tm_mday, tms->tm_mon + 1, tms->tm_year + 1900, tms->tm_hour, tms->tm_min, tms->tm_sec);
 	else
-		sprintf(buffer, "UNIX Time : %d", (int32_t)time);
+		res = sprintf(buffer, "UNIX Time : %d", (int32_t)time);
+
+	if(res < 0)
+		return "";
 
 	return buffer;
 }
 
 std::string formatDateShort(time_t time)
 {
-	char buffer[21];
+	char buffer[24];
 	const tm* tms = localtime(&time);
+	int res;
 	if(tms)
-		strftime(buffer, 12, "%d %b %Y", tms);
+	{
+		res = strftime(buffer, 12, "%d %b %Y", tms);
+		if(res == 0)
+			return "";
+	}
 	else
-		sprintf(buffer, "UNIX Time : %d", (int32_t)time);
-
+	{
+		res = sprintf(buffer, "UNIX Time : %d", (int32_t)time);
+		if(res < 0)
+			return "";
+	}
 	return buffer;
 }
 
@@ -858,8 +869,7 @@ ShootTypeNames shootTypeNames[] =
 	{"explosion",		NM_SHOOT_EXPLOSION},
 	{"cake",		NM_SHOOT_CAKE},
 	{"tarsalarrow",		NM_SHOOT_TARSALARROW},
-	{"vortexbolt",		NM_SHOOT_VORTEXBOLT},
-	{"football",		NM_SHOOT_FOOTBALL}
+	{"vortexbolt",		NM_SHOOT_VORTEXBOLT}
 };
 
 CombatTypeNames combatTypeNames[] =
@@ -1186,7 +1196,7 @@ uint32_t adlerChecksum(uint8_t *data, size_t length)
 template<typename _Tp>
 inline std::string toString(_Tp __p)
 {
-	std::stringstream ss;
+	std::ostringstream ss;
 	ss << __p;
 	return ss.str();
 }
@@ -1223,8 +1233,6 @@ std::string getWeaponName(WeaponType_t weaponType)
 			return "axe";
 		case WEAPON_DIST:
 			return "distance";
-		case WEAPON_SHIELD:
-			return "shield";
 		case WEAPON_WAND:
 			return "wand";
 		case WEAPON_AMMO:
@@ -1235,12 +1243,25 @@ std::string getWeaponName(WeaponType_t weaponType)
 	return "";
 }
 
-uint32_t combatTypeToIndex(CombatType_t v)
+uint32_t combatTypeToIndex(CombatType_t combatType)
 {
-	if(v == COMBAT_FIRST)
-		return 0;
-
-	return (uint32_t)(log((double)v) / log((double)2)) + 1;
+	switch(combatType)
+	{
+		case COMBAT_NONE: return 0;
+		case COMBAT_PHYSICALDAMAGE: return 1;
+		case COMBAT_ENERGYDAMAGE: return 2;
+		case COMBAT_EARTHDAMAGE: return 3;
+		case COMBAT_FIREDAMAGE: return 4;
+		case COMBAT_UNDEFINEDDAMAGE: return 5;
+		case COMBAT_LIFEDRAIN: return 6;
+		case COMBAT_MANADRAIN: return 7;
+		case COMBAT_HEALING: return 8;
+		case COMBAT_DROWNDAMAGE: return 9;
+		case COMBAT_ICEDAMAGE: return 10;
+		case COMBAT_HOLYDAMAGE: return 11;
+		case COMBAT_DEATHDAMAGE: return 12;
+		default: return 0;
+	}
 }
 
 CombatType_t indexToCombatType(uint32_t v)
@@ -1249,4 +1270,24 @@ CombatType_t indexToCombatType(uint32_t v)
 		return COMBAT_FIRST;
 
 	return (CombatType_t)(1 << (v - 1));
+}
+
+uint8_t serverFluidToClient(uint8_t serverFluid)
+{
+	uint8_t size = sizeof(clientToServerFluidMap) / sizeof(int8_t);
+	for(uint8_t i = 0; i < size; ++i)
+	{
+		if(clientToServerFluidMap[i] == serverFluid)
+			return i;
+	}
+	return 0;
+}
+
+uint8_t clientFluidToServer(uint8_t clientFluid)
+{
+	uint8_t size = sizeof(clientToServerFluidMap) / sizeof(int8_t);
+	if(clientFluid >= size)
+		return 0;
+
+	return clientToServerFluidMap[clientFluid];
 }

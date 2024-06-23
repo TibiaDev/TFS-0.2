@@ -122,6 +122,7 @@ class MonsterType
 		bool isConvinceable;
 		bool isAttackable;
 		bool isHostile;
+		bool hiddenHealth;
 
 		int32_t lightLevel;
 		int32_t lightColor;
@@ -154,7 +155,7 @@ class Monsters
 		~Monsters();
 
 		bool loadFromXml(bool reloading = false);
-		bool isLoaded(){return loaded;}
+		bool isLoaded() const {return loaded;}
 		bool reload();
 
 		MonsterType* getMonsterType(const std::string& name);

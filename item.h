@@ -354,7 +354,7 @@ class Item : virtual public Thing, public ItemAttributes
 		bool floorChangeWest() const {return items[id].floorChangeWest;}
 
 		const std::string& getName() const {return items[id].name;}
-		const std::string& getPluralName() const {return items[id].pluralName;}
+		const std::string getPluralName() const {return items[id].getPluralName();}
 		const std::string& getArticle() const {return items[id].article;}
 
 		// get the number of items
@@ -386,8 +386,9 @@ class Item : virtual public Thing, public ItemAttributes
 
 		virtual void __startDecaying();
 
-		bool isLoadedFromMap() {return loadedFromMap;}
+		bool isLoadedFromMap() const {return loadedFromMap;}
 		void setLoadedFromMap(bool value) {loadedFromMap = value;}
+		bool isCleanable() const {return(!loadedFromMap && (getUniqueId() == 0 && getActionId() == 0) && isPickupable() && canRemove()); }
 
 	protected:
 		std::string getWeightDescription(double weight) const;

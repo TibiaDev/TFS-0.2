@@ -21,8 +21,8 @@
  *
  */
 
-#ifndef _SHA1_H_
-#define _SHA1_H_
+#ifndef __SHA1__
+#define __SHA1__
 
 class SHA1
 {
@@ -66,7 +66,7 @@ class SHA1
 		/*
 		 * Performs a circular left shift operation
 		 */
-		inline unsigned CircularShift(int bits, unsigned word);
+		inline unsigned CircularShift(int bits, unsigned word) const;
 
 		unsigned H[5]; // Message digest buffers
 

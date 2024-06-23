@@ -159,6 +159,9 @@ class Creature : public AutoID, virtual public Thing
 		const Position& getMasterPos() const { return masterPos;}
 		void setMasterPos(const Position& pos, uint32_t radius = 1) { masterPos = pos; masterRadius = radius;}
 
+		bool isHealthHidden() const { return hiddenHealth; }
+		void setHiddenHealth(bool b) { hiddenHealth = b; }
+
 		virtual int32_t getThrowRange() const {return 1;}
 		virtual bool isPushable() const {return (getWalkDelay() <= 0);}
 		virtual bool isRemoved() const {return isInternalRemoved;}
@@ -353,6 +356,8 @@ class Creature : public AutoID, virtual public Thing
 
 		static bool canSee(const Position& myPos, const Position& pos, uint32_t viewRangeX, uint32_t viewRangeY);
 
+		virtual double getDamageRatio(Creature* attacker) const;
+
 	protected:
 		static const int32_t mapWalkWidth = Map::maxViewportX * 2 + 1;
 		static const int32_t mapWalkHeight = Map::maxViewportY * 2 + 1;
@@ -402,6 +407,7 @@ class Creature : public AutoID, virtual public Thing
 		uint32_t walkUpdateTicks;
 		bool hasFollowPath;
 		bool forceUpdateFollowPath;
+		bool hiddenHealth;
 
 		//combat variables
 		Creature* attackedCreature;
@@ -443,7 +449,6 @@ class Creature : public AutoID, virtual public Thing
 		virtual bool hasExtraSwing() {return false;}
 
 		virtual uint64_t getLostExperience() const { return 0; }
-		virtual double getDamageRatio(Creature* attacker) const;
 		bool getKillers(Creature** lastHitCreature, Creature** mostDamageCreature);
 		virtual void dropLoot(Container* corpse) {}
 		virtual uint16_t getLookCorpse() const { return 0; }

@@ -1,8 +1,6 @@
 //////////////////////////////////////////////////////////////////////
 // OpenTibia - an opensource roleplaying game
 //////////////////////////////////////////////////////////////////////
-// Account class
-//////////////////////////////////////////////////////////////////////
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; either version 2
@@ -18,8 +16,8 @@
 // Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //////////////////////////////////////////////////////////////////////
 
-#ifndef __OTSERV_ACCOUNT_H__
-#define __OTSERV_ACCOUNT_H__
+#ifndef __ACCOUNT__
+#define __ACCOUNT__
 
 #include <list>
 #include <string>
@@ -33,7 +31,7 @@ struct Account
 	std::string name, recoveryKey, password;
 	std::list<std::string> charList;
 
-	Account() { id = 0; }
+	Account() { id = 0; accountType = ACCOUNT_TYPE_NORMAL; }
 };
 
 #endif

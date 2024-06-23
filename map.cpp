@@ -1309,7 +1309,7 @@ uint32_t Map::clean()
 				ItemVector::iterator it = itemList->begin(), end = itemList->end();
 				while(it != end)
 				{
-					if((*it)->isPushable() && !(*it)->isLoadedFromMap())
+					if((*it)->isCleanable())
 					{
 						g_game.internalRemoveItem(*it, -1);
 						it = itemList->begin();

@@ -1,8 +1,6 @@
 //////////////////////////////////////////////////////////////////////
 // OpenTibia - an opensource roleplaying game
 //////////////////////////////////////////////////////////////////////
-//
-//////////////////////////////////////////////////////////////////////
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; either version 2
@@ -163,7 +161,7 @@ bool Actions::registerEvent(Event* event, xmlNodePtr p)
 			uniqueItemMap[id] = new Action(action);
 		}
 	}
-	else if(readXMLInteger(p, "actionid", id))
+	else if(readXMLInteger(p, "actionid", id) || readXMLInteger(p, "aid", id))
 	{
 		if(actionItemMap.find(id) != actionItemMap.end())
 		{
@@ -355,10 +353,8 @@ ReturnValue Actions::internalUseItem(Player* player, const Position& pos,
 			player->setWriteItem(NULL);
 			player->sendTextWindow(item, 0, false);
 		}
-
 		return RET_NOERROR;
 	}
-
 	return RET_CANNOTUSETHISOBJECT;
 }
 
@@ -370,14 +366,8 @@ bool Actions::useItem(Player* player, const Position& pos, uint8_t index, Item* 
 	player->setNextActionTask(NULL);
 	player->stopWalk();
 
-	int32_t itemId = 0;
-	uint32_t itemCount = 0;
-
 	if(isHotkey)
-	{
-		itemId = item->getID();
-		itemCount = player->__getItemTypeCount(itemId, -1);
-	}
+		showUseHotkeyMessage(player, item->getID(), player->__getItemTypeCount(item->getID(), -1));
 
 	ReturnValue ret = internalUseItem(player, pos, index, item, 0);
 	if(ret != RET_NOERROR)
@@ -385,9 +375,6 @@ bool Actions::useItem(Player* player, const Position& pos, uint8_t index, Item* 
 		player->sendCancelMessage(ret);
 		return false;
 	}
-
-	if(isHotkey)
-		showUseHotkeyMessage(player, itemId, itemCount);
 
 	player->setNextAction(OTSYS_TIME() + g_config.getNumber(ConfigManager::ACTIONS_DELAY_INTERVAL));
 	return true;
@@ -416,14 +403,8 @@ bool Actions::useItemEx(Player* player, const Position& fromPos, const Position&
 		return false;
 	}
 
-	int32_t itemId = 0;
-	uint32_t itemCount = 0;
-
 	if(isHotkey)
-	{
-		itemId = item->getID();
-		itemCount = player->__getItemTypeCount(itemId, -1);
-	}
+		showUseHotkeyMessage(player, item->getID(), player->__getItemTypeCount(item->getID(), -1));
 
 	int32_t fromStackPos = item->getParent()->__getIndexOfThing(item);
 	PositionEx fromPosEx(fromPos, fromStackPos);
@@ -433,11 +414,9 @@ bool Actions::useItemEx(Player* player, const Position& fromPos, const Position&
 	{
 		if(!action->hasOwnErrorHandler())
 			player->sendCancelMessage(RET_CANNOTUSETHISOBJECT);
+
 		return false;
 	}
-
-	if(isHotkey)
-		showUseHotkeyMessage(player, itemId, itemCount);
 
 	player->setNextAction(OTSYS_TIME() + g_config.getNumber(ConfigManager::EX_ACTIONS_DELAY_INTERVAL));
 	return true;
@@ -446,13 +425,13 @@ bool Actions::useItemEx(Player* player, const Position& fromPos, const Position&
 void Actions::showUseHotkeyMessage(Player* player, int32_t id, uint32_t count)
 {
 	const ItemType& it = Item::items[id];
-	std::stringstream ss;
+	std::ostringstream ss;
 	if(!it.showCount)
 		ss << "Using one of " << it.name << "...";
 	else if(count == 1)
 		ss << "Using the last " << it.name << "...";
 	else
-		ss << "Using one of " << count << " " << it.pluralName << "...";
+		ss << "Using one of " << count << " " << it.getPluralName() << "...";
 
 	player->sendTextMessage(MSG_INFO_DESCR, ss.str());
 }
@@ -590,7 +569,7 @@ bool Action::executeUse(Player* player, Item* item, const PositionEx& fromPos, c
 		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 
 		#ifdef __DEBUG_LUASCRIPTS__
-		std::stringstream desc;
+		std::ostringstream desc;
 		desc << player->getName() << " - " << item->getID() << " " << fromPos << "|" << toPos;
 		env->setEventDesc(desc.str());
 		#endif

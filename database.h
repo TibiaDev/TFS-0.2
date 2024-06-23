@@ -90,7 +90,7 @@ class _Database
 		*
 		* @return whether or not the database is connected.
 		*/
-		bool isConnected() { return m_connected; }
+		bool isConnected() const { return m_connected; }
 
 	protected:
 		/**
@@ -277,7 +277,7 @@ class _DBResult
  *
  * By using this class for your queries you lock and unlock database for threads.
 */
-class DBQuery : public std::stringstream
+class DBQuery : public std::ostringstream
 {
 	friend class _Database;
 
@@ -323,7 +323,7 @@ class DBInsert
 		/**
 		* Allows to use addRow() with stringstream as parameter.
 		*/
-		bool addRow(std::stringstream& row);
+		bool addRow(std::ostringstream& row);
 
 		/**
 		* Executes current buffer.

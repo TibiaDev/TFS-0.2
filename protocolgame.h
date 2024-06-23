@@ -61,7 +61,7 @@ class ProtocolGame : public Protocol
 
 		virtual int32_t getProtocolId() {return 0x0A;}
 
-		bool login(const std::string& name, uint32_t accnumber, const std::string& password, uint16_t operatingSystem, uint8_t gamemasterLogin);
+		bool login(const std::string& name, uint32_t accnumber, const std::string& password, uint16_t operatingSystem, uint8_t gamemasterLogin, std::list<uint8_t> openChannels);
 		bool logout(bool displayEffect, bool forced);
 
 		void setPlayer(Player* p);
@@ -69,7 +69,7 @@ class ProtocolGame : public Protocol
 	private:
 		std::list<uint32_t> knownCreatureList;
 
-		bool connect(uint32_t playerId);
+		bool connect(uint32_t playerId, std::list<uint8_t> openChannels);
 		void disconnect();
 		void disconnectClient(uint8_t error, const char* message);
 
@@ -93,6 +93,7 @@ class ProtocolGame : public Protocol
 		void parseCancelMove(NetworkMessage& msg);
 
 		void parseReceivePing(NetworkMessage& msg);
+		void parseReceivePingBack(NetworkMessage& msg);
 		void parseAutoWalk(NetworkMessage& msg);
 		void parseMove(NetworkMessage& msg, Direction dir);
 		void parseTurn(NetworkMessage& msg, Direction dir);
@@ -163,7 +164,7 @@ class ProtocolGame : public Protocol
 		void parseChannelExclude(NetworkMessage& msg);
 		void parseGetChannels(NetworkMessage& msg);
 		void parseOpenChannel(NetworkMessage& msg);
-		void parseOpenPriv(NetworkMessage& msg);
+		void parseOpenPrivateChannel(NetworkMessage& msg);
 		void parseCloseChannel(NetworkMessage& msg);
 		void parseCloseNpc(NetworkMessage& msg);
 
@@ -184,6 +185,7 @@ class ProtocolGame : public Protocol
 		void sendCreatureHealth(const Creature* creature);
 		void sendSkills();
 		void sendPing();
+		void sendPingBack();
 		void sendCreatureTurn(const Creature* creature, uint32_t stackpos);
 		void sendCreatureSay(const Creature* creature, SpeakClasses type, const std::string& text, Position* pos = NULL);
 
@@ -198,6 +200,7 @@ class ProtocolGame : public Protocol
 		void sendCreatureOutfit(const Creature* creature, const Outfit_t& outfit);
 		void sendCreatureInvisible(const Creature* creature);
 		void sendStats();
+		void sendBasicData();
 		void sendTextMessage(MessageClasses mclass, const std::string& message, Position* pos = NULL, uint32_t exp = 0, TextColor_t color = TEXTCOLOR_NONE);
 		void sendReLoginWindow();
 

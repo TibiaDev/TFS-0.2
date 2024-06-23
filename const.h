@@ -23,7 +23,7 @@
 
 #include "definitions.h"
 
-#define NETWORKMESSAGE_MAXSIZE 16384
+#define NETWORKMESSAGE_MAXSIZE 24576
 
 enum MagicEffectClasses
 {
@@ -160,8 +160,7 @@ enum ShootType_t
 	NM_SHOOT_TARSALARROW	= 0x2B, //43
 	NM_SHOOT_VORTEXBOLT	= 0x2C, //44
 	NM_SHOOT_UNK2		= 0x2D, //45 DEBUG!
-	NM_SHOOT_FOOTBALL	= 0x2E, //46
-	NM_SHOOT_LAST		= NM_SHOOT_FOOTBALL,
+	NM_SHOOT_LAST		= NM_SHOOT_UNK2,
 
 	//for internal use, dont send to client
 	NM_SHOOT_WEAPONTYPE	= 0xFE, //254
@@ -265,6 +264,28 @@ const uint8_t reverseFluidMap[] =
 	FLUID_EMPTY,
 	FLUID_LEMONADE,
 	FLUID_MILK
+};
+
+const uint8_t clientToServerFluidMap[] =
+{
+	FLUID_EMPTY,
+	FLUID_WATER,
+	FLUID_MANA,
+	FLUID_BEER,
+	FLUID_MUD,
+	FLUID_BLOOD,
+	FLUID_SLIME,
+	FLUID_RUM,
+	FLUID_LEMONADE,
+	FLUID_MILK,
+	FLUID_WINE,
+	FLUID_LIFE,
+	FLUID_URINE,
+	FLUID_OIL,
+	FLUID_FRUITJUICE,
+	FLUID_COCONUTMILK,
+	FLUID_TEA,
+	FLUID_MEAD
 };
 
 enum ClientFluidTypes_t
