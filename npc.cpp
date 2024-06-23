@@ -1733,7 +1733,7 @@ void Npc::processResponse(Player* player, NpcState* npcState, const NpcResponse*
 							g_game.removeMoney(player, moneyCount);
 						}
 						else
-							std::cout << "Error [Npc::processResponse] Not enough money: " << player->getName()  << "\tNpc: " << getName() << std::endl;
+							std::cout << "Error [Npc::processResponse] Not enough money: " << player->getName() << "\tNpc: " << getName() << std::endl;
 					}
 					break;
 				}
@@ -1829,7 +1829,7 @@ void Npc::processResponse(Player* player, NpcState* npcState, const NpcResponse*
 						for(std::list<ListItem>::const_iterator iit = response->prop.itemList.begin(); iit != response->prop.itemList.end(); ++iit)
 						{
 							bool addDelim = (n + 1 != response->prop.itemList.size());
-							scriptstream <<  "{id = " << iit->itemId
+							scriptstream << "{id = " << iit->itemId
 								<< ", subtype = " << iit->subType
 								<< ", buy=" << iit->buyPrice
 								<< ", sell=" << iit->sellPrice << "}";
@@ -2876,7 +2876,7 @@ bool NpcScriptInterface::loadNpcLib(std::string file)
 
 	if(loadFile(file) == -1)
 	{
-		std::cout << "Warning: [NpcScriptInterface::loadNpcLib] Can not load " << file  << std::endl;
+		std::cout << "Warning: [NpcScriptInterface::loadNpcLib] Can not load " << file << std::endl;
 		return false;
 	}
 
@@ -2965,7 +2965,7 @@ int32_t NpcScriptInterface::luaActionSay(lua_State* L)
 	bool publicize = true;
 
 	if(parameters >= 3)
-		publicize = (popNumber(L) == LUA_TRUE);
+		publicize = (popNumber(L) == 1);
 
 	if(parameters >= 2)
 	{
@@ -3324,7 +3324,7 @@ int32_t NpcScriptInterface::luaOpenShopWindow(lua_State* L)
 	if(lua_istable(L, -1) == 0)
 	{
 		reportError(__FUNCTION__, "item list is not a table.");
-		lua_pushnumber(L, LUA_ERROR);
+		lua_pushboolean(L, false);
 		return 1;
 	}
 
@@ -3351,7 +3351,7 @@ int32_t NpcScriptInterface::luaOpenShopWindow(lua_State* L)
 	if(!player)
 	{
 		reportErrorFunc(getErrorDesc(LUA_ERROR_PLAYER_NOT_FOUND));
-		lua_pushnumber(L, LUA_ERROR);
+		lua_pushboolean(L, false);
 		return 1;
 	}
 
@@ -3361,7 +3361,7 @@ int32_t NpcScriptInterface::luaOpenShopWindow(lua_State* L)
 	if(!npc)
 	{
 		reportErrorFunc(getErrorDesc(LUA_ERROR_CREATURE_NOT_FOUND));
-		lua_pushnumber(L, LUA_ERROR);
+		lua_pushboolean(L, false);
 		return 1;
 	}
 
@@ -3369,7 +3369,7 @@ int32_t NpcScriptInterface::luaOpenShopWindow(lua_State* L)
 	player->setShopOwner(npc, buyCallback, sellCallback);
 	player->openShopWindow(items);
 
-	lua_pushnumber(L, LUA_NO_ERROR);
+	lua_pushboolean(L, true);
 	return 1;
 }
 
@@ -3382,7 +3382,7 @@ int32_t NpcScriptInterface::luaCloseShopWindow(lua_State* L)
 	if(!player)
 	{
 		reportErrorFunc(getErrorDesc(LUA_ERROR_PLAYER_NOT_FOUND));
-		lua_pushnumber(L, LUA_ERROR);
+		lua_pushboolean(L, false);
 		return 1;
 	}
 
@@ -3390,7 +3390,7 @@ int32_t NpcScriptInterface::luaCloseShopWindow(lua_State* L)
 	if(!npc)
 	{
 		reportErrorFunc(getErrorDesc(LUA_ERROR_CREATURE_NOT_FOUND));
-		lua_pushnumber(L, LUA_ERROR);
+		lua_pushboolean(L, false);
 		return 1;
 	}
 
@@ -3414,7 +3414,7 @@ int32_t NpcScriptInterface::luaCloseShopWindow(lua_State* L)
 		npc->removeShopPlayer(player);
 	}
 
-	lua_pushnumber(L, LUA_NO_ERROR);
+	lua_pushboolean(L, true);
 	return 1;
 }
 
@@ -3448,7 +3448,7 @@ int32_t NpcScriptInterface::luaDoSellItem(lua_State* L)
 	if(!player)
 	{
 		reportErrorFunc(getErrorDesc(LUA_ERROR_PLAYER_NOT_FOUND));
-		lua_pushnumber(L, LUA_ERROR);
+		lua_pushboolean(L, false);
 		return 1;
 	}
 

@@ -99,11 +99,13 @@ void Spells::clear()
 	RunesMap::iterator it;
 	for(it = runes.begin(); it != runes.end(); ++it)
 		delete it->second;
+
 	runes.clear();
 
 	InstantsMap::iterator it2;
 	for(it2 = instants.begin(); it2 != instants.end(); ++it2)
 		delete it2->second;
+
 	instants.clear();
 }
 
@@ -126,8 +128,8 @@ Event* Spells::getEvent(const std::string& nodeName)
 		return new InstantSpell(&m_scriptInterface);
 	else if(tmpNodeName == "conjure")
 		return new ConjureSpell(&m_scriptInterface);
-	else
-		return NULL;
+
+	return NULL;
 }
 
 bool Spells::registerEvent(Event* event, xmlNodePtr p)
@@ -164,8 +166,10 @@ Spell* Spells::getSpellByName(const std::string& name)
 	Spell* spell;
 	if((spell = getRuneSpellByName(name)))
 		return spell;
+
 	if((spell = getInstantSpellByName(name)))
 		return spell;
+
 	return NULL;
 }
 
@@ -174,6 +178,7 @@ RuneSpell* Spells::getRuneSpell(uint32_t id)
 	RunesMap::iterator it = runes.find(id);
 	if(it != runes.end())
 		return it->second;
+
 	return NULL;
 }
 
@@ -373,27 +378,28 @@ bool CombatSpell::executeCastSpell(Creature* creature, const LuaVariant& var)
 		lua_pushnumber(L, cid);
 		m_scriptInterface->pushVariant(L, var);
 
-		int32_t result = m_scriptInterface->callFunction(2);
+		bool result = m_scriptInterface->callFunction(2);
 		m_scriptInterface->releaseScriptEnv();
 
-		return (result != LUA_ERROR);
+		return result;
 	}
 	else
 	{
-		std::cout << "[Error] Call stack overflow. CombatSpell::executeCastSpell" << std::endl;
+		std::cout << "[Error - ComatSpell::executeCastSpell] Call stack overflow." << std::endl;
 		return false;
 	}
 }
 
 Spell::Spell()
 {
+	spellId = 0;
 	level = 0;
 	magLevel = 0;
 	mana = 0;
 	manaPercent = 0;
 	soul = 0;
 	range = -1;
-	exhaustion = 1000;
+	cooldown = 1000;
 	needTarget = false;
 	needWeapon = false;
 	selfTarget = false;
@@ -403,6 +409,10 @@ Spell::Spell()
 	enabled = true;
 	isAggressive = true;
 	learnable = false;
+	group = SPELLGROUP_NONE;
+	groupCooldown = 1000;
+	secondaryGroup = SPELLGROUP_NONE;
+	secondaryGroupCooldown = 0;
 }
 
 bool Spell::configureSpell(xmlNodePtr p)
@@ -443,16 +453,59 @@ bool Spell::configureSpell(xmlNodePtr p)
 		{
 			if(strcasecmp(reservedList[i], name.c_str()) == 0)
 			{
-				std::cout << "Error: [Spell::configureSpell] Spell is using a reserved name: " << reservedList[i] << std::endl;
+				std::cout << "[Error - Spell::configureSpell] Spell is using a reserved name: " << reservedList[i] << std::endl;
 				return false;
 			}
 		}
 	}
 	else
 	{
-		std::cout << "Error: [Spell::configureSpell] Spell without name." << std::endl;
+		std::cout << "[Error - Spell::configureSpell] Spell without name." << std::endl;
 		return false;
 	}
+
+	if(readXMLInteger(p, "spellid", intValue) || readXMLInteger(p, "icon", intValue))
+		spellId = intValue;
+
+	if(readXMLString(p, "group", strValue))
+	{
+		std::string tmpStr = asLowerCaseString(strValue);
+		if(tmpStr == "none" || tmpStr == "0")
+			group = SPELLGROUP_NONE;
+		else if(tmpStr == "attack" || tmpStr == "1")
+			group = SPELLGROUP_ATTACK;
+		else if(tmpStr == "healing" || tmpStr == "2")
+			group = SPELLGROUP_HEALING;
+		else if(tmpStr == "support" || tmpStr == "3")
+			group = SPELLGROUP_SUPPORT;
+		else if(tmpStr == "special" || tmpStr == "4")
+			group = SPELLGROUP_SPECIAL;
+		else
+			std::cout << "[Warning - Spell::configureSpell] Unknown group: " << strValue << std::endl;
+	}
+
+	if(readXMLInteger(p, "groupcooldown", intValue))
+	 	groupCooldown = intValue;
+
+	if(readXMLString(p, "secondarygroup", strValue))
+	{
+		std::string tmpStr = asLowerCaseString(strValue);
+		if(tmpStr == "none")
+			secondaryGroup = SPELLGROUP_NONE;
+		else if(tmpStr == "attack")
+			secondaryGroup = SPELLGROUP_ATTACK;
+		else if(tmpStr == "healing")
+			secondaryGroup = SPELLGROUP_HEALING;
+		else if(tmpStr == "support")
+			secondaryGroup = SPELLGROUP_SUPPORT;
+		else if(tmpStr == "special")
+			secondaryGroup = SPELLGROUP_SPECIAL;
+		else
+			std::cout << "[Warning - Spell::configureSpell] Unknown secondarygroup: " << strValue << std::endl;
+	}
+
+	if(readXMLInteger(p, "secondarygroupcooldown", intValue))
+	 	secondaryGroupCooldown = intValue;
 
 	if(readXMLInteger(p, "lvl", intValue))
 	 	level = intValue;
@@ -469,8 +522,8 @@ bool Spell::configureSpell(xmlNodePtr p)
 	if(readXMLInteger(p, "soul", intValue))
 	 	soul = intValue;
 
-	if(readXMLInteger(p, "exhaustion", intValue))
-		exhaustion = intValue;
+	if(readXMLInteger(p, "exhaustion", intValue) || readXMLInteger(p, "cooldown", intValue))
+		cooldown = intValue;
 
 	if(readXMLInteger(p, "prem", intValue))
 		premium = (intValue == 1);
@@ -515,8 +568,63 @@ bool Spell::configureSpell(xmlNodePtr p)
 			std::cout << "[Warning - Spell::configureSpell] Blocktype \"" <<strValue << "\" does not exist." << std::endl;
 	}
 
-	if(readXMLInteger(p, "aggressive", intValue))
-		isAggressive = (intValue == 1);
+	if(readXMLString(p, "aggressive", strValue))
+		isAggressive = (strValue == "1" || asLowerCaseString(strValue) == "yes");
+
+	if(readXMLString(p, "groups", strValue))
+	{
+		std::vector<std::string> split = explodeString(strValue, ",", 2);
+		std::vector<std::string>::iterator it = split.begin();
+		if(it != split.end())
+		{
+			std::string tmpStr = asLowerCaseString(*it);
+			if(tmpStr == "none" || tmpStr == "0")
+				group = SPELLGROUP_NONE;
+			else if(tmpStr == "attack" || tmpStr == "1")
+				group = SPELLGROUP_ATTACK;
+			else if(tmpStr == "healing" || tmpStr == "2")
+				group = SPELLGROUP_HEALING;
+			else if(tmpStr == "support" || tmpStr == "3")
+				group = SPELLGROUP_SUPPORT;
+			else if(tmpStr == "special" || tmpStr == "4")
+				group = SPELLGROUP_SPECIAL;
+			else
+				std::cout << "[Warning - Spell::configureSpell] Unknown groups (primary): " << strValue << std::endl;
+		}
+		++it;
+
+		if(it != split.end())
+		{
+			std::string tmpStr = asLowerCaseString(*it);
+			if(tmpStr == "none" || tmpStr == "0")
+				secondaryGroup = SPELLGROUP_NONE;
+			else if(tmpStr == "attack" || tmpStr == "1")
+				secondaryGroup = SPELLGROUP_ATTACK;
+			else if(tmpStr == "healing" || tmpStr == "2")
+				secondaryGroup = SPELLGROUP_HEALING;
+			else if(tmpStr == "support" || tmpStr == "3")
+				secondaryGroup = SPELLGROUP_SUPPORT;
+			else if(tmpStr == "special" || tmpStr == "4")
+				secondaryGroup = SPELLGROUP_SPECIAL;
+			else
+				std::cout << "[Warning - Spell::configureSpell] Unknown groups (secondary): " << strValue << std::endl;
+		}
+	}
+
+	if(readXMLString(p, "groupexhaustions", strValue))
+	{
+		std::vector<std::string> split = explodeString(strValue, ",", 2);
+		std::vector<std::string>::iterator it = split.begin();
+		if(it != split.end())
+			groupCooldown = atoi((*it).c_str());
+
+		++it;
+		if(it != split.end())
+			secondaryGroupCooldown = atoi((*it).c_str());
+	}
+
+	if(group == SPELLGROUP_NONE)
+		group = (isAggressive ? SPELLGROUP_ATTACK : SPELLGROUP_HEALING);
 
 	xmlNodePtr vocationNode = p->children;
 	while(vocationNode)
@@ -534,7 +642,7 @@ bool Spell::configureSpell(xmlNodePtr p)
 						vocSpellMap[promotedVocation] = true;
 				}
 				else
-					std::cout << "Warning: [Spell::configureSpell] Wrong vocation name: " << strValue << std::endl;
+					std::cout << "[Warning - Spell::configureSpell] Wrong vocation name: " << strValue << std::endl;
 			}
 		}
 		vocationNode = vocationNode->next;
@@ -547,121 +655,99 @@ bool Spell::playerSpellCheck(Player* player, bool ignoreExhaust/* = false*/) con
 	if(player->hasFlag(PlayerFlag_CannotUseSpells))
 		return false;
 
-	if(!player->hasFlag(PlayerFlag_IgnoreSpellCheck))
+	if(player->hasFlag(PlayerFlag_IgnoreSpellCheck))
+		return true;
+
+	if(!enabled)
+		return false;
+
+	bool exhaust = false;
+	if(isAggressive && !player->hasFlag(PlayerFlag_IgnoreProtectionZone) && player->getZone() == ZONE_PROTECTION)
 	{
-		if(!enabled)
-			return false;
+		player->sendCancelMessage(RET_ACTIONNOTPERMITTEDINPROTECTIONZONE);
+		return false;
+	}
 
-		bool exhaust = false;
-		if(isAggressive)
+	if(!exhaust && (player->hasCondition(CONDITION_SPELLGROUPCOOLDOWN, group) || player->hasCondition(CONDITION_SPELLCOOLDOWN, spellId)))
+		exhaust = true;
+
+	if(exhaust)
+	{
+		player->sendCancelMessage(RET_YOUAREEXHAUSTED);
+
+		if(isInstant())
+			g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
+
+		return false;
+	}
+
+	if((int32_t)player->getLevel() < level)
+	{
+		player->sendCancelMessage(RET_NOTENOUGHLEVEL);
+		g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
+		return false;
+	}
+
+	if((int32_t)player->getMagicLevel() < magLevel)
+	{
+		player->sendCancelMessage(RET_NOTENOUGHMAGICLEVEL);
+		g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
+		return false;
+	}
+
+	if(player->getMana() < getManaCost(player) && !player->hasFlag(PlayerFlag_HasInfiniteMana))
+	{
+		player->sendCancelMessage(RET_NOTENOUGHMANA);
+		g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
+		return false;
+	}
+
+	if(player->getPlayerInfo(PLAYERINFO_SOUL) < soul && !player->hasFlag(PlayerFlag_HasInfiniteSoul))
+	{
+		player->sendCancelMessage(RET_NOTENOUGHSOUL);
+		g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
+		return false;
+	}
+
+	if(isInstant() && isLearnable())
+	{
+		if(!player->hasLearnedInstantSpell(getName()))
 		{
-			if(!player->hasFlag(PlayerFlag_IgnoreProtectionZone) && player->getZone() == ZONE_PROTECTION)
+			player->sendCancelMessage(RET_YOUNEEDTOLEARNTHISSPELL);
+			g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
+			return false;
+		}
+	}
+	else if(!vocSpellMap.empty() && vocSpellMap.find(player->getVocationId()) == vocSpellMap.end())
+	{
+		player->sendCancelMessage(RET_YOURVOCATIONCANNOTUSETHISSPELL);
+		g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
+		return false;
+	}
+
+	if(needWeapon)
+	{
+		switch(player->getWeaponType())
+		{
+			case WEAPON_SWORD:
+			case WEAPON_CLUB:
+			case WEAPON_AXE:
+				break;
+
+			default:
 			{
-				player->sendCancelMessage(RET_ACTIONNOTPERMITTEDINPROTECTIONZONE);
+				player->sendCancelMessage(RET_YOUNEEDAWEAPONTOUSETHISSPELL);
+				g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
 				return false;
 			}
-
-			if(!ignoreExhaust)
-			{
-				if(player->hasCondition(CONDITION_EXHAUST_COMBAT) || (OTSYS_TIME() - player->getLastCombatExhaust()) <= g_config.getNumber(ConfigManager::ALTERNATIVE_EXHAUST))
-					exhaust = true;
-				else
-					player->setLastCombatExhaust(OTSYS_TIME());
-			}
 		}
-		else if(!ignoreExhaust)
-		{
-			if(player->hasCondition(CONDITION_EXHAUST_HEAL) || (OTSYS_TIME() - player->getLastHealExhaust()) <= g_config.getNumber(ConfigManager::ALTERNATIVE_EXHAUST))
-				exhaust = true;
-			else
-				player->setLastHealExhaust(OTSYS_TIME());
-		}
+	}
 
-		if(exhaust)
-		{
-			player->sendCancelMessage(RET_YOUAREEXHAUSTED);
-
-			if(isInstant())
-				g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
-
-			return false;
-		}
-
-		if((int32_t)player->getLevel() < level)
-		{
-			player->sendCancelMessage(RET_NOTENOUGHLEVEL);
-			g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
-			return false;
-		}
-
-		if((int32_t)player->getMagicLevel() < magLevel)
-		{
-			player->sendCancelMessage(RET_NOTENOUGHMAGICLEVEL);
-			g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
-			return false;
-		}
-
-		if(player->getMana() < getManaCost(player) && !player->hasFlag(PlayerFlag_HasInfiniteMana))
-		{
-			player->sendCancelMessage(RET_NOTENOUGHMANA);
-			g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
-			return false;
-		}
-
-		if(player->getPlayerInfo(PLAYERINFO_SOUL) < soul && !player->hasFlag(PlayerFlag_HasInfiniteSoul))
-		{
-			player->sendCancelMessage(RET_NOTENOUGHSOUL);
-			g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
-			return false;
-		}
-
-		if(isInstant() && isLearnable())
-		{
-			if(!player->hasLearnedInstantSpell(getName()))
-			{
-				player->sendCancelMessage(RET_YOUNEEDTOLEARNTHISSPELL);
-				g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
-				return false;
-			}
-		}
-		else
-		{
-			if(!vocSpellMap.empty())
-			{
-				if(vocSpellMap.find(player->getVocationId()) == vocSpellMap.end())
-				{
-					player->sendCancelMessage(RET_YOURVOCATIONCANNOTUSETHISSPELL);
-					g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
-					return false;
-				}
-			}
-		}
-
-		if(needWeapon)
-		{
-			switch(player->getWeaponType())
-			{
-				case WEAPON_SWORD:
-				case WEAPON_CLUB:
-				case WEAPON_AXE:
-					break;
-
-				default:
-				{
-					player->sendCancelMessage(RET_YOUNEEDAWEAPONTOUSETHISSPELL);
-					g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
-					return false;
-					break;
-				}
-			}
-		}
-
-		if(isPremium() && !player->isPremium())
-		{
-			player->sendCancelMessage(RET_YOUNEEDPREMIUMACCOUNT);
-			g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
-			return false;
-		}
+	if(isPremium() && !player->isPremium())
+	{
+		player->sendCancelMessage(RET_YOUNEEDPREMIUMACCOUNT);
+		g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
+		return false;
 	}
 	return true;
 }
@@ -807,12 +893,27 @@ void Spell::postCastSpell(Player* player, bool finishedCast /*= true*/, bool pay
 	{
 		if(!player->hasFlag(PlayerFlag_HasNoExhaustion))
 		{
-			if(exhaustion > 0)
+			if(cooldown > 0)
 			{
-				if(isAggressive)
-					player->addCombatExhaust(exhaustion);
-				else
-					player->addHealExhaust(exhaustion);
+				Condition* condition = Condition::createCondition(CONDITIONID_DEFAULT, CONDITION_SPELLCOOLDOWN, cooldown, 0, false, spellId);
+				player->addCondition(condition);
+				player->sendSpellCooldown(spellId, cooldown);
+			}
+
+			if(groupCooldown > 0)
+			{
+				Condition* condition = Condition::createCondition(CONDITIONID_DEFAULT, CONDITION_SPELLGROUPCOOLDOWN, groupCooldown, 0, false, group);
+				player->addCondition(condition);
+				if(group != 0)
+					player->sendSpellGroupCooldown(group, groupCooldown);
+			}
+
+			if(secondaryGroupCooldown > 0)
+			{
+				Condition* condition = Condition::createCondition(CONDITIONID_DEFAULT, CONDITION_SPELLGROUPCOOLDOWN, secondaryGroupCooldown, 0, false, secondaryGroup);
+				player->addCondition(condition);
+				if(secondaryGroup != 0)
+					player->sendSpellGroupCooldown(secondaryGroup, secondaryGroupCooldown);
 			}
 		}
 
@@ -1166,7 +1267,7 @@ bool InstantSpell::internalCastSpell(Creature* creature, const LuaVariant& var)
 	bool result = false;
 
 	if(m_scripted)
-		result =  executeCastSpell(creature, var);
+		result = executeCastSpell(creature, var);
 	else
 	{
 		if(function)
@@ -1200,14 +1301,14 @@ bool InstantSpell::executeCastSpell(Creature* creature, const LuaVariant& var)
 		lua_pushnumber(L, cid);
 		m_scriptInterface->pushVariant(L, var);
 
-		int32_t result = m_scriptInterface->callFunction(2);
+		bool result = m_scriptInterface->callFunction(2);
 		m_scriptInterface->releaseScriptEnv();
 
-		return (result != LUA_ERROR);
+		return result;
 	}
 	else
 	{
-		std::cout << "[Error] Call stack overflow. InstantSpell::executeCastSpell" << std::endl;
+		std::cout << "[Error - InstantSpell::executeCastSpell] Call stack overflow." << std::endl;
 		return false;
 	}
 }
@@ -1886,7 +1987,7 @@ bool ConjureSpell::playerCastInstant(Player* player, const std::string& param)
 		LuaVariant var;
 		var.type = VARIANT_STRING;
 		var.text = param;
-		result =  executeCastSpell(player, var);
+		result = executeCastSpell(player, var);
 	}
 	else
 	{
@@ -1929,7 +2030,7 @@ bool RuneSpell::configureEvent(xmlNodePtr p)
 		runeId = intValue;
 	else
 	{
-		std::cout << "Error: [RuneSpell::configureSpell] Rune spell without id." << std::endl;
+		std::cout << "[Error - RuneSpell::configureSpell] Rune spell without id." << std::endl;
 		return false;
 	}
 
@@ -2176,14 +2277,14 @@ bool RuneSpell::executeCastSpell(Creature* creature, const LuaVariant& var)
 		lua_pushnumber(L, cid);
 		m_scriptInterface->pushVariant(L, var);
 
-		int32_t result = m_scriptInterface->callFunction(2);
+		bool result = m_scriptInterface->callFunction(2);
 		m_scriptInterface->releaseScriptEnv();
 
-		return (result != LUA_ERROR);
+		return result;
 	}
 	else
 	{
-		std::cout << "[Error] Call stack overflow. RuneSpell::executeCastSpell" << std::endl;
+		std::cout << "[Error - RuneSpell::executeCastSpell] Call stack overflow." << std::endl;
 		return false;
 	}
 }

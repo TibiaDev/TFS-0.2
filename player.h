@@ -132,6 +132,14 @@ class Player : public Creature, public Cylinder
 		virtual const std::string& getNameDescription() const {return name;}
 		virtual std::string getDescription(int32_t lookDistance) const;
 
+		uint8_t getCurrentMount() const;
+		void setCurrentMount(uint8_t mountId);
+		bool isMounted() const { return defaultOutfit.lookMount != 0; }
+		bool toggleMount(bool mount);
+		bool tameMount(uint8_t mountId);
+		bool untameMount(uint8_t mountId);
+		void dismount();
+
 		void setDepotChange(bool b) {depotChange = b;}
 
 		void manageAccount(const std::string &text);
@@ -153,12 +161,6 @@ class Player : public Creature, public Cylinder
 			level--;
 			return ((50ULL * level * level * level) - (150ULL * level * level) + (400ULL * level))/3ULL;
 		}
-
-		int64_t getLastCombatExhaust() const {return lastCombatExhaust;}
-		void setLastCombatExhaust(int64_t lastExhaust) {lastCombatExhaust = lastExhaust;}
-
-		int64_t getLastHealExhaust() const {return lastHealExhaust;}
-		void setLastHealExhaust(int64_t lastExhaust) {lastHealExhaust = lastExhaust;}
 
 		uint32_t getGuildId() const {return guildId;}
 		void setGuildId(uint32_t newGuildId) {guildId = newGuildId;}
@@ -502,6 +504,11 @@ class Player : public Creature, public Cylinder
 		void sendCreatureShield(const Creature* creature)
 			{if(client) client->sendCreatureShield(creature);}
 
+		void sendSpellCooldown(uint8_t spellId, uint32_t time)
+			{if(client) client->sendSpellCooldown(spellId, time);}
+		void sendSpellGroupCooldown(SpellGroup_t groupId, uint32_t time)
+			{if(client) client->sendSpellGroupCooldown(groupId, time);}
+
 		//container
 		void sendAddContainerItem(const Container* container, const Item* item);
 		void sendUpdateContainerItem(const Container* container, uint8_t slot, const Item* oldItem, const Item* newItem);
@@ -565,7 +572,6 @@ class Player : public Creature, public Cylinder
 		void sendDistanceShoot(const Position& from, const Position& to, unsigned char type) const
 			{if(client) client->sendDistanceShoot(from, to, type);}
 		void sendHouseWindow(House* house, uint32_t listId) const;
-		void sendOutfitWindow() const;
 		void sendCreatePrivateChannel(uint16_t channelId, const std::string& channelName)
 			{if(client) client->sendCreatePrivateChannel(channelId, channelName);}
 		void sendClosePrivate(uint16_t channelId) const
@@ -585,8 +591,8 @@ class Player : public Creature, public Cylinder
 			{if(client) client->sendTextWindow(windowTextId, item, maxlen, canWrite);}
 		void sendTextWindow(uint32_t itemId, const std::string& text) const
 			{if(client) client->sendTextWindow(windowTextId, itemId, text);}
-		void sendToChannel(Creature* creature, SpeakClasses type, const std::string& text, uint16_t channelId, uint32_t time = 0) const
-			{if(client) client->sendToChannel(creature, type, text, channelId, time);}
+		void sendToChannel(Creature* creature, SpeakClasses type, const std::string& text, uint16_t channelId) const
+			{if(client) client->sendToChannel(creature, type, text, channelId);}
 		void sendShop() const
 			{if(client) client->sendShop(shopItemList);}
 		void sendSaleItemList() const
@@ -748,8 +754,6 @@ class Player : public Creature, public Cylinder
 		uint32_t internalPing;
 		uint32_t npings;
 		int64_t nextAction;
-		int64_t lastCombatExhaust;
-		int64_t lastHealExhaust;
 
 		bool pzLocked;
 		bool isConnecting;
@@ -864,14 +868,14 @@ class Player : public Creature, public Cylinder
 		virtual uint16_t getLookCorpse() const;
 		virtual void getPathSearchParams(const Creature* creature, FindPathParams& fpp) const;
 
-		friend class Game;
-		friend class Npc;
-		friend class LuaScriptInterface;
-		friend class Commands;
-		friend class Map;
-		friend class Actions;
-		friend class IOLoginData;
-		friend class ProtocolGame;
+	friend class Game;
+	friend class Npc;
+	friend class LuaScriptInterface;
+	friend class Commands;
+	friend class Map;
+	friend class Actions;
+	friend class IOLoginData;
+	friend class ProtocolGame;
 };
 
 #endif

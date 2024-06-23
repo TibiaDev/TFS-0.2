@@ -74,6 +74,8 @@
 #include "protocollogin.h"
 #include "status.h"
 #include "admin.h"
+#include "globalevent.h"
+#include "mounts.h"
 
 #ifdef __OTSERV_ALLOCATOR__
 #include "allocator.h"
@@ -109,6 +111,7 @@ TextLogger logger;
 GUI gui;
 extern Actions* g_actions;
 extern CreatureEvents* g_creatureEvents;
+extern GlobalEvents* g_globalEvents;
 extern MoveEvents* g_moveEvents;
 extern Spells* g_spells;
 extern TalkActions* g_talkActions;
@@ -251,7 +254,7 @@ void mainLoader(ServiceManager* service_manager)
 	#endif
 	#endif
 	std::cout << STATUS_SERVER_NAME << " - Version " << STATUS_SERVER_VERSION << " (" << STATUS_SERVER_CODENAME << ")." << std::endl;
-	std::cout << "A server developed by Talaturen, Kornholijo and Elf." << std::endl;
+	std::cout << "A server developed by Talaturen, Kornholijo, Elf and Fallen." << std::endl;
 	std::cout << "Visit our forum for updates, support and resources: http://otland.net/." << std::endl;
 
 	#if defined __DEBUG__MOVESYS__ || defined __DEBUG_HOUSES__ || defined __DEBUG_MAILBOX__ || defined __DEBUG_LUASCRIPTS__ || defined __DEBUG_RAID__ || defined __DEBUG_NET__
@@ -308,10 +311,10 @@ void mainLoader(ServiceManager* service_manager)
 	if(defaultPriority == "realtime")
 		SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
 	else if(defaultPriority == "high")
-  	 	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
-  	else if(defaultPriority == "higher")
-  		SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
-  	#endif
+		SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+	else if(defaultPriority == "higher")
+		SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
+	#endif
 
 	//load RSA key
 	std::cout << ">> Loading RSA key" << std::endl;
@@ -337,7 +340,7 @@ void mainLoader(ServiceManager* service_manager)
 	else if(sqlType == "sqlite")
 	{
 		g_config.setNumber(ConfigManager::SQLTYPE, SQL_TYPE_SQLITE);
-		std::cout << "SqLite." << std::endl;
+		std::cout << "SQLite." << std::endl;
 		FILE* sqliteFile = fopen(g_config.getString(ConfigManager::SQLITE_DB).c_str(), "r");
 		if(sqliteFile == NULL)
 			startupErrorMessage("Failed to connect to sqlite database file, make sure it exists and is readable.");
@@ -351,7 +354,7 @@ void mainLoader(ServiceManager* service_manager)
 	if(!db->connect())
 		startupErrorMessage("Failed to connect to database, read doc/MYSQL_HELP for information or try SqLite which doesn't require any connection.");
 	#elif defined __USE_SQLITE__
-	std::cout << "SqLite." << std::endl;
+	std::cout << "SQLite." << std::endl;
 	FILE* sqliteFile = fopen(g_config.getString(ConfigManager::SQLITE_DB).c_str(), "r");
 	if(sqliteFile == NULL)
 		startupErrorMessage("Failed to connect to sqlite database file, make sure it exists and is readable.");
@@ -486,7 +489,7 @@ void mainLoader(ServiceManager* service_manager)
 	if(!g_game.loadMap(g_config.getString(ConfigManager::MAP_NAME)))
 		startupErrorMessage("");
 
-	std::cout << ">> Setting gamestate to: GAME_STATE_INIT" << std::endl;
+	std::cout << ">> Initializing gamestate" << std::endl;
 	g_game.setGameState(GAME_STATE_INIT);
 
 	// Tibia protocols
@@ -556,10 +559,10 @@ void mainLoader(ServiceManager* service_manager)
 
 	g_npcs.reload();
 
-	std::cout << ">> All modules has been loaded, server starting up..." << std::endl;
+	std::cout << ">> Loaded all modules, server starting up..." << std::endl;
 
 	std::pair<uint32_t, uint32_t> IpNetMask;
-	IpNetMask.first  = inet_addr("127.0.0.1");
+	IpNetMask.first = inet_addr("127.0.0.1");
 	IpNetMask.second = 0xFFFFFFFF;
 	serverIPs.push_back(IpNetMask);
 
@@ -572,7 +575,7 @@ void mainLoader(ServiceManager* service_manager)
 			unsigned char** addr = (unsigned char**)he->h_addr_list;
 			while(addr[0] != NULL)
 			{
-				IpNetMask.first  = *(uint32_t*)(*addr);
+				IpNetMask.first = *(uint32_t*)(*addr);
 				IpNetMask.second = 0x0000FFFF;
 				serverIPs.push_back(IpNetMask);
 				addr++;
@@ -595,7 +598,7 @@ void mainLoader(ServiceManager* service_manager)
 		}
 	}
 
-	IpNetMask.first  = resolvedIp;
+	IpNetMask.first = resolvedIp;
 	IpNetMask.second = 0;
 	serverIPs.push_back(IpNetMask);
 
@@ -751,6 +754,16 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 					}
 					break;
 
+				case ID_MENU_GAME_RELOAD_MOUNTS:
+					if(g_game.getGameState() != GAME_STATE_STARTUP)
+					{
+						if(Mounts::getInstance()->reload())
+							std::cout << "Reloaded mounts." << std::endl;
+						else
+							std::cout << "Failed to reload mounts." << std::endl;
+					}
+					break;
+
 				case ID_MENU_GAME_RELOAD_MOVEMENTS:
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
@@ -810,66 +823,50 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 					break;
 
 				case ID_MENU_GAME_RELOAD_RELOADALL:
-					if(g_game.getGameState() != GAME_STATE_STARTUP)
-					{
-						if(g_monsters.reload())
-						{
-							if(commands.reload())
-							{
-								if(Quests::getInstance()->reload())
-								{
-									if(g_game.reloadHighscores())
-									{
-										if(g_config.reload())
-										{
-											if(g_actions->reload())
-											{
-												if(g_moveEvents->reload())
-												{
-													if(g_talkActions->reload())
-													{
-														if(g_spells->reload())
-														{
-															if(g_creatureEvents->reload())
-															{
-																if(Raids::getInstance()->reload() && Raids::getInstance()->startup())
-																{
-																	g_npcs.reload();
-																	std::cout << "Reloaded all." << std::endl;
-																}
-																else
-																	std::cout << "Failed to reload raids." << std::endl;
-															}
-															else
-																std::cout << "Failed to reload creature events." << std::endl;
-														}
-														else
-															std::cout << "Failed to reload spells." << std::endl;
-													}
-													else
-														std::cout << "Failed to reload talkactions." << std::endl;
-												}
-												else
-													std::cout << "Failed to reload movements." << std::endl;
-											}
-											else
-												std::cout << "Failed to reload actions." << std::endl;
-										}
-										else
-											std::cout << "Failed to reload config." << std::endl;
-									}
-									else
-										std::cout << "Failed to reload highscores." << std::endl;
-								}
-								else
-									std::cout << "Failed to reload quests." << std::endl;
-							}
-							else
-								std::cout << "Failed to reload commands." << std::endl;
-						}
-						else
-							std::cout << "Failed to reload monsters." << std::endl;
-					}
+					if(g_game.getGameState() == GAME_STATE_STARTUP)
+						break;
+
+					if(!g_config.reload())
+						std::cout << "Failed to reload config." << std::endl;
+
+					if(!g_monsters.reload())
+						std::cout << "Failed to reload monsters." << std::endl;
+
+					if(!commands.reload())
+						std::cout << "Failed to reload commands." << std::endl;
+
+					if(!Quests::getInstance()->reload())
+						std::cout << "Failed to reload quests." << std::endl;
+
+					if(!Mounts::getInstance()->reload())
+						std::cout << "Failed to reload mounts." << std::endl;
+
+					if(!g_game.reloadHighscores())
+						std::cout << "Failed to reload highscores." << std::endl;
+
+					if(!g_actions->reload())
+						std::cout << "Failed to reload actions." << std::endl;
+
+					if(!g_moveEvents->reload())
+						std::cout << "Failed to reload movements." << std::endl;
+
+					if(!g_talkActions->reload())
+						std::cout << "Failed to reload talkactions." << std::endl;
+
+					if(!g_spells->reload())
+						std::cout << "Failed to reload spells." << std::endl;
+
+					if(!g_creatureEvents->reload())
+						std::cout << "Failed to reload creature events." << std::endl;
+
+					if(!Raids::getInstance()->reload() || !Raids::getInstance()->startup())
+						std::cout << "Failed to reload raids." << std::endl;
+
+					if(!g_globalEvents->reload())
+						std::cout << "Failed to reload global events." << std::endl;
+
+					g_npcs.reload();
+					std::cout << "Reloaded all." << std::endl;
 					break;
 
 				case ID_MENU_GAME_WORLDTYPE_PVP:
@@ -902,7 +899,7 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 						gui.m_logText = "";
 						gui.m_lineCount = 0;
 						std::cout << STATUS_SERVER_NAME << " - Version " << STATUS_SERVER_VERSION << " (" << STATUS_SERVER_CODENAME << ")." << std::endl;
-						std::cout << "A server developed by Talaturen, Kornholijo and Elf." << std::endl;
+						std::cout << "A server developed by Talaturen, Kornholijo, Elf and Fallen." << std::endl;
 						std::cout << "Visit our forum for updates, support and resources: http://otland.net/." << std::endl << std::endl;
 					}
 					break;
@@ -1016,8 +1013,8 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszA
 	wincl.lpfnWndProc = WindowProcedure;
 	wincl.style = CS_DBLCLKS;
 	wincl.cbSize = sizeof(WNDCLASSEX);
-	wincl.hIcon  = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_ICON));
-	wincl.hIconSm  = (HICON)LoadImage(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_ICON), IMAGE_ICON, 16, 16, 0);
+	wincl.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_ICON));
+	wincl.hIconSm = (HICON)LoadImage(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_ICON), IMAGE_ICON, 16, 16, 0);
 	wincl.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wincl.lpszMenuName = MAKEINTRESOURCE(ID_MENU);
 	wincl.cbClsExtra = 0;

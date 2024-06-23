@@ -40,6 +40,7 @@
 #include "creatureevent.h"
 #include "status.h"
 #include "beds.h"
+#include "mounts.h"
 #ifndef __CONSOLE__
 #include "gui.h"
 #endif
@@ -186,9 +187,6 @@ Creature()
 	setParty(NULL);
 
 	groupId = 0;
-
-	lastCombatExhaust = 0;
-	lastHealExhaust = 0;
 
 	ghostMode = false;
 	requestedOutfit = false;
@@ -647,6 +645,8 @@ void Player::addSkillAdvance(skills_t skill, uint32_t count)
 		char advMsg[50];
 		sprintf(advMsg, "You advanced in %s.", getSkillName(skill).c_str());
 		sendTextMessage(MSG_EVENT_ADVANCE, advMsg);
+
+		g_creatureEvents->playerAdvance(this, skill, (skills[skill][SKILL_LEVEL] - 1), skills[skill][SKILL_LEVEL]);
 		advance = true;
 
 		if(vocation->getReqSkillTries(skill, skills[skill][SKILL_LEVEL]) > vocation->getReqSkillTries(skill, skills[skill][SKILL_LEVEL] + 1))
@@ -836,11 +836,21 @@ void Player::addStorageValue(const uint32_t key, const int32_t value)
 				std::cout << "Warning: No valid addons value key:" << key << " value: " << (int32_t)value << " player: " << getName() << std::endl;
 			else
 				m_playerOutfits.addOutfit(outfit);
+
+			return;
+		}
+		else if(IS_IN_KEYRANGE(key, MOUNTS_RANGE))
+		{
+			// do nothing
 		}
 		else
+		{
 			std::cout << "Warning: unknown reserved key: " << key << " player: " << getName() << std::endl;
+			return;
+		}
 	}
-	else if(value == -1)
+
+	if(value == -1)
 		storageMap.erase(key);
 	else
 		storageMap[key] = value;
@@ -877,7 +887,7 @@ bool Player::canSeeCreature(const Creature* creature) const
 	if(creature->isInGhostMode() && !accessLevel)
 		return false;
 
-	if(creature->isInvisible() && !creature->getPlayer()  && !canSeeInvisibility())
+	if(creature->isInvisible() && !creature->getPlayer() && !canSeeInvisibility())
 		return false;
 
 	return true;
@@ -1963,6 +1973,7 @@ void Player::addExperience(uint64_t exp, bool useMult/* = false*/, bool sendText
 
 		char levelMsg[60];
 		sprintf(levelMsg, "You advanced from Level %d to Level %d.", prevLevel, newLevel);
+		g_creatureEvents->playerAdvance(this, LEVEL, prevLevel, newLevel);
 		sendTextMessage(MSG_EVENT_ADVANCE, levelMsg);
 	}
 
@@ -2646,7 +2657,7 @@ ReturnValue Player::__queryMaxCount(int32_t index, const Thing* thing, uint32_t 
 					//iterate through all items, including sub-containers (deep search)
 					for(ContainerIterator cit = subContainer->begin(); cit != subContainer->end(); ++cit)
 					{
-						if(Container* tmpContainer  = (*cit)->getContainer())
+						if(Container* tmpContainer = (*cit)->getContainer())
 						{
 							queryCount = 0;
 							tmpContainer->__queryMaxCount(INDEX_WHEREEVER, item, item->getItemCount(), queryCount, flags);
@@ -2937,7 +2948,7 @@ void Player::__replaceThing(uint32_t index, Thing* thing)
 	if(index < 0 || index > 11)
 	{
 #ifdef __DEBUG__MOVESYS__
-		std::cout << "Failure: [Player::__replaceThing], " << "player: " << getName() << ", index: " << index << ",  index < 0 || index > 11" << std::endl;
+		std::cout << "Failure: [Player::__replaceThing], " << "player: " << getName() << ", index: " << index << ", index < 0 || index > 11" << std::endl;
 		DEBUG_REPORT
 #endif
 		return /*RET_NOTPOSSIBLE*/;
@@ -4573,7 +4584,7 @@ bool Player::isPremium() const
 	if(g_config.getBoolean(ConfigManager::FREE_PREMIUM) || hasFlag(PlayerFlag_IsAlwaysPremium))
 		return true;
 
-	return premiumDays;
+	return premiumDays > 0;
 }
 
 void Player::setGuildLevel(GuildLevel_t newGuildLevel)
@@ -4728,4 +4739,113 @@ void Player::clearPartyInvitations()
 GuildEmblems_t Player::getGuildEmblem(const Player* player) const
 {
 	return EMBLEM_NONE;
+}
+
+uint8_t Player::getCurrentMount() const
+{
+	int32_t value;
+	if(getStorageValue(PSTRG_MOUNTS_CURRENTMOUNT, value))
+		return value;
+
+	return 0;
+}
+
+void Player::setCurrentMount(uint8_t mount)
+{
+	addStorageValue(PSTRG_MOUNTS_CURRENTMOUNT, mount);
+}
+
+bool Player::toggleMount(bool mount)
+{
+	if(mount)
+	{
+		if(isMounted())
+			return false;
+
+		if(_tile->hasFlag(TILESTATE_PROTECTIONZONE))
+		{
+			sendCancelMessage(RET_ACTIONNOTPERMITTEDINPROTECTIONZONE);
+			return false;
+		}
+
+		if(!isPremium())
+		{
+			sendCancelMessage(RET_YOUNEEDPREMIUMACCOUNT);
+			return false;
+		}
+
+		uint8_t currentMountId = getCurrentMount();
+		if(currentMountId == 0)
+		{
+			sendOutfitWindow();
+			return false;
+		}
+
+		Mount* currentMount = Mounts::getInstance()->getMountByID(currentMountId);
+		if(!currentMount)
+			return false;
+
+		defaultOutfit.lookMount = currentMount->getClientID();
+		if(currentMount->getSpeed() != 0)
+			g_game.changeSpeed(this, currentMount->getSpeed());
+
+		g_game.internalCreatureChangeOutfit(this, defaultOutfit);
+	}
+	else
+	{
+		if(!isMounted())
+			return false;
+
+		dismount();
+	}
+	return true;
+}
+
+bool Player::tameMount(uint8_t mountId)
+{
+	if(!Mounts::getInstance()->getMountByID(mountId))
+		return false;
+
+	mountId--;
+	int key = PSTRG_MOUNTS_RANGE_START + (mountId / 31);
+	int32_t value = 0;
+	if(getStorageValue(key, value))
+		value |= (int32_t)pow(2, mountId % 31);
+	else
+		value = pow(2, mountId % 31);
+
+	addStorageValue(key, value);
+	return true;
+}
+
+bool Player::untameMount(uint8_t mountId)
+{
+	if(!Mounts::getInstance()->getMountByID(mountId))
+		return false;
+
+	mountId--;
+	int key = PSTRG_MOUNTS_RANGE_START + (mountId / 31);
+	int32_t value = 0;
+	if(!getStorageValue(key, value))
+		return true;
+
+	value ^= (int32_t)pow(2, mountId % 31);
+	addStorageValue(key, value);
+
+	if(isMounted() && getCurrentMount() == (mountId + 1))
+	{
+		dismount();
+		setCurrentMount(0);
+	}
+	return true;
+}
+
+void Player::dismount()
+{
+	Mount* mount = Mounts::getInstance()->getMountByID(getCurrentMount());
+	if(mount && mount->getSpeed() > 0)
+		g_game.changeSpeed(this, -mount->getSpeed());
+
+	defaultOutfit.lookMount = 0;
+	g_game.internalCreatureChangeOutfit(this, defaultOutfit);
 }
