@@ -27,6 +27,7 @@
 	criticalHitChance = 7
 	removeAmmoWhenUsingDistanceWeapon = "yes"
 	removeChargesFromRunes = "yes"
+	removeChargesFromWeapons = "yes"
 	timeToDecreaseFrags = 24 * 60 * 60 * 1000
 	whiteSkullTime = 15 * 60 * 1000
 	oldConditionAccuracy = "no"
@@ -62,6 +63,7 @@
 
 	-- Guilds
 	ingameGuildSystem = "yes"
+	levelToCreateGuild = 8
 
 	-- Highscores
 	highscoreDisplayPlayers = 15
@@ -85,7 +87,6 @@
 	mapStorageType = "relational"
 
 	-- Messaging
-	enableRuleViolationReports = "no"
 	maxMessageBuffer = 4
 
 	-- MySQL

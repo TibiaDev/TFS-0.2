@@ -86,7 +86,7 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 	msg.SkipBytes(12);
 
 	if(version <= 760)
-		disconnectClient(0x0A, "Only clients with protocol 8.54 allowed!");
+		disconnectClient(0x0A, "Only clients with protocol 8.62 allowed!");
 
 	if(!RSA_decrypt(msg))
 	{
@@ -119,9 +119,9 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 		}
 	}
 
-	if(version < 854)
+	if(version < 862)
 	{
-		disconnectClient(0x0A, "Only clients with protocol 8.54 allowed!");
+		disconnectClient(0x0A, "Only clients with protocol 8.62 allowed!");
 		return false;
 	}
 
@@ -186,7 +186,7 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 
 		//Add char list
 		output->AddByte(0x64);
-		if(accnumber != 1 && g_config.getBoolean(ConfigManager::ACCOUNT_MANAGER))
+		if(g_config.getBoolean(ConfigManager::ACCOUNT_MANAGER) && accnumber != 1)
 		{
 			output->AddByte((uint8_t)account.charList.size() + 1);
 			output->AddString("Account Manager");
@@ -217,7 +217,7 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 
 		//Add premium days
 		if(g_config.getBoolean(ConfigManager::FREE_PREMIUM))
-			output->AddU16(65535); //client displays free premium
+			output->AddU16(0xFFFF); //client displays free premium
 		else
 			output->AddU16(account.premiumDays);
 

@@ -262,10 +262,8 @@ Creature* Tile::getTopVisibleCreature(const Creature* creature)
 		{
 			for(CreatureVector::const_iterator cit = creatures->begin(); cit != creatures->end(); ++cit)
 			{
-				if((*cit)->getPlayer() && (*cit)->getPlayer()->isInGhostMode())
-					continue;
-
-				return (*cit);
+				if ((creature && creature->canSeeCreature(*cit)) || (!creature && !((*cit)->isInvisible() || ((*cit)->getPlayer() && (*cit)->getPlayer()->isInGhostMode()))))
+					return (*cit);
 			}
 		}
 	}
@@ -282,10 +280,8 @@ const Creature* Tile::getTopVisibleCreature(const Creature* creature) const
 		{
 			for(CreatureVector::const_iterator cit = creatures->begin(); cit != creatures->end(); ++cit)
 			{
-				if((*cit)->getPlayer() && (*cit)->getPlayer()->isInGhostMode())
-					continue;
-
-				return (*cit);
+				if ((creature && creature->canSeeCreature(*cit)) || (!creature && !((*cit)->isInvisible() || ((*cit)->getPlayer() && (*cit)->getPlayer()->isInGhostMode()))))
+					return (*cit);
 			}
 		}
 	}
@@ -632,30 +628,28 @@ ReturnValue Tile::__queryAdd(int32_t index, const Thing* thing, uint32_t count,
 				return RET_NOTPOSSIBLE;
 			}
 
-			if(player->isPzLocked() && !player->getTile()->hasFlag(TILESTATE_PVPZONE) && hasFlag(TILESTATE_PVPZONE))
+			if(player->getTile() && player->isPzLocked())
 			{
-				//player is trying to enter a pvp zone while being pz-locked
-				return RET_PLAYERISPZLOCKEDENTERPVPZONE;
-			}
+				if(!player->getTile()->hasFlag(TILESTATE_PVPZONE))
+				{
+					//player is trying to enter a pvp zone while being pz-locked
+					if(hasFlag(TILESTATE_PVPZONE))
+						return RET_PLAYERISPZLOCKEDENTERPVPZONE;
+				}
+				else if(!hasFlag(TILESTATE_PVPZONE)) //player is trying to leave a pvp zone while being pz-locked
+					return RET_PLAYERISPZLOCKEDLEAVEPVPZONE;
 
-			if(player->isPzLocked() && player->getTile()->hasFlag(TILESTATE_PVPZONE) && !hasFlag(TILESTATE_PVPZONE))
-			{
-				//player is trying to leave a pvp zone while being pz-locked
-				return RET_PLAYERISPZLOCKEDLEAVEPVPZONE;
 			}
 
 			if((hasFlag(TILESTATE_NOPVPZONE) || hasFlag(TILESTATE_PROTECTIONZONE)) && player->isPzLocked())
 				return RET_PLAYERISPZLOCKED;
 		}
-		else
+		else if(creatures && !creatures->empty() && !hasBitSet(FLAG_IGNOREBLOCKCREATURE, flags))
 		{
-			if(creatures && !creatures->empty() && !hasBitSet(FLAG_IGNOREBLOCKCREATURE, flags))
+			for(CreatureVector::const_iterator cit = creatures->begin(); cit != creatures->end(); ++cit)
 			{
-				for(CreatureVector::const_iterator cit = creatures->begin(); cit != creatures->end(); ++cit)
-				{
-					if(!(*cit)->isInGhostMode())
-						return RET_NOTENOUGHROOM;
-				}
+				if(!(*cit)->isInGhostMode())
+					return RET_NOTENOUGHROOM;
 			}
 		}
 
@@ -1437,28 +1431,17 @@ int32_t Tile::__getLastIndex() const
 	return getThingCount();
 }
 
-uint32_t Tile::__getItemTypeCount(uint16_t itemId, int32_t subType /*= -1*/, bool itemCount /*= true*/) const
+uint32_t Tile::__getItemTypeCount(uint16_t itemId, int32_t subType /*= -1*/) const
 {
 	uint32_t count = 0;
 	Thing* thing = NULL;
 	for(uint32_t i = 0; i < getThingCount(); ++i)
 	{
 		thing = __getThing(i);
-
 		if(const Item* item = thing->getItem())
 		{
-			if(item->getID() == itemId && (subType == -1 || subType == item->getSubType()))
-			{
-				if(itemCount)
-					count+= item->getItemCount();
-				else
-				{
-					if(item->isRune())
-						count+= item->getCharges();
-					else
-						count+= item->getItemCount();
-				}
-			}
+			if(item->getID() == itemId)
+				count += Item::countByType(item, subType);
 		}
 	}
 	return count;
