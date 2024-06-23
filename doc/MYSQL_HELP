@@ -3,13 +3,13 @@
 		The Forgotten Server
 
 	Version
-		0.2.9
+		0.2.10
 
 	Codenamed
 		"Mystic Spirit"
 
 	License
-		GNU GPLv3
+		GNU GPLv2
 
 	Forum
 		http://otland.net/
@@ -99,7 +99,7 @@
 
 		#1
 			Download XAMPP from:
-				http://heanet.dl.sourceforge.net/sourceforge/xampp/xampp-win32-1.7.3-installer.exe
+				http://heanet.dl.sourceforge.net/sourceforge/xampp/xampp-win32-1.7.4-VC6-installer.exe
 
 		#2
 			Go to http://localhost/security/xamppsecurity.php and change your root password.

@@ -254,6 +254,9 @@ bool Npc::loadFromXml(const std::string& filename)
 				else if(readXMLInteger(p, "typeex", intValue))
 					defaultOutfit.lookTypeEx = intValue;
 
+				if(readXMLInteger(p, "mount", intValue))
+					defaultOutfit.lookMount = intValue;
+
 				currentOutfit = defaultOutfit;
 			}
 			else if(xmlStrcmp(p->name, (const xmlChar*)"parameters") == 0)
@@ -506,7 +509,7 @@ ResponseList Npc::loadInteraction(xmlNodePtr node)
 						{
 							m_scriptInterface->getScriptEnv()->setRealPos(getPosition());
 							m_scriptInterface->getScriptEnv()->setNpc(this);
-							m_scriptInterface->loadBuffer(strValue, false);
+							m_scriptInterface->loadBuffer(strValue, NULL);
 							m_scriptInterface->releaseScriptEnv();
 						}
 					}
@@ -1867,7 +1870,7 @@ void Npc::processResponse(Player* player, NpcState* npcState, const NpcResponse*
 						scriptstream << (*it).strValue;
 
 						//std::cout << scriptstream.str() << std::endl;
-						if(m_scriptInterface->loadBuffer(scriptstream.str(), false) != -1)
+						if(m_scriptInterface->loadBuffer(scriptstream.str(), NULL) != -1)
 						{
 							lua_State* L = m_scriptInterface->getLuaState();
 							lua_getglobal(L, "_state");

@@ -44,6 +44,7 @@
 #include "chat.h"
 #include "quests.h"
 #include "mounts.h"
+#include "globalevent.h"
 #ifdef __ENABLE_SERVER_DIAGNOSTIC__
 #include "outputmessage.h"
 #include "connection.h"
@@ -65,6 +66,7 @@ extern Weapons* g_weapons;
 extern Game g_game;
 extern Chat g_chat;
 extern CreatureEvents* g_creatureEvents;
+extern GlobalEvents* g_globalEvents;
 
 s_defcommands Commands::defined_commands[] =
 {
@@ -236,8 +238,8 @@ bool Commands::exeCommand(Creature* creature, const std::string& cmd)
 	std::string str_command;
 	std::string str_param;
 
-	std::string::size_type loc = cmd.find( ' ', 0 );
-	if(loc != std::string::npos && loc >= 0)
+	std::string::size_type loc = cmd.find(' ', 0);
+	if(loc != std::string::npos)
 	{
 		str_command = std::string(cmd, 0, loc);
 		str_param = std::string(cmd, (loc + 1), cmd.size() - loc - 1);
@@ -590,6 +592,11 @@ void Commands::reloadInfo(Player* player, const std::string& cmd, const std::str
 		Mounts::getInstance()->reload();
 		player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Reloaded mounts.");
 	}
+	else if(tmpParam == "globalevents" || tmpParam == "globalevent")
+	{
+		g_globalEvents->reload();
+		player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Reloaded globalevents.");
+	}
 	else
 		player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Reload type not found.");
 }
@@ -684,7 +691,6 @@ void Commands::closeServer(Player* player, const std::string& cmd, const std::st
 	{
 		g_dispatcher.addTask(
 			createTask(boost::bind(&Game::setGameState, &g_game, GAME_STATE_CLOSED)));
-
 		player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Server is now closed.");
 	}
 }
@@ -1195,7 +1201,7 @@ void Commands::createGuild(Player* player, const std::string& cmd, const std::st
 
 void Commands::ban(Player* player, const std::string& cmd, const std::string& param)
 {
-	std::vector<std::string> exploded = explodeString(param, ", ", 4);
+	StringVec exploded = explodeString(param, ", ", 4);
 	if(!exploded.size() || exploded.size() < 5)
 	{
 		player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Not enough params.");
@@ -1213,8 +1219,8 @@ void Commands::ban(Player* player, const std::string& cmd, const std::string& pa
 		reason = (int32_t)atoi(exploded[2].c_str());
 
 	bool ipBan = (atoi(exploded[3].c_str()) != 0);
-	std::string comment = exploded[4];
 
+	std::string comment = exploded[4];
 	g_game.violationWindow(player, targetName, reason, action, comment, ipBan);
 }
 

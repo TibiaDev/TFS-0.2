@@ -243,7 +243,7 @@ CREATE TABLE `player_viplist`
 CREATE TABLE `map_store`
 (
 	`house_id` int(10) unsigned NOT NULL,
-	`data` LONGBLOB NOT NULL,
+	`data` blob NOT NULL,
 	KEY `house_id` (`house_id`)
 ) ENGINE = InnoDB;
 
@@ -266,6 +266,13 @@ CREATE TABLE `tile_items`
 	`attributes` BLOB NOT NULL,
 	FOREIGN KEY (`tile_id`) REFERENCES `tiles` (`id`) ON DELETE CASCADE,
 	INDEX (`sid`)
+) ENGINE = InnoDB;
+
+CREATE TABLE `tile_store`
+(
+	`house_id` INT(11) NOT NULL,
+	`data` LONGBLOB NOT NULL,
+	FOREIGN KEY (`house_id`) REFERENCES `houses` (`id`) ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
 DELIMITER |

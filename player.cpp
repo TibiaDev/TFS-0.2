@@ -1441,16 +1441,16 @@ void Player::onFollowCreatureDisappear(bool isLogout)
 
 void Player::onChangeZone(ZoneType_t zone)
 {
-	if(attackedCreature)
+	if(zone == ZONE_PROTECTION)
 	{
-		if(zone == ZONE_PROTECTION)
+		if(attackedCreature && !hasFlag(PlayerFlag_IgnoreProtectionZone))
 		{
-			if(!hasFlag(PlayerFlag_IgnoreProtectionZone))
-			{
-				setAttackedCreature(NULL);
-				onAttackedCreatureDisappear(false);
-			}
+			setAttackedCreature(NULL);
+			onAttackedCreatureDisappear(false);
 		}
+
+		if(isMounted())
+			dismount();
 	}
 	sendIcons();
 }
@@ -1898,6 +1898,7 @@ void Player::addManaSpent(uint64_t amount, bool withMultiplier /*= true*/)
 			char MaglvMsg[50];
 			sprintf(MaglvMsg, "You advanced to magic level %d.", magLevel);
 			sendTextMessage(MSG_EVENT_ADVANCE, MaglvMsg);
+			g_creatureEvents->playerAdvance(this, MAGLEVEL, magLevel-1, magLevel);
 
 			currReqMana = nextReqMana;
 			nextReqMana = vocation->getReqMana(magLevel + 1);
@@ -1995,7 +1996,7 @@ uint32_t Player::getPercentLevel(uint64_t count, uint64_t nextLevelCount)
 	if(nextLevelCount > 0)
 	{
 		uint32_t result = (count * 100) / nextLevelCount;
-		if(result < 0 || result > 100)
+		if(result > 100)
 			return 0;
 
 		return result;
@@ -2945,7 +2946,7 @@ void Player::__updateThing(Thing* thing, uint16_t itemId, uint32_t count)
 
 void Player::__replaceThing(uint32_t index, Thing* thing)
 {
-	if(index < 0 || index > 11)
+	if(index > 11)
 	{
 #ifdef __DEBUG__MOVESYS__
 		std::cout << "Failure: [Player::__replaceThing], " << "player: " << getName() << ", index: " << index << ", index < 0 || index > 11" << std::endl;
@@ -4812,7 +4813,7 @@ bool Player::tameMount(uint8_t mountId)
 	if(getStorageValue(key, value))
 		value |= (int32_t)pow(2, mountId % 31);
 	else
-		value = pow(2, mountId % 31);
+		value = (int32_t)pow(2, mountId % 31);
 
 	addStorageValue(key, value);
 	return true;
