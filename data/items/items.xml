@@ -4839,6 +4839,7 @@
 		<attribute key="weight" value="2300"/>
 		<attribute key="defense" value="20"/>
 		<attribute key="attack" value="35"/>
+		<attribute key="elementFire" value="11"/>
 		<attribute key="weaponType" value="sword"/>
 		<attribute key="extradef" value="1"/>
 	</item>
@@ -4955,10 +4956,10 @@
 	<item id="2409" article="a" name="serpent sword">
 		<attribute key="weight" value="4100"/>
 		<attribute key="defense" value="15"/>
-		<attribute key="attack" value="18"/>
+		<attribute key="attack" value="26"/>
+		<attribute key="elementEarth" value="8"/>
 		<attribute key="weaponType" value="sword"/>
 		<attribute key="extradef" value="1"/>
-		<attribute key="elementEarth" value="8"/>
 	</item>
 	<item id="2410" article="a" name="throwing knife" plural="throwing knives">
 		<attribute key="weight" value="500"/>
@@ -4973,6 +4974,7 @@
 		<attribute key="weight" value="880"/>
 		<attribute key="defense" value="8"/>
 		<attribute key="attack" value="18"/>
+		<attribute key="elementEarth" value="2"/>
 		<attribute key="weaponType" value="sword"/>
 	</item>
 	<item id="2412" article="a" name="katana">
@@ -5116,6 +5118,7 @@
 		<attribute key="weight" value="4000"/>
 		<attribute key="defense" value="16"/>
 		<attribute key="attack" value="38"/>
+		<attribute key="elementFire" value="11"/>
 		<attribute key="weaponType" value="axe"/>
 		<attribute key="extradef" value="1"/>
 	</item>
@@ -19862,8 +19865,11 @@
 		<attribute key="weaponType" value="sword"/>
 		<attribute key="extradef" value="3"/>
 	</item>
-	<item id="7391" name="">
-		<attribute key="weight" value="0"/>
+	<item id="7391" article="an" name="thaian sword">
+		<attribute key="weight" value="6100"/>
+		<attribute key="defense" value="29"/>
+		<attribute key="attack" value="46"/>
+		<attribute key="weaponType" value="sword"/>
 	</item>
 	<item id="7392" article="an" name="orcish maul">
 		<attribute key="weight" value="5400"/>
@@ -19953,8 +19959,12 @@
 		<attribute key="attack" value="43"/>
 		<attribute key="weaponType" value="club"/>
 	</item>
-	<item id="7411" name="">
-		<attribute key="weight" value="0"/>
+	<item id="7411" article="an" name="ornamented axe">
+		<attribute key="weight" value="6150"/>
+		<attribute key="defense" value="22"/>
+		<attribute key="attack" value="42"/>
+		<attribute key="weaponType" value="axe"/>
+		<attribute key="extradef" value="2"/>
 	</item>
 	<item id="7412" article="a" name="butcher's axe">
 		<attribute key="weight" value="6800"/>
@@ -20356,10 +20366,10 @@
 	<item id="7496" article="a" name="blue bottle">
 		<attribute key="weight" value="250"/>
 	</item>
-	<item id="7497" article="a" name="mining helmet">	    
+	<item id="7497" article="a" name="mining helmet">
 		<attribute key="weight" value="700"/>
 		<attribute key="armor" value="1"/>
-		<attribute key="slotType" value="head"/>		
+		<attribute key="slotType" value="head"/>
 	</item>
 	<item id="7498" article="a" name="parcel">
 		<attribute key="weight" value="1800"/>
@@ -22079,7 +22089,7 @@
 		<attribute key="absorbPercentFire" value="5"/>
 		<attribute key="absorbPercentIce" value="-5"/>
 		<attribute key="slotType" value="feet"/>
-	</item>		
+	</item>
 	<item id="7892" name="glacier shoes">
 	    <attribute key="description" value="It has 5% ice protection, but also increases damage taken from energy by 5%."/>
 		<attribute key="weight" value="750"/>
@@ -22087,7 +22097,7 @@
 		<attribute key="slotType" value="feet"/>
 		<attribute key="absorbPercentIce" value="5"/>
 		<attribute key="absorbPercentEnergy" value="-5"/>
-	</item>	
+	</item>
 	<item id="7893" name="lightning boots">
 	    <attribute key="description" value="It has 5% energy protection, but also increases damage taken from earth by 5%."/>
 		<attribute key="weight" value="750"/>
@@ -22095,7 +22105,7 @@
 		<attribute key="absorbPercentEnergy" value="5"/>
 		<attribute key="absorbPercentEarth" value="-5"/>
 		<attribute key="slotType" value="feet"/>
-	</item>	
+	</item>
 	<item id="7894" name="magma legs">
 	    <attribute key="description" value="It has 6% fire protection, but also increases damage taken from ice by 6%."/>
 		<attribute key="weight" value="1900"/>
@@ -22145,36 +22155,36 @@
 		<attribute key="slotType" value="body"/>
 	</item>
 	<item id="7900" article="a" name="magma monocle">
-        <attribute key="description" value="It has 4% fire protection, but also increases damage taken from ice by 4%."/>	
+        <attribute key="description" value="It has 4% fire protection, but also increases damage taken from ice by 4%."/>
 		<attribute key="weight" value="1000"/>
 		<attribute key="armor" value="5"/>
 		<attribute key="slotType" value="head"/>
 		<attribute key="absorbPercentFire" value="4"/>
-		<attribute key="absorbPercentIce" value="-4"/>		
+		<attribute key="absorbPercentIce" value="-4"/>
 	</item>
 	<item id="7901" article="a" name="lightning headband">
 	    <attribute key="description" value="It has 4% energy protection, but also increases damage taken from earth by 4%."/>
 		<attribute key="weight" value="100"/>
 		<attribute key="armor" value="5"/>
-		<attribute key="slotType" value="head"/>	
+		<attribute key="slotType" value="head"/>
 		<attribute key="absorbPercentEnergy" value="4"/>
-		<attribute key="absorbPercentEarth" value="-4"/>	
+		<attribute key="absorbPercentEarth" value="-4"/>
 	</item>
 	<item id="7902" article="a" name="glacier mask">
 	    <attribute key="description" value="It has 4% ice protection, but also increases damage taken from energy by 4%."/>
 		<attribute key="weight" value="1000"/>
 		<attribute key="armor" value="5"/>
-		<attribute key="slotType" value="head"/>	
+		<attribute key="slotType" value="head"/>
 		<attribute key="absorbPercentIce" value="4"/>
-		<attribute key="absorbPercentEnergy" value="-4"/>	
+		<attribute key="absorbPercentEnergy" value="-4"/>
 	</item>
 	<item id="7903" article="a" name="terra hood">
 	    <attribute key="description" value="It has 4% earth protection, but also increases damage taken from fire by 4%."/>
 		<attribute key="weight" value="1000"/>
 		<attribute key="armor" value="5"/>
-		<attribute key="slotType" value="head"/>	
+		<attribute key="slotType" value="head"/>
 		<attribute key="absorbPercentFire" value="-4"/>
-		<attribute key="absorbPercentEarth" value="4"/>	
+		<attribute key="absorbPercentEarth" value="4"/>
 	</item>
 	<item id="7904" article="a" name="furniture package">
 		<attribute key="description" value="It contains a modification kit for a green bed."/>
@@ -22283,10 +22293,10 @@
 	</item>
 	<item id="7938" article="a" name="weaved hole">
 	</item>
-	<item id="7939" article="a" name="mining helmet">	    
+	<item id="7939" article="a" name="mining helmet">
 		<attribute key="weight" value="700"/>
 		<attribute key="armor" value="1"/>
-		<attribute key="slotType" value="head"/>		
+		<attribute key="slotType" value="head"/>
 	</item>
 	<item id="7940" name="cave entrance">
 	</item>
@@ -22318,10 +22328,10 @@
 	</item>
 	<item id="7956" article="a" name="waterpolo ball">
 	</item>
-	<item id="7957" article="a" name="jester hat">	    
+	<item id="7957" article="a" name="jester hat">
 		<attribute key="weight" value="1000"/>
 		<attribute key="armor" value="1"/>
-		<attribute key="slotType" value="head"/>		
+		<attribute key="slotType" value="head"/>
 	</item>
 	<item id="7958" article="a" name="jester staff">
 		<attribute key="weight" value="725"/>
@@ -22582,7 +22592,7 @@
 	</item>
 	<item id="8208" article="an" name="ice cream cone">
 		<attribute key="weight" value="100"/>
-		<attribute key="decayTo" value="0"/> 
+		<attribute key="decayTo" value="0"/>
 		<attribute key="duration" value="120"/>
 	</item>
 	<item id="8210" name="cave entrance">
@@ -22663,7 +22673,7 @@
 		<attribute key="decayTo" value="8274"/>
 		<attribute key="duration" value="600"/>
 		<attribute key="corpseType" value="blood"/>
-	</item>	
+	</item>
 	<item id="8274" article="a" name="slain lich">
 		<attribute key="decayTo" value="0"/>
 		<attribute key="corpseType" value="blood"/>
@@ -22727,7 +22737,7 @@
 	<item id="8300" article="a" name="flawless ice crystal">
 		<attribute key="weight" value="250"/>
 	</item>
-	<item id="8301" name="fine sulphur"> 
+	<item id="8301" name="fine sulphur">
 		<attribute key="description" value="It has been extracted from an inactive lava hole."/>
 		<attribute key="weight" value="50"/>
 	</item>
@@ -22738,7 +22748,7 @@
 		<attribute key="weight" value="250"/>
 	</item>
 	<item id="8304" name="eternal flames">
-		<attribute key="weight" value="250"/> 
+		<attribute key="weight" value="250"/>
 	</item>
 	<item id="8305" name="mother soil">
 		<attribute key="weight" value="250"/>
@@ -22765,7 +22775,7 @@
 	<item id="8309" article="a" name="nail" plural="nails">
 		<attribute key="weight" value="1"/>
 	</item>
-	<item id="8310" name="neutral matter"> 
+	<item id="8310" name="neutral matter">
 		<attribute key="weight" value="250"/>
 	</item>
 	<item id="8311" name="slain sea serpent">
@@ -22801,7 +22811,7 @@
 	</item>
 	<item id="8323" article="a" name="hole">
 		<attribute key="floorchange" value="down"/>
-	</item>	
+	</item>
 	<item id="8323" article="a" name="hole">
 		<attribute key="floorchange" value="down"/>
 	</item>
@@ -22918,7 +22928,7 @@
 	</item>
 	<item id="8380" article="a" name="tunnel entrance">
 		<attribute key="floorchange" value="down"/>
-	</item>	
+	</item>
 	<item id="8386" name="skeletal remains">
 	</item>
 	<item id="8387" name="skeletal remains">
@@ -23227,7 +23237,7 @@
 	<item id="8536" article="a" name="buttress">
 	</item>
 	<item id="8537" article="a" name="buttress">
-	</item>	
+	</item>
 	<item id="8538" article="a" name="closed door">
 		<attribute key="type" value="door"/>
 		<attribute key="blockprojectile" value="1"/>
@@ -23448,7 +23458,7 @@
 	<item id="8625" article="a" name="dwarven statue">
 	</item>
 	<item id="8626" article="a" name="dwarven statue">
-	</item>	
+	</item>
 	<item id="8631" article="a" name="burning wall">
 	</item>
 	<item id="8632" article="a" name="whirlpool">
@@ -23597,7 +23607,7 @@
 	</item>
 	<item id="8704" article="a" name="small health potion">
 		<attribute key="weight" value="175"/>
-	</item>	
+	</item>
 	<item id="8707" article="your" name="student book">
 		<attribute key="description" value="Write down important notes in here."/>
 		<attribute key="weight" value="900"/>
@@ -23941,7 +23951,7 @@
 		<attribute key="hitChance" value="-20"/>
 		<attribute key="attack" value="20"/>
 	</item>
-	<item id="8853" article="the" name="iron worker">
+	<item id="8853" article="the" name="ironworker">
 		<attribute key="weight" value="5500"/>
 		<attribute key="slotType" value="two-handed"/>
 		<attribute key="weaponType" value="distance"/>
@@ -24238,41 +24248,42 @@
 		<attribute key="weight" value="6900"/>
 		<attribute key="defense" value="36"/>
 		<attribute key="weaponType" value="shield"/>
+		<attribute key="duration" value="1200"/>
+		<attribute key="showduration" value="1"/>
+		<attribute key="decayTo" value="8905"/>
 		<attribute key="skillShield" value="2"/>
-		<attribute key="charges" value="1000"/>
-		<attribute key="decayTo" value="8811"/>
-		<attribute key="showcharges" value="1"/>
 	</item>
 	<item id="8907" article="an" name="icy rainbow shield">
 		<attribute key="description" value="It has been temporarily imbued with ice magic and has a greatly increased shielding value."/>
 		<attribute key="weight" value="6900"/>
 		<attribute key="defense" value="39"/>
 		<attribute key="weaponType" value="shield"/>
-		<attribute key="charges" value="1000"/>
-		<attribute key="decayTo" value="8811"/>
-		<attribute key="showcharges" value="1"/>
+		<attribute key="duration" value="1200"/>
+		<attribute key="showduration" value="1"/>
+		<attribute key="decayTo" value="8905"/>
 	</item>
 	<item id="8908" article="a" name="sparking rainbow shield">
 		<attribute key="description" value="It has been temporarily imbued with energy magic and increases your speed."/>
 		<attribute key="weight" value="6900"/>
 		<attribute key="defense" value="36"/>
 		<attribute key="weaponType" value="shield"/>
-		<attribute key="speed" value="10"/>
-		<attribute key="charges" value="1000"/>
-		<attribute key="decayTo" value="8811"/>
-		<attribute key="showcharges" value="1"/>
+		<attribute key="duration" value="1200"/>
+		<attribute key="showduration" value="1"/>
+		<attribute key="decayTo" value="8905"/>
+		<attribute key="speed" value="20"/>
 	</item>
 	<item id="8909" article="a" name="terran rainbow shield">
 		<attribute key="description" value="It has been temporarily imbued with earth magic and boosts your regeneration."/>
 		<attribute key="weight" value="6900"/>
 		<attribute key="defense" value="37"/>
 		<attribute key="weaponType" value="shield"/>
-		<attribute key="duration" value="2400"/>
+		<attribute key="duration" value="1200"/>
+		<attribute key="showduration" value="1"/>
+		<attribute key="decayTo" value="8905"/>
 		<attribute key="healthGain" value="1"/>
 		<attribute key="healthTicks" value="3000"/>
 		<attribute key="manaGain" value="4"/>
 		<attribute key="manaTicks" value="3000"/>
-		<attribute key="decayTo" value="8811"/>
 	</item>
 	<item id="8910" article="an" name="underworld rod">
 		<attribute key="weight" value="2900"/>
@@ -24581,38 +24592,38 @@
 	</item>
 	<item id="8964" article="a" name="slain fire elemental">
 		<attribute key="weight" value="25000"/>
-		<attribute key="containerSize" value="8"/>	
+		<attribute key="containerSize" value="8"/>
 		<attribute key="decayTo" value="8969"/>
 		<attribute key="duration" value="900"/>
 		<attribute key="corpseType" value="fire"/>
 	</item>
 	<item id="8965" article="a" name="slain ice elemental">
 		<attribute key="weight" value="25000"/>
-		<attribute key="containerSize" value="8"/>	
+		<attribute key="containerSize" value="8"/>
 		<attribute key="decayTo" value="8968"/>
 		<attribute key="duration" value="900"/>
 	</item>
 	<item id="8966" article="a" name="slain energy elemental">
 		<attribute key="weight" value="25000"/>
-		<attribute key="containerSize" value="8"/>	
+		<attribute key="containerSize" value="8"/>
 		<attribute key="decayTo" value="8967"/>
 		<attribute key="duration" value="900"/>
 	</item>
 	<item id="8967" article="a" name="slain energy elemental">
 		<attribute key="weight" value="10000"/>
-		<attribute key="containerSize" value="8"/>	
+		<attribute key="containerSize" value="8"/>
 		<attribute key="decayTo" value="0"/>
 		<attribute key="duration" value="500"/>
 	</item>
 	<item id="8968" article="a" name="slain ice elemental">
 		<attribute key="weight" value="10000"/>
-		<attribute key="containerSize" value="8"/>	
+		<attribute key="containerSize" value="8"/>
 		<attribute key="decayTo" value="0"/>
 		<attribute key="duration" value="500"/>
 	</item>
 	<item id="8969" article="a" name="slain fire elemental">
 		<attribute key="weight" value="10000"/>
-		<attribute key="containerSize" value="8"/>	
+		<attribute key="containerSize" value="8"/>
 		<attribute key="decayTo" value="0"/>
 		<attribute key="duration" value="500"/>
 		<attribute key="corpseType" value="fire"/>

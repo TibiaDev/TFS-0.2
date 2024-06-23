@@ -285,7 +285,7 @@ MoveEvent* MoveEvents::getEvent(Item* item, MoveEvent_t eventType)
 				return *moveEventList.begin();
 		}
 	}
-	
+
 	it = m_itemIdMap.find(item->getID());
 	if(it != m_itemIdMap.end())
 	{
@@ -431,6 +431,15 @@ MoveEvent::MoveEvent(const MoveEvent* copy) :
 	moveFunction = copy->moveFunction;
 	equipFunction = copy->equipFunction;
 	slot = copy->slot;
+	if(copy->m_eventType == MOVE_EVENT_EQUIP)
+	{
+		wieldInfo = copy->wieldInfo;
+		reqLevel = copy->reqLevel;
+		reqMagLevel = copy->reqMagLevel;
+		vocationString = copy->vocationString;
+		premium = copy->premium;
+		vocEquipMap = copy->vocEquipMap;
+	}
 }
 
 MoveEvent::~MoveEvent()

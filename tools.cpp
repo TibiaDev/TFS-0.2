@@ -975,3 +975,12 @@ bool fileExists(const char* filename)
 	return exists;
 }
 
+bool operator<(const ShopInfo& left, const ShopInfo& right)
+{
+	return left.itemName < right.itemName;
+}
+
+void sortItems(std::list<ShopInfo>& itemList)
+{
+	itemList.sort();
+}
