@@ -85,8 +85,9 @@ class ConfigManager
 			SAVE_GLOBAL_STORAGE,
 			INGAME_GUILD_SYSTEM,
 			REPLACE_KICK_ON_LOGIN,
-			ENABLE_RULE_VIOLATION_REPORTS,
 			OLD_CONDITION_ACCURACY,
+			MAP_STORAGE_TYPE,
+			FREE_MEMORY_AT_SHUTDOWN,
 			LAST_STRING_CONFIG /* this must be the last one */
 		};
 
@@ -95,7 +96,6 @@ class ConfigManager
 			LOGIN_TRIES = 0,
 			RETRY_TIMEOUT,
 			LOGIN_TIMEOUT,
-			PORT,
 			SQL_PORT,
 			MAX_PLAYERS,
 			PZ_LOCKED,
@@ -137,6 +137,10 @@ class ConfigManager
 			WHITE_SKULL_TIME,
 			AUTO_SAVE_EACH_MINUTES,
 			ALTERNATIVE_EXHAUST,
+			ADMIN_PORT,
+			GAME_PORT,
+			LOGIN_PORT,
+			STATUS_PORT,
 			LAST_INTEGER_CONFIG /* this must be the last one */
 		};
 
