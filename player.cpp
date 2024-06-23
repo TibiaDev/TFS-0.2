@@ -632,8 +632,19 @@ int32_t Player::getSkill(skills_t skilltype, skillsid_t skillinfo) const
 
 void Player::addSkillAdvance(skills_t skill, uint32_t count)
 {
-	skills[skill][SKILL_TRIES] += count * g_config.getNumber(ConfigManager::RATE_SKILL);
+	uint64_t currReqTries = vocation->getReqSkillTries(skill, skills[skill][SKILL_LEVEL]);
+	uint64_t nextReqTries = vocation->getReqSkillTries(skill, skills[skill][SKILL_LEVEL] + 1);
+	if(currReqTries > nextReqTries)
+	{
+		//player has reached max skill
+		skills[skill][SKILL_TRIES] = 0;
+		skills[skill][SKILL_PERCENT] = 0;
+		sendSkills();
+		return;
+	}
+
 	//Need skill up?
+	skills[skill][SKILL_TRIES] += count * g_config.getNumber(ConfigManager::RATE_SKILL);
 	if(skills[skill][SKILL_TRIES] >= vocation->getReqSkillTries(skill, skills[skill][SKILL_LEVEL] + 1))
 	{
 	 	skills[skill][SKILL_LEVEL]++;
@@ -1148,9 +1159,7 @@ void Player::sendStats()
 void Player::sendPing(uint32_t interval)
 {
 	internalPing += interval;
-
-	//1 ping each 5 seconds
-	if(internalPing >= 5000)
+	if(internalPing >= 5000) //1 ping each 5 seconds
 	{
 		internalPing = 0;
 		npings++;
@@ -1161,7 +1170,10 @@ void Player::sendPing(uint32_t interval)
 	if(canLogout())
 	{
 		if(!client)
+		{
+			g_creatureEvents->playerLogout(this);
 			g_game.removeCreature(this, true);
+		}
 		else if(npings > 24)
 			client->logout(true, true);
 	}
@@ -1789,28 +1801,59 @@ void Player::addManaSpent(uint64_t amount)
 {
 	if(amount != 0 && !hasFlag(PlayerFlag_NotGainMana))
 	{
-		manaSpent += amount * g_config.getNumber(ConfigManager::RATE_MAGIC);
-		uint64_t reqMana = vocation->getReqMana(magLevel + 1);
-		if(manaSpent >= reqMana)
+		uint64_t currReqMana = vocation->getReqMana(magLevel);
+		uint64_t nextReqMana = vocation->getReqMana(magLevel + 1);
+		if(currReqMana > nextReqMana)
 		{
-			manaSpent -= reqMana;
+			//player has reached max magic level
+			manaSpent = 0;
+			magLevelPercent = 0;
+			sendStats();
+			return;
+		}
+
+		manaSpent += amount * g_config.getNumber(ConfigManager::RATE_MAGIC);
+		if(manaSpent >= nextReqMana)
+		{
+			manaSpent -= nextReqMana;
 			magLevel++;
 			char MaglvMsg[50];
 			sprintf(MaglvMsg, "You advanced to magic level %d.", magLevel);
 			sendTextMessage(MSG_EVENT_ADVANCE, MaglvMsg);
-			sendStats();
+
+			if(manaSpent > vocation->getReqMana(magLevel + 1))
+			{
+				//prevent player from getting a magic level everytime s/he casts a spell
+				manaSpent = 0;
+			}
+			currReqMana = nextReqMana;
 		}
 
-		magLevelPercent = Player::getPercentLevel(manaSpent, vocation->getReqMana(magLevel + 1));
+		nextReqMana = vocation->getReqMana(magLevel + 1);
+		if(nextReqMana > currReqMana)
+			magLevelPercent = Player::getPercentLevel(manaSpent, nextReqMana);
+		else
+			magLevelPercent = 0;
+
+		sendStats();
 	}
 }
 
 void Player::addExperience(uint64_t exp)
 {
-	experience += exp;
-	int32_t prevLevel = getLevel();
 	int32_t newLevel = getLevel();
-	while(experience >= Player::getExpForLevel(newLevel + 1))
+
+	uint64_t nextLevelExp = Player::getExpForLevel(newLevel + 1);
+	if(Player::getExpForLevel(newLevel) > nextLevelExp)
+	{
+		//player has reached max level
+		levelPercent = 0;
+		sendStats();
+		return;
+	}
+	experience += exp;
+
+	while(experience >= nextLevelExp)
 	{
 		++newLevel;
 		healthMax += vocation->getHPGain();
@@ -1818,8 +1861,15 @@ void Player::addExperience(uint64_t exp)
 		manaMax += vocation->getManaGain();
 		mana += vocation->getManaGain();
 		capacity += vocation->getCapGain();
+		nextLevelExp = Player::getExpForLevel(newLevel + 1);
+		if(Player::getExpForLevel(newLevel) > nextLevelExp)
+		{
+			//player has reached max level
+			break;
+		}
 	}
 
+	int32_t prevLevel = getLevel();
 	if(prevLevel != newLevel)
 	{
 		level = newLevel;
@@ -1840,9 +1890,14 @@ void Player::addExperience(uint64_t exp)
 	}
 
 	uint64_t currLevelExp = Player::getExpForLevel(level);
-	uint32_t newPercent = Player::getPercentLevel(experience - currLevelExp, Player::getExpForLevel(level + 1) - currLevelExp);
-	if(newPercent != levelPercent)
+	nextLevelExp = Player::getExpForLevel(level + 1);
+	if(nextLevelExp > currLevelExp)
+	{
+		uint32_t newPercent = Player::getPercentLevel(experience - currLevelExp, Player::getExpForLevel(level + 1) - currLevelExp);
 		levelPercent = newPercent;
+	}
+	else
+		levelPercent = 0;
 
 	sendStats();
 }
@@ -1938,8 +1993,7 @@ BlockType_t Player::blockHit(Creature* attacker, CombatType_t combatType, int32_
 
 	if(damage != 0)
 	{
-		int32_t blocked = 0;
-
+		int32_t blocked;
 		Item* item = NULL;
 		for(int32_t slot = SLOT_FIRST; slot < SLOT_LAST; ++slot)
 		{
@@ -1949,6 +2003,7 @@ BlockType_t Player::blockHit(Creature* attacker, CombatType_t combatType, int32_
 			if(!(item = getInventoryItem((slots_t)slot)))
 				continue;
 
+			blocked = 0;
 			const ItemType& it = Item::items[item->getID()];
 			switch(combatType)
 			{
@@ -2030,11 +2085,11 @@ BlockType_t Player::blockHit(Creature* attacker, CombatType_t combatType, int32_
 				}
 			}
 
-			if(item->hasCharges())
+			damage -= blocked;
+			if(blocked != 0 && item->hasCharges())
 				g_game.transformItem(item, item->getID(), std::max((int32_t)0, (int32_t)item->getCharges() - 1));
 		}
 
-		damage -= blocked;
 		if(damage <= 0)
 		{
 			damage = 0;
@@ -2092,7 +2147,11 @@ void Player::death()
 		}
 
 		manaSpent -= std::max((int32_t)0, (int32_t)lostMana);
-		magLevelPercent = Player::getPercentLevel(manaSpent, vocation->getReqMana(magLevel + 1));
+		uint64_t nextReqMana = vocation->getReqMana(magLevel + 1);
+		if(nextReqMana > vocation->getReqMana(magLevel))
+			magLevelPercent = Player::getPercentLevel(manaSpent, nextReqMana);
+		else
+			magLevelPercent = 0;
 
 		//Skill loss
 		uint32_t lostSkillTries;
@@ -2144,7 +2203,11 @@ void Player::death()
 		}
 
 		uint64_t currLevelExp = Player::getExpForLevel(newLevel);
-		levelPercent = Player::getPercentLevel(experience - currLevelExp - getLostExperience(), Player::getExpForLevel(newLevel + 1) - currLevelExp);
+		uint64_t nextLevelExp = Player::getExpForLevel(newLevel + 1);
+		if(nextLevelExp > currLevelExp)
+			levelPercent = Player::getPercentLevel(experience - currLevelExp - getLostExperience(), nextLevelExp - currLevelExp);
+		else
+			levelPercent = 0;
 
 		if(!inventory[SLOT_BACKPACK])
 			__internalAddThing(SLOT_BACKPACK, Item::CreateItem(1987));
@@ -2275,7 +2338,10 @@ void Player::kickPlayer(bool displayEffect)
 	if(client)
 		client->logout(displayEffect, true);
 	else
+	{
+		g_creatureEvents->playerLogout(this);
 		g_game.removeCreature(this);
+	}
 }
 
 void Player::notifyLogIn(Player* login_player)
@@ -3036,6 +3102,7 @@ void Player::postRemoveNotification(Thing* thing, int32_t index, bool isComplete
 
 void Player::postUpdateGoods(uint32_t itemId)
 {
+	uint32_t amount = 0;
 	for(ShopInfoList::iterator it = shopOffer.begin(); it != shopOffer.end(); ++it)
 	{
 		if((*it).itemId == itemId)
@@ -3045,10 +3112,13 @@ void Player::postUpdateGoods(uint32_t itemId)
 				goodsMap[(*it).itemId] = itemCount;
 			else
 				goodsMap.erase((*it).itemId);
+
+			amount++;
 		}
 	}
 
-	sendGoods();
+	if(amount > 0)
+		sendGoods();
 }
 
 void Player::__internalAddThing(Thing* thing)
@@ -3739,9 +3809,9 @@ void Player::addUnjustifiedDead(const Player* attacked)
 		if(account.warnings > 3)
 			g_bans.addAccountDeletion(accountNumber, time(NULL), 20, 7, "No comment.", 0);
 		else if(account.warnings == 3)
-			g_bans.addAccountBan(accountNumber, time(NULL) + (30 * 86400), 20, 4, "No comment.", 0);
+			g_bans.addAccountBan(accountNumber, time(NULL) + (g_config.getNumber(ConfigManager::FINAL_BAN_DAYS) * 86400), 20, 4, "No comment.", 0);
 		else
-			g_bans.addAccountBan(accountNumber, time(NULL) + (7 * 86400), 20, 2, "No comment.", 0);
+			g_bans.addAccountBan(accountNumber, time(NULL) + (g_config.getNumber(ConfigManager::BAN_DAYS) * 86400), 20, 2, "No comment.", 0);
 
 		uint32_t playerId = getID();
 		g_game.addMagicEffect(getPosition(), NM_ME_MAGIC_POISON);
@@ -3770,18 +3840,24 @@ bool Player::isPromoted()
 
 double Player::getLostPercent()
 {
-	uint16_t lostPercent = g_config.getNumber(ConfigManager::DEATH_LOSE_PERCENT);
+	uint32_t lostPercent = g_config.getNumber(ConfigManager::DEATH_LOSE_PERCENT);
+	if(isPromoted())
+	{
+		if(lostPercent <= 3)
+			return 0;
+
+		lostPercent -= 3;
+	}
+
 	for(int16_t i = 0; i < 5; i++)
 	{
-		if(lostPercent == 0) break;
+		if(!lostPercent)
+			return 0;
+
 		if(hasBlessing(i))
 			lostPercent--;
 	}
-
-	if(isPromoted() && lostPercent >= 3)
-		lostPercent -= 3;
-
-	return lostPercent / (double)100;
+	return (double)lostPercent / 100;
 }
 
 void Player::learnInstantSpell(const std::string& name)
@@ -3816,18 +3892,20 @@ void Player::manageAccount(const std::string &text)
 		{
 			newCharacterName = text;
 			trimString(newCharacterName);
-			if(!isValidName(newCharacterName))
-				msg << "That name seems to contain invalid symbols tell me another name.";
-			else if(islower(newCharacterName[0]))
-				msg << "Names dont start with lowercase tell me another name starting with uppercase!";
+			if(newCharacterName.length() < 4)
+				msg << "Your name you want is too short, please select a longer name.";
 			else if(newCharacterName.length() > 20)
 				msg << "The name you want is too long, please select a shorter name.";
-			else if(upchar(newCharacterName[0]) == 'G' && upchar(newCharacterName[1]) == 'M')
-				msg << "Your character is not a gamemaster please tell me another name!";
+			else if(asLowerCaseString(newCharacterName).substr(0, 4) == "god "
+				|| asLowerCaseString(newCharacterName).substr(0, 3) == "gm "
+				|| asLowerCaseString(newCharacterName).substr(0, 3) == "cm ")
+			{
+				msg << "You are not a gamemaster, please pick another name.";
+			}
 			else if(IOLoginData::getInstance()->playerExists(newCharacterName))
 				msg << "A player with this name currently exists, please choose another name.";
-			else if(newCharacterName.length() < 4)
-				msg << "Your name you want is too short, please select a longer name.";
+			else if(!isValidName(newCharacterName))
+				msg << "That name seems to contain invalid symbols tell me another name.";
 			else
 			{
 				talkState[1] = true;
@@ -3890,17 +3968,11 @@ void Player::manageAccount(const std::string &text)
 		}
 		else if(talkState[2])
 		{
-			std::string tmpStr = text;
-			trimString(tmpStr);
-			if(!isValidName(tmpStr))
-				msg << "That name contains invalid characters, try to say your name again, you might have typed it wrong.";
-			else
-			{
-				talkState[2] = false;
-				talkState[3] = true;
-				removeChar = tmpStr;
-				msg << "Do you really want to delete the character named " << removeChar << "?";
-			}
+			removeChar = text;
+			trimString(removeChar);
+			talkState[2] = false;
+			talkState[3] = true;
+			msg << "Do you really want to delete the character named " << removeChar << "?";
 		}
 		else if(checkText(text, "yes") && talkState[3])
 		{
@@ -3998,18 +4070,20 @@ void Player::manageAccount(const std::string &text)
 		{
 			newCharacterName = text;
 			trimString(newCharacterName);
-			if(!isValidName(newCharacterName))
-				msg << "That name seems to contain invalid symbols tell me another name.";
-			else if(islower(newCharacterName[0]))
-				msg << "Names dont start with lowercase tell me another name starting with uppercase!";
+			if(newCharacterName.length() < 4)
+				msg << "Your name you want is too short, please select a longer name.";
 			else if(newCharacterName.length() > 20)
 				msg << "The name you want is too long, please select a shorter name.";
-			else if(upchar(newCharacterName[0]) == 'G' && (upchar(newCharacterName[1]) == 'M' || (upchar(newCharacterName[1]) == 'O' && upchar(newCharacterName[2]) == 'D')))
-				msg << "Your character is not a gamemaster please tell me a another name!";
+			else if(asLowerCaseString(newCharacterName).substr(0, 4) == "god "
+				|| asLowerCaseString(newCharacterName).substr(0, 3) == "gm "
+				|| asLowerCaseString(newCharacterName).substr(0, 3) == "cm ")
+			{
+				msg << "You are not a gamemaster, please pick another name.";
+			}
 			else if(IOLoginData::getInstance()->playerExists(newCharacterName))
 				msg << "A player with this name currently exists, please choose another name.";
-			else if(newCharacterName.length() < 4)
-				msg << "Your name you want is too short, please select a longer name.";
+			else if(!isValidName(newCharacterName))
+				msg << "That name seems to contain invalid symbols tell me another name.";
 			else
 			{
 				talkState[6] = false;

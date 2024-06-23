@@ -377,6 +377,11 @@ bool isNumber(char character)
 	return (character >= 48 && character <= 57);
 }
 
+bool isUppercaseLetter(char character)
+{
+	return (character >= 65 && character <= 90);
+}
+
 bool isLowercaseLetter(char character)
 {
 	return (character >= 97 && character <= 122);
@@ -394,9 +399,7 @@ bool isValidPassword(std::string text)
 	uint32_t textLength = text.length();
 	for(uint32_t size = 0; size < textLength; size++)
 	{
-		if(isLowercaseLetter(text[size]) || isNumber(text[size]) || isPasswordCharacter(text[size]))
-			continue;
-		else
+		if(!isLowercaseLetter(text[size]) && !isNumber(text[size]) && !isPasswordCharacter(text[size]))
 			return false;
 	}
 	return true;
@@ -413,15 +416,62 @@ bool isNumbers(std::string text)
 	return true;
 }
 
-bool isValidName(std::string text)
+bool isValidName(std::string text, bool forceUppercaseOnFirstLetter/* = true*/)
 {
-	toLowerCaseString(text);
-
 	uint32_t textLength = text.length();
-	for(uint32_t size = 0; size < textLength; size++)
+	uint32_t lenBeforeSpace = 1;
+	uint32_t lenBeforeSingleQuote = 1;
+	uint32_t lenBeforeDash = 1;
+
+	if(forceUppercaseOnFirstLetter)
 	{
-		if(isLowercaseLetter(text[size]) || text[size] == 32 || text[size] == 39 || text[size] == 45)
+		if(!isUppercaseLetter(text[0]))
+			return false;
+	}
+	else if(!isLowercaseLetter(text[0]) && !isUppercaseLetter(text[0]))
+		return false;
+
+	for(uint32_t size = 1; size < textLength; size++)
+	{
+		if(text[size] != 32)
+		{
+			lenBeforeSpace++;
+
+			if(text[size] != 39)
+				lenBeforeSingleQuote++;
+			else
+			{
+				if(lenBeforeSingleQuote <= 1 || size == textLength - 1 || text[size + 1] == 32)
+					return false;
+
+				lenBeforeSingleQuote = 0;
+			}
+
+			if(text[size] != 45)
+				lenBeforeDash++;
+			else
+			{
+				if(lenBeforeDash <= 1 || size == textLength - 1 || text[size + 1] == 32)
+					return false;
+
+				lenBeforeDash = 0;
+			}
+		}
+		else
+		{
+			if(lenBeforeSpace <= 1 || size == textLength - 1 || text[size + 1] == 32)
+				return false;
+
+			lenBeforeSpace = 0;
+			lenBeforeSingleQuote = 0;
+			lenBeforeDash = 0;
+		}
+
+		if(isLowercaseLetter(text[size]) || text[size] == 32 || text[size] == 39 || text[size] == 45
+			|| (isUppercaseLetter(text[size]) && text[size - 1] == 32))
+		{
 			continue;
+		}
 		else
 			return false;
 	}
@@ -607,31 +657,39 @@ Position getNextPosition(Direction direction, Position pos)
 		case NORTH:
 			pos.y--;
 			break;
+
 		case SOUTH:
 			pos.y++;
 			break;
+
 		case WEST:
 			pos.x--;
 			break;
+
 		case EAST:
 			pos.x++;
 			break;
+
 		case SOUTHWEST:
 			pos.x--;
 			pos.y++;
 			break;
+
 		case NORTHWEST:
 			pos.x--;
 			pos.y--;
 			break;
+
 		case NORTHEAST:
 			pos.x++;
 			pos.y--;
 			break;
+
 		case SOUTHEAST:
 			pos.x++;
 			pos.y++;
 			break;
+
 		default:
 			break;
 	}
