@@ -73,6 +73,7 @@ Creature()
 	if(client)
 		client->setPlayer(this);
 
+	accountNumber = 0;
 	name = _name;
 	setVocation(0);
 	capacity = 400.00;
@@ -3202,6 +3203,11 @@ bool Player::setAttackedCreature(Creature* creature)
 	else
 		setFollowCreature(NULL);
 
+	if(creature)
+	{
+		Dispatcher::getDispatcher().addTask(createTask(
+			boost::bind(&Game::checkCreatureAttack, &g_game, getID())));
+	}
 	return true;
 }
 
@@ -3893,7 +3899,7 @@ void Player::manageAccount(const std::string &text)
 			newCharacterName = text;
 			trimString(newCharacterName);
 			if(newCharacterName.length() < 4)
-				msg << "Your name you want is too short, please select a longer name.";
+				msg << "The name you want is too short, please select a longer name.";
 			else if(newCharacterName.length() > 20)
 				msg << "The name you want is too long, please select a shorter name.";
 			else if(asLowerCaseString(newCharacterName).substr(0, 4) == "god "
@@ -4071,7 +4077,7 @@ void Player::manageAccount(const std::string &text)
 			newCharacterName = text;
 			trimString(newCharacterName);
 			if(newCharacterName.length() < 4)
-				msg << "Your name you want is too short, please select a longer name.";
+				msg << "The name you want is too short, please select a longer name.";
 			else if(newCharacterName.length() > 20)
 				msg << "The name you want is too long, please select a shorter name.";
 			else if(asLowerCaseString(newCharacterName).substr(0, 4) == "god "
