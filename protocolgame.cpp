@@ -248,6 +248,15 @@ void ProtocolGame::setPlayer(Player* p)
 	player = p;
 }
 
+void ProtocolGame::releaseProtocol()
+{
+	//dispatcher thread
+	if(player && player->client == this)
+		player->client = NULL;
+
+	Protocol::releaseProtocol();
+}
+
 void ProtocolGame::deleteProtocolTask()
 {
 	//dispatcher thread
@@ -256,8 +265,6 @@ void ProtocolGame::deleteProtocolTask()
 		#ifdef __DEBUG_NET_DETAIL__
 		std::cout << "Deleting ProtocolGame - Protocol:" << this << ", Player: " << player << std::endl;
 		#endif
-
-		player->client = NULL;
 
 		g_game.FreeThing(player);
 		player = NULL;
@@ -273,6 +280,18 @@ bool ProtocolGame::login(const std::string& name, uint32_t accnumber, const std:
 	{
 		player = new Player(name, this);
 
+		bool letNamelockedLogin = true;
+		if(g_bans.isPlayerNamelocked(name) && accnumber > 1)
+		{
+			if(g_config.getString(ConfigManager::ACCOUNT_MANAGER) == "yes")
+			{
+				player->name = "Account Manager";
+				player->namelockedPlayer = name;
+			}
+			else
+				letNamelockedLogin = false;
+		}
+
 		player->useThing2();
 		player->setID();
 
@@ -285,26 +304,7 @@ bool ProtocolGame::login(const std::string& name, uint32_t accnumber, const std:
 			return false;
 		}
 
-		bool letNamelockedLogin = true;
-		if(g_bans.isPlayerNamelocked(name) && accnumber > 1)
-		{
-			if(g_config.getString(ConfigManager::ACCOUNT_MANAGER) == "yes")
-			{
-				std::string realPassword = player->password;
-				player = NULL;
-				player = new Player("Account Manager", this);
-				player->useThing2();
-				player->setID();
-				IOLoginData::getInstance()->loadPlayer(player, "Account Manager");
-				player->password = realPassword;
-				player->realAccount = accnumber;
-				player->namelockedPlayer = name;
-			}
-			else
-				letNamelockedLogin = false;
-		}
-
-		if(player->getName() == "Account Manager" && accnumber > 1 && !player->accountManager && g_config.getString(ConfigManager::ACCOUNT_MANAGER) == "yes")
+		if(player->name == "Account Manager" && accnumber > 1 && !player->accountManager && g_config.getString(ConfigManager::ACCOUNT_MANAGER) == "yes")
 		{
 			player->accountManager = true;
 			player->realAccount = accnumber;
@@ -565,6 +565,12 @@ bool ProtocolGame::parseFirstPacket(NetworkMessage& msg)
 	if(g_game.getGameState() == GAME_STATE_STARTUP || g_game.getServerSaveMessage(0))
 	{
 		disconnectClient(0x14, "Gameworld is starting up. Please wait.");
+		return false;
+	}
+
+	if(g_game.getGameState() == GAME_STATE_MAINTAIN)
+	{
+		disconnectClient(0x14, "Gameworld is under maintenance. Please re-connect in a while.");
 		return false;
 	}
 
@@ -1986,7 +1992,7 @@ void ProtocolGame::sendGoods(const std::map<uint32_t, uint32_t>& itemMap)
 		for(std::map<uint32_t, uint32_t>::const_iterator it = itemMap.begin(); it != itemMap.end() && i < 255; ++it, ++i)
 		{
 			msg->AddItemId(it->first);
-			msg->AddByte(it->second);
+			msg->AddByte(std::min((uint32_t)255, it->second));
 		}
 	}
 }

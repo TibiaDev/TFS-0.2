@@ -86,6 +86,7 @@ class ConfigManager
 			INGAME_GUILD_SYSTEM,
 			REPLACE_KICK_ON_LOGIN,
 			ENABLE_RULE_VIOLATION_REPORTS,
+			OLD_CONDITION_ACCURACY,
 			LAST_STRING_CONFIG /* this must be the last one */
 		};
 
@@ -135,6 +136,7 @@ class ConfigManager
 			FRAG_TIME,
 			WHITE_SKULL_TIME,
 			AUTO_SAVE_EACH_MINUTES,
+			ALTERNATIVE_EXHAUST,
 			LAST_INTEGER_CONFIG /* this must be the last one */
 		};
 
