@@ -75,6 +75,7 @@ Game::Game()
 	lastStageLevel = 0;
 	lastPlayersRecord = 0;
 	useLastStageLevel = false;
+	stateTime = OTSYS_TIME();
 	for(int16_t i = 0; i < 3; i++)
 		serverSaveMessage[i] = false;
 
@@ -202,6 +203,8 @@ void Game::setGameState(GameState_t newState)
 
 void Game::saveGameState(bool savePlayers)
 {
+	stateTime = 0;
+	std::cout << "Saving server..." << std::endl;
 	if(savePlayers)
 	{
 		for(AutoList<Player>::listiterator it = Player::listPlayer.list.begin(); it != Player::listPlayer.list.end(); ++it)
@@ -213,8 +216,8 @@ void Game::saveGameState(bool savePlayers)
 
 	g_bans.saveBans();
 	map->saveMap();
-
 	ScriptEnviroment::saveGameState();
+	stateTime = OTSYS_TIME() + STATE_TIME;
 }
 
 void Game::loadGameState()
@@ -3698,9 +3701,9 @@ void Game::addCreatureCheck(Creature* creature)
 	if(creature->checkCreatureVectorIndex != 0)
 		return; //Already in a vector
 
-	int nextVector = (checkCreatureLastIndex + 1) % EVENT_CREATURECOUNT;
-	checkCreatureVectors[nextVector].push_back(creature);
-	creature->checkCreatureVectorIndex = nextVector + 1;
+	uint32_t tmp = (checkCreatureLastIndex + 1) % EVENT_CREATURECOUNT;
+	checkCreatureVectors[tmp].push_back(creature);
+	creature->checkCreatureVectorIndex = (tmp + 1);
 }
 
 void Game::removeCreatureCheck(Creature* creature)
@@ -3708,29 +3711,25 @@ void Game::removeCreatureCheck(Creature* creature)
 	if(creature->checkCreatureVectorIndex == 0)
 		return;
 
-	std::vector<Creature*>& checkCreatureVector = checkCreatureVectors[creature->checkCreatureVectorIndex - 1];
-
-	std::vector<Creature*>::iterator cit = std::find(checkCreatureVector.begin(),
-	checkCreatureVector.end(), creature);
+	CreatureVector& checkCreatureVector = checkCreatureVectors[creature->checkCreatureVectorIndex - 1];
+	CreatureVector::iterator cit = std::find(checkCreatureVector.begin(), checkCreatureVector.end(), creature);
 	if(cit != checkCreatureVector.end())
 	{
 		std::swap(*cit, checkCreatureVector.back());
 		checkCreatureVector.pop_back();
 	}
+
 	creature->checkCreatureVectorIndex = 0;
 }
 
 void Game::checkCreatures()
 {
-	Scheduler::getScheduler().addEvent(createSchedulerTask(
-		EVENT_CHECK_CREATURE_INTERVAL, boost::bind(&Game::checkCreatures, this)));
-
+	Scheduler::getScheduler().addEvent(createSchedulerTask(EVENT_CHECK_CREATURE_INTERVAL, boost::bind(&Game::checkCreatures, this)));
+	checkCreatureLastIndex++;
 	if(checkCreatureLastIndex == EVENT_CREATURECOUNT)
 		checkCreatureLastIndex = 0;
 
-	std::vector<Creature*>& checkCreatureVector = checkCreatureVectors[checkCreatureLastIndex];
-	checkCreatureLastIndex++;
-
+	CreatureVector& checkCreatureVector = checkCreatureVectors[checkCreatureLastIndex];
 	Creature* creature;
 	for(uint32_t i = 0; i < checkCreatureVector.size(); ++i)
 	{
@@ -4595,7 +4594,7 @@ void Game::autoSave()
 {
 	Dispatcher::getDispatcher().addTask(
 		createTask(boost::bind(&Game::saveGameState, this, true)));
-	Scheduler::getScheduler().addEvent(createSchedulerTask(g_config.getNumber(ConfigManager::AUTO_SAVE_EACH_MINUTES)  * 1000 * 60, boost::bind(&Game::autoSave, this)));
+	Scheduler::getScheduler().addEvent(createSchedulerTask(g_config.getNumber(ConfigManager::AUTO_SAVE_EACH_MINUTES) * 1000 * 60, boost::bind(&Game::autoSave, this)));
 }
 
 void Game::prepareServerSave()

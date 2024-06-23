@@ -102,6 +102,7 @@ typedef std::map< uint32_t, shared_ptr<RuleViolation> > RuleViolationsMap;
 #define EVENT_LIGHTINTERVAL 10000
 #define EVENT_DECAYINTERVAL 1000
 #define EVENT_DECAY_BUCKETS 16
+#define STATE_TIME 1000
 
 typedef std::vector< std::pair<std::string, unsigned int> > Highscore;
 
@@ -514,16 +515,17 @@ class Game
 		void addDistanceEffect(const Position& fromPos, const Position& toPos,
 		uint8_t effect);
 
-		void startDecay(Item* item);
-
 		Map* getMap() { return map;}
 		const Map* getMap() const { return map;}
 
-		int getLightHour() {return light_hour;}
+		int64_t getStateTime() const {return stateTime;}
+		void setStateTime(int64_t _stateTime) {stateTime = _stateTime;}
 
 		void addCommandTag(std::string tag);
 		void resetCommandTag();
 
+		void startDecay(Item* item);
+		int getLightHour() {return light_hour;}
 		bool npcSpeakToPlayer(Npc* npc, Player* player, const std::string& text, bool publicize);
 
 		const RuleViolationsMap& getRuleViolations() const {return ruleViolations;}
@@ -551,6 +553,7 @@ class Game
 		time_t lastHSUpdate;
 
 		bool serverSaveMessage[2];
+		int64_t stateTime;
 
 		std::vector<Thing*> ToReleaseThings;
 
