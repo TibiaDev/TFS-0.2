@@ -30,22 +30,21 @@ using boost::shared_ptr;
 
 #include "position.h"
 #include "item.h"
-//#include "creature.h"
 #include "fileloader.h"
 
 #include "tools.h"
 #include "tile.h"
+#include "waypoints.h"
 
 class Creature;
 class Player;
 class Game;
-struct FindPathParams;
-
-#define MAP_MAX_LAYERS 16
-
 class Tile;
 class Map;
 
+#define MAP_MAX_LAYERS 16
+
+struct FindPathParams;
 struct AStarNode
 {
 	int32_t x, y;
@@ -63,7 +62,7 @@ class AStarNodes
 {
 	public:
 		AStarNodes();
-		~AStarNodes(){}
+		~AStarNodes() {}
 
 		AStarNode* createOpenNode();
 		AStarNode* getBestNode();
@@ -91,8 +90,7 @@ template<class T> class lessPointer : public std::binary_function<T*, T*, bool>
 		bool operator()(T*& t1, T*& t2) { return *t1 < *t2; }
 };
 
-typedef std::list<Creature*> SpectatorVec;
-typedef std::list<Player*> PlayerList;
+typedef OTSERV_HASH_SET<Creature*> SpectatorVec;
 typedef std::map<Position, boost::shared_ptr<SpectatorVec> > SpectatorCache;
 
 #define FLOOR_BITS 3
@@ -126,7 +124,6 @@ class QTreeNode
 		friend class Map;
 };
 
-
 class QTreeLeafNode : public QTreeNode
 {
 	public:
@@ -148,6 +145,7 @@ class QTreeLeafNode : public QTreeNode
 		QTreeLeafNode* m_leafE;
 		Floor* m_array[MAP_MAX_LAYERS];
 		CreatureVector creature_list;
+		CreatureVector player_list;
 
 		friend class Map;
 		friend class QTreeNode;
@@ -257,6 +255,8 @@ class Map
 		bool getPathMatching(const Creature* creature, std::list<Direction>& dirList,
 			const FrozenPathingConditionCall& pathCondition, const FindPathParams& fpp);
 
+		Waypoints waypoints;
+
 	protected:
 		uint32_t mapWidth, mapHeight;
 		std::string spawnfile;
@@ -264,14 +264,14 @@ class Map
 		SpectatorCache spectatorCache;
 
 		// Actually scans the map for spectators
-		void getSpectatorsInternal(SpectatorVec& list, const Position& centerPos, bool checkforduplicate,
+		void getSpectatorsInternal(SpectatorVec& list, const Position& centerPos,
 			int32_t minRangeX, int32_t maxRangeX,
 			int32_t minRangeY, int32_t maxRangeY,
-			int32_t minRangeZ, int32_t maxRangeZ);
+			int32_t minRangeZ, int32_t maxRangeZ, bool onlyPlayers);
 
 		// Use this when a custom spectator vector is needed, this support many
 		// more parameters than the heavily cached version below.
-		void getSpectators(SpectatorVec& list, const Position& centerPos, bool checkforduplicate = false, bool multifloor = false,
+		void getSpectators(SpectatorVec& list, const Position& centerPos, bool multifloor = false, bool onlyPlayers = false,
 			int32_t minRangeX = 0, int32_t maxRangeX = 0,
 			int32_t minRangeY = 0, int32_t maxRangeY = 0);
 		// The returned SpectatorVec is a temporary and should not be kept around
@@ -296,18 +296,5 @@ class Map
 
 		friend class IOMap;
 };
-
-inline void QTreeLeafNode::addCreature(Creature* c)
-{
-	creature_list.push_back(c);
-}
-
-inline void QTreeLeafNode::removeCreature(Creature* c)
-{
-	CreatureVector::iterator iter = std::find(creature_list.begin(), creature_list.end(), c);
-	assert(iter != creature_list.end());
-	std::swap(*iter, creature_list.back());
-	creature_list.pop_back();
-}
 
 #endif

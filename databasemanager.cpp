@@ -17,6 +17,7 @@
 #include "otpch.h"
 #include "enums.h"
 #include <iostream>
+#include <stack>
 
 #include "databasemanager.h"
 #include "tools.h"
@@ -75,7 +76,7 @@ bool DatabaseManager::optimizeTables()
 	return true;
 }
 
-bool DatabaseManager::triggerExists(std::string triggerName)
+bool DatabaseManager::triggerExists(const std::string& triggerName)
 {
 	Database* db = Database::getInstance();
 	DBQuery query;
@@ -102,7 +103,7 @@ bool DatabaseManager::triggerExists(std::string triggerName)
 	return true;
 }
 
-bool DatabaseManager::tableExists(std::string tableName)
+bool DatabaseManager::tableExists(const std::string& tableName)
 {
 	Database* db = Database::getInstance();
 	DBQuery query;
@@ -293,6 +294,167 @@ uint32_t DatabaseManager::updateDatabase()
 			return 7;
 		}
 
+		case 7:
+		{
+			if(db->getDatabaseEngine() == DATABASE_ENGINE_MYSQL)
+			{
+				std::cout << "> Updating database to version 8 (account viplist with description, icon and notify server side)" << std::endl;
+				db->executeQuery("RENAME TABLE `player_viplist` TO `account_viplist`;");
+				db->executeQuery("ALTER TABLE `account_viplist` DROP FOREIGN KEY `account_viplist_ibfk_1`;");
+				db->executeQuery("UPDATE `account_viplist` SET `player_id` = (SELECT `account_id` FROM `players` WHERE `id` = `player_id`);");
+				db->executeQuery("ALTER TABLE `account_viplist` CHANGE `player_id` `account_id` INT( 11 ) NOT NULL COMMENT 'id of account whose viplist entry it is';");
+				db->executeQuery("ALTER TABLE `account_viplist` DROP FOREIGN KEY `account_viplist_ibfk_2`;");
+				db->executeQuery("ALTER TABLE `account_viplist` CHANGE `vip_id` `player_id` INT( 11 ) NOT NULL COMMENT 'id of target player of viplist entry';");
+				db->executeQuery("ALTER TABLE `account_viplist` DROP INDEX `player_id`, ADD INDEX `account_id` (`account_id`);");
+				db->executeQuery("ALTER TABLE `account_viplist` DROP INDEX `vip_id`, ADD INDEX `player_id` (`player_id`);");
+				db->executeQuery("ALTER TABLE `account_viplist` ADD FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE;");
+				db->executeQuery("ALTER TABLE `account_viplist` ADD FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE;");
+				db->executeQuery("ALTER TABLE `account_viplist` ADD `description` VARCHAR(128) NOT NULL DEFAULT '', ADD `icon` TINYINT( 2 ) UNSIGNED NOT NULL DEFAULT '0', ADD `notify` TINYINT( 1 ) NOT NULL DEFAULT '0';");
+
+				// Remove duplicates
+				DBResult* result = db->storeQuery("SELECT `account_id`, `player_id`, COUNT(*) AS `count` FROM `account_viplist` GROUP BY `account_id`, `player_id` HAVING COUNT(*) > 1;");
+				if(result)
+				{
+					do
+					{
+						query.str("");
+						query << "DELETE FROM `account_viplist` WHERE `account_id` = " << result->getDataInt("account_id") << " AND `player_id` = " << result->getDataInt("player_id") << " LIMIT " << (result->getDataInt("count") - 1) << ";";
+						db->executeQuery(query.str());
+					}
+					while(result->next());
+					db->freeResult(result);
+				}
+
+				// Remove if an account has over 200 entries
+				result = db->storeQuery("SELECT `account_id`, COUNT(*) AS `count` FROM `account_viplist` GROUP BY `account_id` HAVING COUNT(*) > 200;");
+				if(result)
+				{
+					do
+					{
+						query.str("");
+						query << "DELETE FROM `account_viplist` WHERE `account_id` = " << result->getDataInt("account_id") << " LIMIT " << (result->getDataInt("count") - 200) << ";";
+						db->executeQuery(query.str());
+					}
+					while(result->next());
+					db->freeResult(result);
+				}
+
+				db->executeQuery("ALTER TABLE `account_viplist` ADD UNIQUE `account_player_index` (`account_id`, `player_id`);");
+
+				registerDatabaseConfig("db_version", 8);
+				return 8;
+			}
+			break;
+		}
+
+		case 8:
+		{
+			if(db->getDatabaseEngine() == DATABASE_ENGINE_MYSQL)
+			{
+				std::cout << "> Updating database to version 9 (global inbox)" << std::endl;
+				db->executeQuery("CREATE TABLE IF NOT EXISTS `player_inboxitems` (`player_id` int(11) NOT NULL, `sid` int(11) NOT NULL, `pid` int(11) NOT NULL DEFAULT '0', `itemtype` smallint(6) NOT NULL, `count` smallint(5) NOT NULL DEFAULT '0', `attributes` blob NOT NULL, UNIQUE KEY `player_id_2` (`player_id`,`sid`), KEY `player_id` (`player_id`), FOREIGN KEY (`player_id`) REFERENCES `players`(`id`) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=latin1;");
+
+				// Delete "market" item
+				db->executeQuery("DELETE FROM `player_depotitems` WHERE `itemtype` = 14405;");
+
+				// Move up items in depot chests
+				DBResult* result = db->storeQuery("SELECT `player_id`, `pid`, (SELECT `dp2`.`sid` FROM `player_depotitems` AS `dp2` WHERE `dp2`.`player_id` = `dp1`.`player_id` AND `dp2`.`pid` = `dp1`.`sid` AND `itemtype` = 2594) AS `sid` FROM `player_depotitems` AS `dp1` WHERE `itemtype` = 2589;");
+				if(result)
+				{
+					do
+					{
+						query.str("");
+						query << "UPDATE `player_depotitems` SET `pid` = " << result->getDataInt("pid") << " WHERE `player_id` = " << result->getDataInt("player_id") << " AND `pid` = " << result->getDataInt("sid") << ";";
+						db->executeQuery(query.str());
+					}
+					while(result->next());
+					db->freeResult(result);
+				}
+
+				// Delete the depot lockers
+				db->executeQuery("DELETE FROM `player_depotitems` WHERE `itemtype` = 2589;");
+
+				// Delete the depot chests
+				db->executeQuery("DELETE FROM `player_depotitems` WHERE `itemtype` = 2594;");
+
+				std::ostringstream ss2;
+
+				result = db->storeQuery("SELECT DISTINCT `player_id` FROM `player_depotitems` WHERE `itemtype` = 14404;");
+				if(result)
+				{
+					do
+					{
+						int32_t runningId = 100;
+
+						DBInsert stmt(db);
+						stmt.setQuery("INSERT INTO `player_inboxitems` (`player_id`, `sid`, `pid`, `itemtype`, `count`, `attributes`) VALUES ");
+
+						std::ostringstream sss;
+						sss << "SELECT `sid` FROM `player_depotitems` WHERE `player_id` = " << result->getDataInt("player_id") << " AND `itemtype` = 14404;";
+						DBResult* result2 = db->storeQuery(sss.str());
+						if(result2)
+						{
+							do
+							{
+								std::stack<int32_t> sids;
+								sids.push(result2->getDataInt("sid"));
+								while(!sids.empty())
+								{
+									int32_t sid = sids.top();
+									sids.pop();
+
+									std::ostringstream ss;
+									ss << "SELECT * FROM `player_depotitems` WHERE `player_id` = " << result->getDataInt("player_id") << " AND `pid` = " << sid << ";";
+									DBResult* result3 = db->storeQuery(ss.str());
+									if(result3)
+									{
+										do
+										{
+											unsigned long attrSize = 0;
+											const char* attr = result3->getDataStream("attributes", attrSize);
+											ss2 << result->getDataInt("player_id") << "," << ++runningId << ",0," << result3->getDataInt("itemtype") << "," << result3->getDataInt("count") << "," << db->escapeBlob(attr, attrSize);
+											if(!stmt.addRow(ss2))
+												std::cout << "Failed to add row!" << std::endl;
+
+											sids.push(result3->getDataInt("sid"));
+
+											std::ostringstream tmpss;
+											tmpss << "DELETE FROM `player_depotitems` WHERE `player_id` = " << result->getDataInt("player_id") << " AND `sid` = " << result3->getDataInt("sid") << ";";
+											db->executeQuery(tmpss.str());
+										}
+										while(result3->next());
+										db->freeResult(result3);
+									}
+								}
+							}
+							while(result2->next());
+							db->freeResult(result2);
+						}
+
+						if (!stmt.execute())
+							std::cout << "Failed to execute statement!" << std::endl;
+					}
+					while(result->next());
+					db->freeResult(result);
+				}
+
+				// Delete the inboxes
+				db->executeQuery("DELETE FROM `player_depotitems` WHERE `itemtype` = 14404;");
+
+				registerDatabaseConfig("db_version", 9);
+				return 9;
+			}
+			break;
+		}
+
+		case 9:
+		{
+			std::cout << "> Updating database to version 10 (stamina)" << std::endl;
+			db->executeQuery("ALTER TABLE `players` ADD `stamina` SMALLINT UNSIGNED NOT NULL DEFAULT 2520;");
+			registerDatabaseConfig("db_version", 10);
+			return 10;
+		}
+
 		/*
 		case ?-1:
 		{
@@ -353,7 +515,7 @@ uint32_t DatabaseManager::updateDatabase()
 	return 0;
 }
 
-bool DatabaseManager::getDatabaseConfig(std::string config, int32_t &value)
+bool DatabaseManager::getDatabaseConfig(const std::string& config, int32_t &value)
 {
 	Database* db = Database::getInstance();
 	DBQuery query;
@@ -367,7 +529,7 @@ bool DatabaseManager::getDatabaseConfig(std::string config, int32_t &value)
 	return true;
 }
 
-bool DatabaseManager::getDatabaseConfig(std::string config, std::string &value)
+bool DatabaseManager::getDatabaseConfig(const std::string& config, std::string& value)
 {
 	Database* db = Database::getInstance();
 	DBQuery query;
@@ -381,7 +543,7 @@ bool DatabaseManager::getDatabaseConfig(std::string config, std::string &value)
 	return true;
 }
 
-void DatabaseManager::registerDatabaseConfig(std::string config, int32_t value)
+void DatabaseManager::registerDatabaseConfig(const std::string& config, int32_t value)
 {
 	Database* db = Database::getInstance();
 	DBQuery query;
@@ -395,7 +557,7 @@ void DatabaseManager::registerDatabaseConfig(std::string config, int32_t value)
 	db->executeQuery(query.str());
 }
 
-void DatabaseManager::registerDatabaseConfig(std::string config, std::string value)
+void DatabaseManager::registerDatabaseConfig(const std::string& config, const std::string& value)
 {
 	Database* db = Database::getInstance();
 	DBQuery query;

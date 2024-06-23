@@ -43,11 +43,10 @@ WaitListIterator WaitingList::findClient(const Player* player, uint32_t& slot)
 	slot = 1;
 	for(WaitListIterator it = waitList.begin(); it != waitList.end(); ++it)
 	{
-		if((*it)->acc == player->getAccount() && (*it)->ip == player->getIP() &&
-			strcasecmp((*it)->name.c_str(), player->getName().c_str()) == 0)
-		{
+		Wait* wait = *it;
+		if(wait->acc == player->getAccount() && wait->ip == player->getIP() && strcasecmp(wait->name.c_str(), player->getName().c_str()) == 0)
 			return it;
-		}
+
 		++slot;
 	}
 	return waitList.end();
@@ -100,7 +99,7 @@ bool WaitingList::clientLogin(const Player* player)
 		else
 		{
 			//let them wait a bit longer
-			(*it)->timeout = OTSYS_TIME() + getTimeOut(slot) * 1000;
+			(*it)->timeout = OTSYS_TIME() + (getTimeOut(slot) * 1000);
 			return false;
 		}
 	}
@@ -130,7 +129,7 @@ bool WaitingList::clientLogin(const Player* player)
 	wait->acc = player->getAccount();
 	wait->ip = player->getIP();
 	wait->premium = player->isPremium();
-	wait->timeout = OTSYS_TIME() + getTimeOut(slot) * 1000;
+	wait->timeout = OTSYS_TIME() + (getTimeOut(slot) * 1000);
 	return false;
 }
 
@@ -146,7 +145,6 @@ int32_t WaitingList::getClientSlot(const Player* player)
 
 void WaitingList::cleanUpList()
 {
-	uint32_t slot = 1;
 	for(WaitListIterator it = waitList.begin(); it != waitList.end();)
 	{
 		if((*it)->timeout - OTSYS_TIME() <= 0)
@@ -155,9 +153,6 @@ void WaitingList::cleanUpList()
 			waitList.erase(it++);
 		}
 		else
-		{
-			++slot;
 			++it;
-		}
 	}
 }

@@ -21,8 +21,6 @@
 #ifndef __OTSERV_NETWORK_MESSAGE_H__
 #define __OTSERV_NETWORK_MESSAGE_H__
 
-#include <boost/shared_ptr.hpp>
-
 #include "definitions.h"
 #include "otsystem.h"
 #include "const.h"
@@ -146,8 +144,10 @@ class NetworkMessage
 		void AddBytes(const char* bytes, uint32_t size);
 		void AddPaddingBytes(uint32_t n);
 
-		void AddString(const std::string &value){AddString(value.c_str());}
+		void AddString(const std::string& value);
 		void AddString(const char* value);
+
+		void AddDouble(double value, uint8_t precision = 2);
 
 		// write functions for complex types
 		void AddPosition(const Position &pos);
@@ -166,11 +166,11 @@ class NetworkMessage
 
 		bool isOverrun() const { return m_overrun; }
 
-		char* getBuffer() { return (char*)&m_MsgBuf[0]; }
+		char* getBuffer() const { return (char*)&m_MsgBuf[0]; }
 		char* getBodyBuffer() { m_ReadPos = 2; return (char*)&m_MsgBuf[header_length]; }
 
 #ifdef __TRACK_NETWORK__
-		virtual void Track(std::string file, long line, std::string func) {}
+		virtual void Track(const std::string& file, long line, const std::string& func) {}
 		virtual void clearTrack() {}
 #endif
 
@@ -182,7 +182,7 @@ class NetworkMessage
 
 		inline bool canRead(int32_t size)
 		{
-			if(size >= (NETWORKMESSAGE_MAXSIZE - m_ReadPos))
+			if((m_ReadPos + size) > (m_MsgSize + 8) || size >= (NETWORKMESSAGE_MAXSIZE - m_ReadPos))
 			{
 				m_overrun = true;
 				return false;
@@ -197,7 +197,5 @@ class NetworkMessage
 
 		uint8_t m_MsgBuf[NETWORKMESSAGE_MAXSIZE];
 };
-
-typedef boost::shared_ptr<NetworkMessage> NetworkMessage_ptr;
 
 #endif // #ifndef __NETWORK_MESSAGE_H__

@@ -18,78 +18,42 @@
 // Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //////////////////////////////////////////////////////////////////////
 
-#ifndef __TEMPLATES_H__
-#define __TEMPLATES_H__
+#ifndef __OTSERV_DEPOTLOCKER_H__
+#define __OTSERV_DEPOTLOCKER_H__
 
-#include <set>
-#include <map>
+#include "container.h"
+#include "inbox.h"
 
-#include "creature.h"
-#include "otsystem.h"
-
-template<class T> class AutoList
+class DepotLocker : public Container
 {
 	public:
-		AutoList() {}
+		DepotLocker(uint16_t _type);
+		~DepotLocker();
 
-		virtual ~AutoList()
-		{
-			list.clear();
-		}
+		DepotLocker* getDepotLocker() {return this;}
+		const DepotLocker* getDepotLocker() const {return this;}
 
-		void addList(T* t)
-		{
-			list[t->getID()] = t;
-		}
+		void removeInbox(Inbox* inbox);
 
-		void removeList(uint32_t _id)
-		{
-			list.erase(_id);
-		}
+		//serialization
+		Attr_ReadValue readAttr(AttrTypes_t attr, PropStream& propStream);
 
-		typedef std::map<uint32_t, T*> list_type;
+		uint32_t getDepotId() const {return depotId;}
+		void setDepotId(uint32_t id) {depotId = id;}
 
-		list_type list;
-		typedef typename list_type::iterator listiterator;
-};
+		//cylinder implementations
+		ReturnValue __queryAdd(int32_t index, const Thing* thing, uint32_t count,
+			uint32_t flags, Creature* actor = NULL) const;
 
-class AutoID
-{
-	public:
-		AutoID()
-		{
-			OTSYS_THREAD_LOCK_CLASS lockClass(autoIDLock);
-			count++;
-			if(count >= 0xFFFFFF)
-				count = 1000;
+		void postAddNotification(Thing* thing, const Cylinder* oldParent, int32_t index, cylinderlink_t link = LINK_OWNER);
+		void postRemoveNotification(Thing* thing, const Cylinder* newParent, int32_t index, bool isCompleteRemoval, cylinderlink_t link = LINK_OWNER);
 
-			while(list.find(count) != list.end())
-			{
-				if(count >= 0xFFFFFF)
-					count = 1000;
-				else
-					count++;
-			}
+		//overrides
+		bool canRemove() const {return false;}
 
-			list.insert(count);
-			auto_id = count;
-		}
-
-		virtual ~AutoID()
-		{
-			list_type::iterator it = list.find(auto_id);
-			if(it != list.end())
-				list.erase(it);
-		}
-
-		typedef OTSERV_HASH_SET<uint32_t> list_type;
-
-		uint32_t auto_id;
-		static OTSYS_THREAD_LOCKVAR autoIDLock;
-
-	protected:
-		static uint32_t count;
-		static list_type list;
+	private:
+		uint32_t depotId;
 };
 
 #endif
+

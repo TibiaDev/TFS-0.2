@@ -15,7 +15,7 @@ DROP TABLE IF EXISTS `houses`;
 DROP TABLE IF EXISTS `player_items`;
 DROP TABLE IF EXISTS `player_skills`;
 DROP TABLE IF EXISTS `player_storage`;
-DROP TABLE IF EXISTS `player_viplist`;
+DROP TABLE IF EXISTS `account_viplist`;
 DROP TABLE IF EXISTS `player_spells`;
 DROP TABLE IF EXISTS `player_deaths`;
 DROP TABLE IF EXISTS `guildwar_kills`;
@@ -113,13 +113,14 @@ CREATE TABLE `players`
 	`balance` bigint(20) unsigned NOT NULL DEFAULT '0',
 	`offlinetraining_time` smallint(5) unsigned NOT NULL DEFAULT 43200,
 	`offlinetraining_skill` int(11) NOT NULL DEFAULT -1,
+	`stamina` smallint(5) unsigned NOT NULL DEFAULT 2520,
 	PRIMARY KEY (`id`),
 	KEY `name` (`name`),
 	FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
 	FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`)
 ) ENGINE=InnoDB;
 
-INSERT INTO `players` VALUES (1,'Account Manager',1,1,1,0,150,150,0,0,0,0,0,110,0,0,0,0,0,0,0,50,50,7,'',400,0,0,0,0,0,0,0,'',0,0,0,10,10,10,0,0,0,43200,-1);
+INSERT INTO `players` VALUES (1,'Account Manager',1,1,1,0,150,150,0,0,0,0,0,110,0,0,0,0,0,0,0,50,50,7,'',400,0,0,0,0,0,0,0,'',0,0,0,10,10,10,0,0,0,43200,-1,2520);
 
 CREATE TABLE `bans`
 (
@@ -197,14 +198,24 @@ CREATE TABLE `player_deaths`
 CREATE TABLE `player_depotitems`
 (
 	`player_id` INT NOT NULL,
-	`depot_id` INT NOT NULL DEFAULT 0,
 	`sid` INT NOT NULL COMMENT 'any given range eg 0-100 will be reserved for depot lockers and all > 100 will be then normal items inside depots',
 	`pid` INT NOT NULL DEFAULT 0,
 	`itemtype` INT NOT NULL,
 	`count` INT NOT NULL DEFAULT 0,
 	`attributes` BLOB NOT NULL,
 	FOREIGN KEY (`player_id`) REFERENCES `players`(`id`) ON DELETE CASCADE,
-	KEY (`player_id`, `depot_id`),
+	UNIQUE KEY (`player_id`, `sid`)
+) ENGINE = InnoDB;
+
+CREATE TABLE `player_inboxitems`
+(
+	`player_id` INT NOT NULL,
+	`sid` INT NOT NULL,
+	`pid` INT NOT NULL DEFAULT 0,
+	`itemtype` INT NOT NULL,
+	`count` INT NOT NULL DEFAULT 0,
+	`attributes` BLOB NOT NULL,
+	FOREIGN KEY (`player_id`) REFERENCES `players`(`id`) ON DELETE CASCADE,
 	UNIQUE KEY (`player_id`, `sid`)
 ) ENGINE = InnoDB;
 
@@ -243,13 +254,17 @@ CREATE TABLE `player_storage`
 	FOREIGN KEY (`player_id`) REFERENCES `players`(`id`) ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
-CREATE TABLE `player_viplist`
+CREATE TABLE `account_viplist`
 (
-	`player_id` INT NOT NULL COMMENT 'id of player whose viplist entry it is',
-	`vip_id` INT NOT NULL COMMENT 'id of target player of viplist entry',
-	FOREIGN KEY (`player_id`) REFERENCES `players`(`id`) ON DELETE CASCADE,
-	FOREIGN KEY (`vip_id`) REFERENCES `players`(`id`) ON DELETE CASCADE
-) ENGINE = InnoDB;
+  `account_id` int(11) NOT NULL COMMENT 'id of account whose viplist entry it is',
+  `player_id` int(11) NOT NULL COMMENT 'id of target player of viplist entry',
+  `description` varchar(128) NOT NULL DEFAULT '',
+  `icon` tinyint(2) unsigned NOT NULL DEFAULT '0',
+  `notify` tinyint(1) NOT NULL DEFAULT '0',
+  UNIQUE KEY `account_player_index` (`account_id`,`player_id`),
+  FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`player_id`) REFERENCES `players`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB;
 
 CREATE TABLE `map_store`
 (
@@ -321,7 +336,7 @@ CREATE TABLE `server_config`
 	UNIQUE KEY `config` (`config`)
 ) ENGINE=InnoDB;
 
-INSERT INTO `server_config` VALUES ('db_version','7'),('encryption','0');
+INSERT INTO `server_config` VALUES ('db_version','10'),('encryption','0');
 
 CREATE TABLE `market_history`
 (

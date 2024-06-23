@@ -68,6 +68,7 @@ class ConfigManager
 			OPTIMIZE_DATABASE,
 			MARKET_ENABLED,
 			MARKET_PREMIUM,
+			STAMINA_SYSTEM,
 			LAST_BOOLEAN_CONFIG /* this must be the last one */
 		};
 
@@ -130,9 +131,7 @@ class ConfigManager
 			KILLS_TO_BAN,
 			BAN_DAYS,
 			FINAL_BAN_DAYS,
-			HIGHSCORES_TOP,
 			MAX_MESSAGEBUFFER,
-			HIGHSCORES_UPDATETIME,
 			ACTIONS_DELAY_INTERVAL,
 			EX_ACTIONS_DELAY_INTERVAL,
 			CRITICAL_HIT_CHANCE,
@@ -161,10 +160,10 @@ class ConfigManager
 		bool loadFile(const std::string& _filename);
 		bool reload();
 
-		const std::string& getString(uint32_t _what) const;
-		int32_t getNumber(uint32_t _what) const;
-		bool getBoolean(uint32_t _what) const;
-		bool setNumber(uint32_t _what, int32_t _value);
+		const std::string& getString(string_config_t _what) const;
+		int32_t getNumber(integer_config_t _what) const;
+		bool getBoolean(boolean_config_t _what) const;
+		bool setNumber(integer_config_t _what, int32_t _value);
 
 	private:
 		std::string getGlobalString(lua_State* _L, const std::string& _identifier, const std::string& _default="");

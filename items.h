@@ -231,6 +231,8 @@ class ItemType
 		bool floorChangeWest;
 		bool hasHeight;
 
+		bool walkStack;
+
 		bool blockSolid;
 		bool blockPickupable;
 		bool blockProjectile;
@@ -257,6 +259,8 @@ class ItemType
 		CombatType_t combatType;
 		bool replaceable;
 		bool ware;
+
+//		std::string marketName;
 };
 
 template<typename A>
@@ -288,7 +292,7 @@ class Items
 		bool reload();
 		void clear();
 
-		int32_t loadFromOtb(std::string);
+		int32_t loadFromOtb(const std::string& file);
 
 		const ItemType& operator[](int32_t id) const {return getItemType(id);}
 		const ItemType& getItemType(int32_t id) const;

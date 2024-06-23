@@ -67,22 +67,22 @@ void Protocol::onRecvMessage(NetworkMessage& msg)
 		#ifdef __DEBUG_NET_DETAIL__
 		std::cout << "Protocol::onRecvMessage - decrypt" << std::endl;
 		#endif
-		XTEA_decrypt(msg);
+		if(!XTEA_decrypt(msg))
+			return;
 	}
 	parsePacket(msg);
 }
 
-OutputMessage_ptr Protocol::getOutputBuffer()
+OutputMessage_ptr Protocol::getOutputBuffer(int32_t size)
 {
-	if(m_outputBuffer && m_outputBuffer->getMessageLength() < NETWORKMESSAGE_MAXSIZE - 4096)
+	if(m_outputBuffer && NetworkMessage::max_body_length >= m_outputBuffer->getMessageLength() + size)
 		return m_outputBuffer;
 	else if(m_connection)
 	{
 		m_outputBuffer = OutputMessagePool::getInstance()->getOutputMessage(this);
 		return m_outputBuffer;
 	}
-	else
-		return OutputMessage_ptr();
+	return OutputMessage_ptr();
 }
 
 void Protocol::releaseProtocol()
@@ -90,7 +90,7 @@ void Protocol::releaseProtocol()
 	if(m_refCount > 0)
 	{
 		//Reschedule it and try again.
-		g_scheduler.addEvent( createSchedulerTask(SCHEDULER_MINTICKS,
+		g_scheduler.addEvent(createSchedulerTask(SCHEDULER_MINTICKS,
 			boost::bind(&Protocol::releaseProtocol, this)));
 	}
 	else
@@ -215,7 +215,9 @@ bool Protocol::RSA_decrypt(RSA* rsa, NetworkMessage& msg)
 
 	if(msg.GetByte() != 0)
 	{
+		#ifdef __DEBUG_NET__
 		std::cout << "[Warning - Protocol::RSA_decrypt] First byte != 0" << std::endl;
+		#endif
 		return false;
 	}
 	return true;

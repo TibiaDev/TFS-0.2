@@ -28,7 +28,8 @@
 #include "item.h"
 
 class Container;
-class Depot;
+class DepotChest;
+class DepotLocker;
 
 class ContainerIterator
 {
@@ -50,7 +51,7 @@ class ContainerIterator
 
 		Container* super;
 		std::queue<Container*> over;
-		ItemList::iterator cur;
+		ItemDeque::iterator cur;
 
 		friend class Container;
 };
@@ -64,8 +65,12 @@ class Container : public Item, public Cylinder
 
 		virtual Container* getContainer() {return this;}
 		virtual const Container* getContainer() const {return this;}
-		virtual Depot* getDepot() {return NULL;}
-		virtual const Depot* getDepot() const {return NULL;}
+
+		virtual DepotChest* getDepotChest() {return NULL;}
+		virtual const DepotChest* getDepotChest() const {return NULL;}
+
+		virtual DepotLocker* getDepotLocker() {return NULL;}
+		virtual const DepotLocker* getDepotLocker() const {return NULL;}
 
 		Attr_ReadValue readAttr(AttrTypes_t attr, PropStream& propStream);
 		bool unserializeItemNode(FileLoader& f, NODE node, PropStream& propStream);
@@ -80,10 +85,11 @@ class Container : public Item, public Cylinder
 		ContainerIterator begin() const;
 		ContainerIterator end() const;
 
-		ItemList::const_iterator getItems() const {return itemlist.begin();}
-		ItemList::const_iterator getEnd() const {return itemlist.end();}
-		ItemList::const_reverse_iterator getReversedItems() const {return itemlist.rbegin();}
-		ItemList::const_reverse_iterator getReversedEnd() const {return itemlist.rend();}
+		ItemDeque::const_iterator getItems() const {return itemlist.begin();}
+		ItemDeque::const_iterator getEnd() const {return itemlist.end();}
+
+		ItemDeque::const_reverse_iterator getReversedItems() const {return itemlist.rbegin();}
+		ItemDeque::const_reverse_iterator getReversedEnd() const {return itemlist.rend();}
 
 		void addItem(Item* item);
 		Item* getItem(uint32_t index) const;
@@ -137,7 +143,7 @@ class Container : public Item, public Cylinder
 
 		uint32_t maxSize;
 		double totalWeight;
-		ItemList itemlist;
+		ItemDeque itemlist;
 		uint32_t serializationCount;
 
 		friend class ContainerIterator;

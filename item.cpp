@@ -22,7 +22,6 @@
 #include "definitions.h"
 #include "item.h"
 #include "container.h"
-#include "depot.h"
 #include "teleport.h"
 #include "trashholder.h"
 #include "mailbox.h"
@@ -65,7 +64,7 @@ Item* Item::CreateItem(const uint16_t _type, uint16_t _count /*= 0*/)
 	if(it.id != 0)
 	{
 		if(it.isDepot())
-			newItem = new Depot(_type);
+			newItem = new DepotLocker(_type);
 		else if(it.isContainer())
 			newItem = new Container(_type);
 		else if(it.isTeleport())
@@ -489,6 +488,7 @@ Attr_ReadValue Item::readAttr(AttrTypes_t attr, PropStream& propStream)
 
 			if(state != DECAYING_FALSE)
 				setDecaying(DECAYING_PENDING);
+
 			break;
 		}
 
@@ -641,7 +641,7 @@ bool Item::serializeAttr(PropWriteStream& propWriteStream) const
 		propWriteStream.ADD_ULONG(duration);
 	}
 
-	uint32_t decayState = getDecaying();
+	ItemDecayState_t decayState = getDecaying();
 	if(decayState == DECAYING_TRUE || decayState == DECAYING_PENDING)
 	{
 		propWriteStream.ADD_UCHAR(ATTR_DECAYING_STATE);
@@ -726,7 +726,7 @@ bool Item::hasProperty(enum ITEMPROPERTY prop) const
 double Item::getWeight() const
 {
 	if(isStackable())
-		return items[id].weight * std::max((int32_t)1, (int32_t)getItemCount());
+		return items[id].weight * std::max<int32_t>(1, getItemCount());
 
 	return items[id].weight;
 }
@@ -778,7 +778,7 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 
 			s << ")";
 		}
-		else if(it.weaponType != WEAPON_AMMO && it.weaponType != WEAPON_WAND)
+		else if(it.weaponType != WEAPON_AMMO)
 		{
 			bool begin = true;
 			if(it.attack != 0)
@@ -1078,7 +1078,11 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 						else
 							s << "You read: ";
 
-						s << item->getText();
+						std::string outtext;
+						if(utf8ToLatin1(item->getText().c_str(), outtext))
+							s << outtext;
+						else
+							s << item->getText();
 					}
 					else
 						s << "Nothing is written on it";

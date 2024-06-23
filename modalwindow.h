@@ -1,7 +1,7 @@
 //////////////////////////////////////////////////////////////////////
 // OpenTibia - an opensource roleplaying game
 //////////////////////////////////////////////////////////////////////
-// Mounts
+//
 //////////////////////////////////////////////////////////////////////
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -18,61 +18,50 @@
 // Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //////////////////////////////////////////////////////////////////////
 
-#ifndef _MOUNTS_H_
-#define _MOUNTS_H_
+#ifndef __MODALWINDOW_H__
+#define __MODALWINDOW_H__
+
+#include "definitions.h"
 
 #include <list>
 #include <string>
-#include "player.h"
-#include "networkmessage.h"
 
-class Mount;
+typedef std::pair<std::string, uint8_t> ModalWindowChoice;
+typedef std::list<ModalWindowChoice> ModalWindowChoiceList;
 
-typedef std::list<Mount*> MountsList;
-
-class Mount
+class ModalWindow
 {
 	public:
-		Mount(uint8_t _id, uint16_t _clientId, const std::string& _name, int32_t _speed, bool _premium);
-		~Mount() {}
+		ModalWindow(uint32_t id, const std::string& title, const std::string& message);
+		~ModalWindow() {}
 
-		bool isTamed(Player* player) const;
-		uint8_t getID() const { return id; }
-		uint16_t getClientID() const { return clientId; }
-		std::string getName() const { return name; }
-		int32_t getSpeed() const { return speed; }
-		bool isPremium() const { return premium; }
+		std::string getTitle() const;
+		std::string getMessage() const;
 
-	private:
-		uint8_t id;
-		uint16_t clientId;
-		std::string name;
-		int32_t speed;
-		bool premium;
-};
+		uint32_t getID() const;
+		uint32_t getButtonCount() const;
+		uint32_t getChoiceCount() const;
+		void addChoice(uint8_t id, const std::string& text);
+		void addButton(uint8_t id, const std::string& text);
 
-class Mounts
-{
-	public:
-		Mounts() {}
-		~Mounts();
+		void setDefaultEnterButton(uint8_t enterButtonId);
+		void setDefaultEscapeButton(uint8_t escapeButtonId);
+		uint8_t getDefaultEnterButton() const;
+		uint8_t getDefaultEscapeButton() const;
 
-		static Mounts* getInstance()
-		{
-			static Mounts instance;
-			return &instance;
-		}
+		bool hasPriority() const;
+		void setPriority(bool priority);
 
-		bool reload();
-		bool loadFromXml();
-		Mount* getMountByID(uint8_t id);
-		Mount* getMountByClientID(uint16_t clientId);
-
-		MountsList::const_iterator getFirstMount() const {return mounts.begin();}
-		MountsList::const_iterator getLastMount() const {return mounts.end();}
+		const ModalWindowChoiceList& getButtons() const;
+		const ModalWindowChoiceList& getChoices() const;
 
 	private:
-		MountsList mounts;
+		uint32_t id;
+		std::string title, message;
+		uint8_t defaultEnterButton, defaultEscapeButton;
+		bool priority;
+
+		ModalWindowChoiceList buttons, choices;
 };
 
 #endif

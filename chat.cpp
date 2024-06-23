@@ -29,7 +29,7 @@ extern ConfigManager g_config;
 extern Game g_game;
 extern Chat g_chat;
 
-PrivateChatChannel::PrivateChatChannel(uint16_t channelId, std::string channelName) :
+PrivateChatChannel::PrivateChatChannel(uint16_t channelId, const std::string& channelName) :
 	ChatChannel(channelId, channelName)
 {
 	m_owner = 0;
@@ -43,13 +43,13 @@ bool PrivateChatChannel::isInvited(const Player* player)
 	if(player->getGUID() == getOwner())
 		return true;
 
-	InvitedMap::iterator it = m_invites.find(player->getGUID());
+	InvitedMap::const_iterator it = m_invites.find(player->getGUID());
 	return it != m_invites.end();
 }
 
 bool PrivateChatChannel::addInvited(Player* player)
 {
-	InvitedMap::iterator it = m_invites.find(player->getGUID());
+	InvitedMap::const_iterator it = m_invites.find(player->getGUID());
 	if(it != m_invites.end())
 		return false;
 
@@ -124,7 +124,7 @@ void PrivateChatChannel::closeChannel()
 	}
 }
 
-ChatChannel::ChatChannel(uint16_t channelId, std::string channelName)
+ChatChannel::ChatChannel(uint16_t channelId, const std::string& channelName)
 {
 	m_id = channelId;
 	m_name = channelName;
@@ -179,9 +179,9 @@ bool ChatChannel::removeUser(Player* player)
 	return true;
 }
 
-void ChatChannel::sendToAll(std::string message, SpeakClasses type)
+void ChatChannel::sendToAll(const std::string& message, SpeakClasses type)
 {
-	for(UsersMap::iterator it = m_users.begin(); it != m_users.end(); ++it)
+	for(UsersMap::iterator it = m_users.begin(), end = m_users.end(); it != end; ++it)
 		it->second->sendChannelMessage("", message, type, m_id);
 }
 
@@ -205,39 +205,15 @@ bool ChatChannel::talk(Player* fromPlayer, SpeakClasses type, const std::string&
 Chat::Chat()
 {
 	// Create the default channels
-	ChatChannel *newChannel;
+	m_normalChannels[CHANNEL_GAMEMASTER] = new ChatChannel(CHANNEL_GAMEMASTER, "Gamemaster");
+	m_normalChannels[CHANNEL_TUTOR] = new ChatChannel(CHANNEL_TUTOR, "Tutor");
+	m_normalChannels[CHANNEL_WORLDCHAT] = new ChatChannel(CHANNEL_WORLDCHAT, "World Chat");
+	m_normalChannels[CHANNEL_ENGLISHCHAT] = new ChatChannel(CHANNEL_ENGLISHCHAT, "English Chat");
+	m_normalChannels[CHANNEL_ADVERTISING] = new ChatChannel(CHANNEL_ADVERTISING, "Advertising");
+	m_normalChannels[CHANNEL_ADVERTISINGROOKGAARD] = new ChatChannel(CHANNEL_ADVERTISINGROOKGAARD, "Advertising-Rookgaard");
+	m_normalChannels[CHANNEL_HELP] = new ChatChannel(CHANNEL_HELP, "Help");
 
-	newChannel = new ChatChannel(CHANNEL_GAMEMASTER, "Gamemaster");
-	if(newChannel)
-		m_normalChannels[CHANNEL_GAMEMASTER] = newChannel;
-
-	newChannel = new ChatChannel(CHANNEL_TUTOR, "Tutor");
-	if(newChannel)
-		m_normalChannels[CHANNEL_TUTOR] = newChannel;
-
-	newChannel = new ChatChannel(CHANNEL_WORLDCHAT, "World Chat");
-	if(newChannel)
-		m_normalChannels[CHANNEL_WORLDCHAT] = newChannel;
-
-	newChannel = new ChatChannel(CHANNEL_ENGLISHCHAT, "English Chat");
-	if(newChannel)
-		m_normalChannels[CHANNEL_ENGLISHCHAT] = newChannel;
-
-	newChannel = new ChatChannel(CHANNEL_ADVERTISING, "Advertising");
-	if(newChannel)
-		m_normalChannels[CHANNEL_ADVERTISING] = newChannel;
-
-	newChannel = new ChatChannel(CHANNEL_ADVERTISINGROOKGAARD, "Advertising-Rookgaard");
-	if(newChannel)
-		m_normalChannels[CHANNEL_ADVERTISINGROOKGAARD] = newChannel;
-
-	newChannel = new ChatChannel(CHANNEL_HELP, "Help");
-	if(newChannel)
-		m_normalChannels[CHANNEL_HELP] = newChannel;
-
-	newChannel = new PrivateChatChannel(CHANNEL_PRIVATE, "Private Chat Channel");
-	if(newChannel)
-		dummyPrivate = newChannel;
+	dummyPrivate = new PrivateChatChannel(CHANNEL_PRIVATE, "Private Chat Channel");
 }
 
 Chat::~Chat()
@@ -473,9 +449,9 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 				AutoList<Player>::listiterator it = Player::listPlayer.list.begin();
 				while(it != Player::listPlayer.list.end())
 				{
-					if((*it).second->getGuildId() == player->getGuildId())
+					if(it->second->getGuildId() == player->getGuildId())
 					{
-						ss << (i > 0 ? ", " : "") << (*it).second->getName() << " [" << (*it).second->getLevel() << "]";
+						ss << (i > 0 ? ", " : "") << it->second->getName() << " [" << it->second->getLevel() << "]";
 						i++;
 					}
 					it++;
@@ -1347,6 +1323,15 @@ ChatChannel* Chat::getChannel(Player* player, uint16_t channelId)
 	PrivateChannelMap::iterator pit = m_privateChannels.find(channelId);
 	if(pit != m_privateChannels.end() && pit->second->isInvited(player))
 		return pit->second;
+
+	return NULL;
+}
+
+ChatChannel* Chat::getGuildChannelById(uint32_t guildId)
+{
+	GuildChannelMap::iterator git = m_guildChannels.find(guildId);
+	if(git != m_guildChannels.end())
+		return git->second;
 
 	return NULL;
 }

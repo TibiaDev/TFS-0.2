@@ -134,35 +134,32 @@ uint32_t Monsters::getLootRandom()
 
 void MonsterType::createLoot(Container* corpse)
 {
-	for(LootItems::const_reverse_iterator it = lootItems.rbegin(), end = lootItems.rend(); it != end; ++it)
+	Player* owner = g_game.getPlayerByID(corpse->getCorpseOwner());
+	if(!owner || owner->getStaminaMinutes() > 840)
 	{
-		std::list<Item*> itemList = createLootItem(*it);
-		if(itemList.empty())
-			continue;
-
-		for(std::list<Item*>::iterator iit = itemList.begin(), iend = itemList.end(); iit != iend; ++iit)
+		for(LootItems::const_reverse_iterator it = lootItems.rbegin(), end = lootItems.rend(); it != end; ++it)
 		{
-			Item* tmpItem = *iit;
+			std::list<Item*> itemList = createLootItem(*it);
+			if(itemList.empty())
+				continue;
 
-			//check containers
-			if(Container* container = tmpItem->getContainer())
+			for(std::list<Item*>::iterator iit = itemList.begin(), iend = itemList.end(); iit != iend; ++iit)
 			{
-				if(!createLootContainer(container, *it))
-					delete container;
+				Item* tmpItem = *iit;
+
+				//check containers
+				if(Container* container = tmpItem->getContainer())
+				{
+					if(!createLootContainer(container, *it))
+						delete container;
+					else if(g_game.internalAddItem(corpse, tmpItem) != RET_NOERROR)
+						corpse->__internalAddThing(tmpItem);
+				}
 				else if(g_game.internalAddItem(corpse, tmpItem) != RET_NOERROR)
 					corpse->__internalAddThing(tmpItem);
 			}
-			else if(g_game.internalAddItem(corpse, tmpItem) != RET_NOERROR)
-				corpse->__internalAddThing(tmpItem);
 		}
-	}
 
-	corpse->__startDecaying();
-
-	uint32_t ownerId = corpse->getCorpseOwner();
-	if(ownerId)
-	{
-		Player* owner = g_game.getPlayerByID(ownerId);
 		if(owner)
 		{
 			std::ostringstream ss;
@@ -173,6 +170,16 @@ void MonsterType::createLoot(Container* corpse)
 				owner->sendTextMessage(MSG_INFO_DESCR, ss.str());
 		}
 	}
+	else
+	{
+		std::ostringstream ss;
+		ss << "Loot of " << nameDescription << ": nothing (due to low stamina)";
+		if(owner->getParty())
+			owner->getParty()->broadcastPartyLoot(ss.str());
+		else
+			owner->sendTextMessage(MSG_INFO_DESCR, ss.str());
+	}
+	corpse->__startDecaying();
 }
 
 std::list<Item*> MonsterType::createLootItem(const LootBlock& lootBlock)
@@ -192,7 +199,7 @@ std::list<Item*> MonsterType::createLootItem(const LootBlock& lootBlock)
 	std::list<Item*> itemList;
 	while(itemCount > 0)
 	{
-		uint16_t n = (uint16_t)std::min(itemCount, (int32_t)100);
+		uint16_t n = (uint16_t)std::min<int32_t>(itemCount, 100);
 		tmpItem = Item::CreateItem(lootBlock.id, n);
 		if(!tmpItem)
 			break;

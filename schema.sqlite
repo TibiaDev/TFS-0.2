@@ -76,12 +76,13 @@ CREATE TABLE "players" (
     "skulltime" INTEGER NOT NULL DEFAULT 0,
     "offlinetraining_time" INTEGER UNSIGNED NOT NULL DEFAULT 43200,
     "offlinetraining_skill" INTEGER NOT NULL DEFAULT -1,
+	"stamina" INTEGER NOT NULL DEFAULT 2520,
     UNIQUE ("name"),
     FOREIGN KEY ("account_id") REFERENCES "accounts" ("id"),
     FOREIGN KEY ("group_id") REFERENCES "groups" ("id")
 );
 
-INSERT INTO "players" VALUES(1,'Account Manager',1,1,1,0,150,150,0,0,0,0,0,110,0,0,0,0,0,0,0,50,50,7,'',400,0,0,0,0,0,0,0,'',0,0,0,10,10,10,0,0,0,0,0,43200,-1);
+INSERT INTO "players" VALUES(1,'Account Manager',1,1,1,0,150,150,0,0,0,0,0,110,0,0,0,0,0,0,0,50,50,7,'',400,0,0,0,0,0,0,0,'',0,0,0,10,10,10,0,0,0,0,0,43200,-1,2520);
 
 CREATE TABLE "global_storage"
 (
@@ -136,7 +137,16 @@ CREATE TABLE "player_deaths" (
 
 CREATE TABLE "player_depotitems" (
     "player_id" INTEGER NOT NULL,
-    "depot_id" INTEGER NOT NULL DEFAULT 0,
+    "sid" INTEGER NOT NULL,
+    "pid" INTEGER NOT NULL DEFAULT 0,
+    "itemtype" INTEGER NOT NULL,
+    "count" INTEGER NOT NULL DEFAULT 0,
+    "attributes" BLOB NOT NULL,
+    FOREIGN KEY ("player_id") REFERENCES "players" ("id")
+);
+
+CREATE TABLE "player_inboxitems" (
+    "player_id" INTEGER NOT NULL,
     "sid" INTEGER NOT NULL,
     "pid" INTEGER NOT NULL DEFAULT 0,
     "itemtype" INTEGER NOT NULL,
@@ -165,6 +175,16 @@ CREATE TABLE "player_viplist" (
     "vip_id" INTEGER NOT NULL,
     FOREIGN KEY ("player_id") REFERENCES "players" ("id"),
     FOREIGN KEY ("vip_id") REFERENCES "players" ("id")
+);
+
+CREATE TABLE "account_viplist" (
+  "account_id" INTEGER NOT NULL,
+  "player_id" INTEGER NOT NULL,
+  "description" VARCHAR(128) NOT NULL DEFAULT '',
+  "icon" TINYINT NOT NULL DEFAULT 0,
+  "notify" BOOLEAN NOT NULL DEFAULT 0,
+  FOREIGN KEY ("account_id") REFERENCES "accounts" ("id"),
+  FOREIGN KEY ("player_id") REFERENCES "players" ("id")
 );
 
 CREATE TABLE "tiles" (
@@ -221,7 +241,7 @@ CREATE TABLE "tile_store"
 );
 
 CREATE TABLE "server_config" ("config" VARCHAR(50) NOT NULL, "value" VARCHAR(256) NOT NULL DEFAULT '', UNIQUE("config"));
-INSERT INTO "server_config" VALUES('db_version','7');
+INSERT INTO "server_config" VALUES('db_version','10');
 INSERT INTO "server_config" VALUES('encryption','0');
 CREATE TABLE "market_offers" ("id" INTEGER PRIMARY KEY NOT NULL, "player_id" INTEGER NOT NULL, "sale" BOOLEAN NOT NULL DEFAULT 0, "itemtype" UNSIGNED INTEGER NOT NULL, "amount" UNSIGNED INTEGER NOT NULL, "created" UNSIGNED INTEGER NOT NULL, "anonymous" BOOLEAN NOT NULL DEFAULT 0, "price" UNSIGNED INTEGER NOT NULL DEFAULT 0, FOREIGN KEY ("player_id") REFERENCES "players" ("id") ON DELETE CASCADE);
 CREATE TABLE "market_history" ("id" INTEGER PRIMARY KEY NOT NULL, "player_id" INTEGER NOT NULL, "sale" BOOLEAN NOT NULL DEFAULT 0, "itemtype" UNSIGNED INTEGER NOT NULL, "amount" UNSIGNED INTEGER NOT NULL, "price" UNSIGNED INTEGER NOT NULL DEFAULT 0, "expires_at" UNSIGNED INTEGER NOT NULL, "inserted" UNSIGNED INTEGER NOT NULL, "state" UNSIGNED INTEGER NOT NULL, FOREIGN KEY ("player_id") REFERENCES "players" ("id") ON DELETE CASCADE);

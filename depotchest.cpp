@@ -19,40 +19,21 @@
 //////////////////////////////////////////////////////////////////////
 #include "otpch.h"
 
-#include "depot.h"
+#include "depotchest.h"
 #include "tools.h"
 
-Depot::Depot(uint16_t _type) :
-Container(_type)
+DepotChest::DepotChest(uint16_t _type) :
+	Container(_type)
 {
-	depotId = 0;
-	maxSize = 3;
 	maxDepotLimit = 1500;
-	inbox = NULL;
-	chest = NULL;
 }
 
-Depot::~Depot()
+DepotChest::~DepotChest()
 {
 	//
 }
 
-Attr_ReadValue Depot::readAttr(AttrTypes_t attr, PropStream& propStream)
-{
-	if(attr == ATTR_DEPOT_ID)
-	{
-		uint16_t _depotId;
-		if(!propStream.GET_USHORT(_depotId))
-			return ATTR_READ_ERROR;
-
-		setDepotId(_depotId);
-		return ATTR_READ_CONTINUE;
-	}
-	else
-		return Item::readAttr(attr, propStream);
-}
-
-ReturnValue Depot::__queryAdd(int32_t index, const Thing* thing, uint32_t count,
+ReturnValue DepotChest::__queryAdd(int32_t index, const Thing* thing, uint32_t count,
 	uint32_t flags, Creature* actor/* = NULL*/) const
 {
 	const Item* item = thing->getItem();
@@ -80,29 +61,14 @@ ReturnValue Depot::__queryAdd(int32_t index, const Thing* thing, uint32_t count,
 	return Container::__queryAdd(index, thing, count, flags, actor);
 }
 
-ReturnValue Depot::__queryMaxCount(int32_t index, const Thing* thing, uint32_t count,
-	uint32_t& maxQueryCount, uint32_t flags) const
-{
-	return Container::__queryMaxCount(index, thing, count, maxQueryCount, flags);
-}
-
-void Depot::postAddNotification(Thing* thing, const Cylinder* oldParent, int32_t index, cylinderlink_t link /*= LINK_OWNER*/)
+void DepotChest::postAddNotification(Thing* thing, const Cylinder* oldParent, int32_t index, cylinderlink_t link /*= LINK_OWNER*/)
 {
 	if(getParent() != NULL)
 		getParent()->postAddNotification(thing, oldParent, index, LINK_PARENT);
 }
 
-void Depot::postRemoveNotification(Thing* thing, const Cylinder* newParent, int32_t index, bool isCompleteRemoval, cylinderlink_t link /*= LINK_OWNER*/)
+void DepotChest::postRemoveNotification(Thing* thing, const Cylinder* newParent, int32_t index, bool isCompleteRemoval, cylinderlink_t link /*= LINK_OWNER*/)
 {
 	if(getParent() != NULL)
 		getParent()->postRemoveNotification(thing, newParent, index, isCompleteRemoval, LINK_PARENT);
-}
-
-void Depot::moveChestToFront()
-{
-	if(!chest)
-		return;
-
-	itemlist.remove(chest);
-	itemlist.push_front(chest);
 }

@@ -109,6 +109,7 @@ bool ConfigManager::loadFile(const std::string& _filename)
 	m_confBoolean[ALLOW_CLONES] = booleanString(getGlobalString(L, "allowClones", "no"));
 	m_confBoolean[MARKET_ENABLED] = booleanString(getGlobalString(L, "marketEnabled", "yes"));
 	m_confBoolean[MARKET_PREMIUM] = booleanString(getGlobalString(L, "premiumToCreateMarketOffer", "yes"));
+	m_confBoolean[STAMINA_SYSTEM] = booleanString(getGlobalString(L, "staminaSystem", "yes"));
 
 	m_confString[DEFAULT_PRIORITY] = getGlobalString(L, "defaultPriority", "high");
 	m_confString[MAP_STORAGE_TYPE] = getGlobalString(L, "mapStorageType", "relational");
@@ -145,8 +146,6 @@ bool ConfigManager::loadFile(const std::string& _filename)
 	m_confInteger[KILLS_TO_BAN] = getGlobalNumber(L, "killsToBan", 5);
 	m_confInteger[BAN_DAYS] = getGlobalNumber(L, "banDays", 7);
 	m_confInteger[FINAL_BAN_DAYS] = getGlobalNumber(L, "finalBanDays", 30);
-	m_confInteger[HIGHSCORES_TOP] = getGlobalNumber(L, "highscoreDisplayPlayers", 10);
-	m_confInteger[HIGHSCORES_UPDATETIME] = getGlobalNumber(L, "updateHighscoresAfterMinutes", 60);
 	m_confInteger[ACTIONS_DELAY_INTERVAL] = getGlobalNumber(L, "timeBetweenActions", 200);
 	m_confInteger[EX_ACTIONS_DELAY_INTERVAL] = getGlobalNumber(L, "timeBetweenExActions", 1000);
 	m_confInteger[MAX_MESSAGEBUFFER] = getGlobalNumber(L, "maxMessageBuffer", 4);
@@ -178,7 +177,7 @@ bool ConfigManager::reload()
 	return loadFile(m_confString[CONFIG_FILE]);
 }
 
-const std::string& ConfigManager::getString(uint32_t _what) const
+const std::string& ConfigManager::getString(string_config_t _what) const
 {
 	if(m_isLoaded && _what < LAST_STRING_CONFIG)
 		return m_confString[_what];
@@ -189,7 +188,7 @@ const std::string& ConfigManager::getString(uint32_t _what) const
 	}
 }
 
-int32_t ConfigManager::getNumber(uint32_t _what) const
+int32_t ConfigManager::getNumber(integer_config_t _what) const
 {
 	if(m_isLoaded && _what < LAST_INTEGER_CONFIG)
 		return m_confInteger[_what];
@@ -200,7 +199,7 @@ int32_t ConfigManager::getNumber(uint32_t _what) const
 	}
 }
 
-bool ConfigManager::getBoolean(uint32_t _what) const
+bool ConfigManager::getBoolean(boolean_config_t _what) const
 {
 	if(m_isLoaded && _what < LAST_BOOLEAN_CONFIG)
 		return m_confBoolean[_what];
@@ -211,7 +210,7 @@ bool ConfigManager::getBoolean(uint32_t _what) const
 	}
 }
 
-bool ConfigManager::setNumber(uint32_t _what, int32_t _value)
+bool ConfigManager::setNumber(integer_config_t _what, int32_t _value)
 {
 	if(m_isLoaded && _what < LAST_INTEGER_CONFIG)
 	{

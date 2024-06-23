@@ -37,7 +37,7 @@ typedef std::list<Quest*> QuestsList;
 class MissionState
 {
 	public:
-		MissionState(std::string _description, int32_t _missionID);
+		MissionState(const std::string& _description, int32_t _missionID);
 
 		int32_t getMissionID() const { return missionID; }
 		std::string getMissionDescription() const { return description; }
@@ -50,7 +50,7 @@ class MissionState
 class Mission
 {
 	public:
-		Mission(std::string _missionName, int32_t _storageID, int32_t _startValue, int32_t _endValue);
+		Mission(const std::string& _missionName, int32_t _storageID, int32_t _startValue, int32_t _endValue, bool _ignoreEndValue);
 		~Mission();
 		bool isCompleted(Player* player) const;
 		bool isStarted(Player* player) const;
@@ -68,12 +68,13 @@ class Mission
 		std::string missionName;
 		uint32_t storageID;
 		int32_t startValue, endValue;
+		bool ignoreEndValue;
 };
 
 class Quest
 {
 	public:
-		Quest(std::string _name, uint16_t _id, int32_t _startStorageID, int32_t _startStorageValue);
+		Quest(const std::string& _name, uint16_t _id, int32_t _startStorageID, int32_t _startStorageValue);
 		~Quest();
 
 		bool isCompleted(Player* player);
@@ -117,7 +118,7 @@ class Quests
 
 		bool loadFromXml();
 		Quest* getQuestByID(uint16_t id);
-		bool isQuestStorage(const uint32_t key, const int32_t value);
+		bool isQuestStorage(const uint32_t key, const int32_t value, const int32_t oldValue);
 		uint16_t getQuestsCount(Player* player);
 		bool reload();
 

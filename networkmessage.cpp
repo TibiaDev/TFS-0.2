@@ -67,16 +67,34 @@ Position NetworkMessage::GetPosition()
 }
 /******************************************************************************/
 
+void NetworkMessage::AddString(const std::string& value)
+{
+	uint32_t stringlen = (uint32_t)value.length();
+	if(!canAdd(stringlen + 2) || stringlen > 8192)
+		return;
+
+	AddU16(stringlen);
+	memcpy((char*)(m_MsgBuf + m_ReadPos), value.c_str(), stringlen);
+	m_ReadPos += stringlen;
+	m_MsgSize += stringlen;
+}
+
 void NetworkMessage::AddString(const char* value)
 {
 	uint32_t stringlen = (uint32_t)strlen(value);
-	if(!canAdd(stringlen+2) || stringlen > 8192)
+	if(!canAdd(stringlen + 2) || stringlen > 8192)
 		return;
 
 	AddU16(stringlen);
 	strcpy((char*)(m_MsgBuf + m_ReadPos), value);
 	m_ReadPos += stringlen;
 	m_MsgSize += stringlen;
+}
+
+void NetworkMessage::AddDouble(double value, uint8_t precision/* = 2*/)
+{
+	AddByte(precision);
+	AddU32((value * std::pow((float)10, precision)) + INT_MAX);
 }
 
 void NetworkMessage::AddBytes(const char* bytes, uint32_t size)
@@ -130,7 +148,7 @@ void NetworkMessage::AddItem(const Item* item)
 	AddU16(it.clientId);
 
 	if(it.stackable)
-		AddByte(std::min((uint16_t)255, item->getSubType()));
+		AddByte(std::min<uint16_t>(0xFF, item->getSubType()));
 	else if(it.isSplash() || it.isFluidContainer())
 	{
 		uint32_t fluidIndex = item->getSubType() % 8;

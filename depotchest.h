@@ -18,54 +18,35 @@
 // Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //////////////////////////////////////////////////////////////////////
 
-#ifndef __OTSERV_DEPOT_H__
-#define __OTSERV_DEPOT_H__
+#ifndef __OTSERV_DEPOTCHEST_H__
+#define __OTSERV_DEPOTCHEST_H__
 
 #include "container.h"
 
-class Depot : public Container
+class DepotChest : public Container
 {
 	public:
-		Depot(uint16_t _type);
-		~Depot();
+		DepotChest(uint16_t _type);
+		~DepotChest();
 
-		virtual Depot* getDepot() {return this;}
-		virtual const Depot* getDepot() const {return this;}
-
-		void setInbox(Container* container) { inbox = container; }
-		Container* getInbox() const { return inbox; }
-
-		void setChest(Container* container) { chest = container; }
-		Container* getChest() const { return chest; }
+		DepotChest* getDepotChest() {return this;}
+		const DepotChest* getDepotChest() const {return this;}
 
 		//serialization
-		virtual Attr_ReadValue readAttr(AttrTypes_t attr, PropStream& propStream);
-
-		uint32_t getDepotId() const {return depotId;}
 		void setMaxDepotLimit(uint32_t maxitems) {maxDepotLimit = maxitems;}
-		void setDepotId(uint32_t id) {depotId = id;}
 
 		//cylinder implementations
-		virtual ReturnValue __queryAdd(int32_t index, const Thing* thing, uint32_t count,
+		ReturnValue __queryAdd(int32_t index, const Thing* thing, uint32_t count,
 			uint32_t flags, Creature* actor = NULL) const;
 
-		virtual ReturnValue __queryMaxCount(int32_t index, const Thing* thing, uint32_t count,
-			uint32_t& maxQueryCount, uint32_t flags) const;
-
-		virtual void postAddNotification(Thing* thing, const Cylinder* oldParent, int32_t index, cylinderlink_t link = LINK_OWNER);
-		virtual void postRemoveNotification(Thing* thing, const Cylinder* newParent, int32_t index, bool isCompleteRemoval, cylinderlink_t link = LINK_OWNER);
+		void postAddNotification(Thing* thing, const Cylinder* oldParent, int32_t index, cylinderlink_t link = LINK_OWNER);
+		void postRemoveNotification(Thing* thing, const Cylinder* newParent, int32_t index, bool isCompleteRemoval, cylinderlink_t link = LINK_OWNER);
 
 		//overrides
-		virtual bool canRemove() const {return false;}
-
-		void moveChestToFront();
+		bool canRemove() const {return false;}
 
 	private:
 		uint32_t maxDepotLimit;
-		uint32_t depotId;
-
-		Container* chest;
-		Container* inbox;
 };
 
 #endif

@@ -135,10 +135,10 @@ bool BedItem::canUse(Player* player)
 	return true;
 }
 
-void BedItem::sleep(Player* player)
+bool BedItem::trySleep(Player* player)
 {
 	if(!house || !player || player->isRemoved())
-		return;
+		return false;
 
 	if(sleeperGUID != 0)
 	{
@@ -146,33 +146,44 @@ void BedItem::sleep(Player* player)
 			wakeUp(NULL);
 
 		g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
+		return false;
 	}
-	else
-	{
-		BedItem* nextBedItem = getNextBedItem();
+	return true;
+}
 
-		internalSetSleeper(player);
-		if(nextBedItem)
-			nextBedItem->internalSetSleeper(player);
+bool BedItem::sleep(Player* player)
+{
+	if(!house || !player || player->isRemoved())
+		return false;
 
-		// update the BedSleepersMap
-		Beds::getInstance().setBedSleeper(this, player->getGUID());
+	if(sleeperGUID != 0)
+		return false;
 
-		// make the player walk onto the bed
-		player->getTile()->moveCreature(player, getTile());
+	BedItem* nextBedItem = getNextBedItem();
 
-		// display 'Zzzz'/sleep effect
-		g_game.addMagicEffect(player->getPosition(), NM_ME_SLEEP);
+	internalSetSleeper(player);
+	if(nextBedItem)
+		nextBedItem->internalSetSleeper(player);
 
-		// kick player after he sees himself walk onto the bed and it change id
-		uint32_t playerId = player->getID();
-		g_scheduler.addEvent(createSchedulerTask(SCHEDULER_MINTICKS, boost::bind(&Game::kickPlayer, &g_game, playerId, false)));
+	// update the BedSleepersMap
+	Beds::getInstance().setBedSleeper(this, player->getGUID());
 
-		// change self and partner's appearance
-		updateAppearance(player);
-		if(nextBedItem)
-			nextBedItem->updateAppearance(player);
-	}
+	// make the player walk onto the bed
+	player->getTile()->moveCreature(player, getTile());
+
+	// display 'Zzzz'/sleep effect
+	g_game.addMagicEffect(player->getPosition(), NM_ME_SLEEP);
+
+	// kick player after he sees himself walk onto the bed and it change id
+	uint32_t playerId = player->getID();
+	g_scheduler.addEvent(createSchedulerTask(SCHEDULER_MINTICKS, boost::bind(&Game::kickPlayer, &g_game, playerId, false)));
+
+	// change self and partner's appearance
+	updateAppearance(player);
+	if(nextBedItem)
+		nextBedItem->updateAppearance(player);
+
+	return true;
 }
 
 void BedItem::wakeUp(Player* player)
@@ -192,7 +203,7 @@ void BedItem::wakeUp(Player* player)
 				if(IOLoginData::getInstance()->loadPlayer(_player, name))
 				{
 					regeneratePlayer(_player);
-					IOLoginData::getInstance()->savePlayer(_player, true);
+					IOLoginData::getInstance()->savePlayer(_player);
 				}
 
 				delete _player;
@@ -245,11 +256,11 @@ void BedItem::regeneratePlayer(Player* player) const
 		else
 			regen = sleptTime / 30;
 
-		player->changeHealth(regen);
+		player->changeHealth(regen, false);
 		player->changeMana(regen);
 	}
 
-	int32_t soulRegen = (int32_t)std::max((float)0, ((float)sleptTime/(60*15)));
+	int32_t soulRegen = sleptTime / (60 * 15);
 	player->changeSoul(soulRegen);
 }
 
