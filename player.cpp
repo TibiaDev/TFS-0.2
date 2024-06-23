@@ -76,6 +76,7 @@ Creature()
 	depotChange = false;
 	accountNumber = 0;
 	name = _name;
+	accountManagerEx = g_config.getBoolean(ConfigManager::ACCOUNT_MANAGER) && name == "Account Manager";
 	setVocation(0);
 	capacity = 400.00;
 	mana = 0;
@@ -578,6 +579,9 @@ void Player::sendIcons() const
 		if(_tile->hasFlag(TILESTATE_PROTECTIONZONE))
 			icons |= ICON_PIGEON;
 
+		if(!getCondition(CONDITION_REGENERATION))
+			icons |= ICON_HUNGRY;
+
 		client->sendIcons(icons);
 	}
 }
@@ -703,19 +707,14 @@ int32_t Player::getDefaultStats(stats_t stat)
 	{
 		case STAT_MAXHITPOINTS:
 			return getMaxHealth() - getVarStats(STAT_MAXHITPOINTS);
-			break;
 		case STAT_MAXMANAPOINTS:
 			return getMaxMana() - getVarStats(STAT_MAXMANAPOINTS);
-			break;
 		case STAT_SOULPOINTS:
 			return getPlayerInfo(PLAYERINFO_SOUL) - getVarStats(STAT_SOULPOINTS);
-			break;
 		case STAT_MAGICPOINTS:
 			return getMagicLevel() - getVarStats(STAT_MAGICPOINTS);
-			break;
 		default:
 			return 0;
-			break;
 	}
 }
 
@@ -1549,10 +1548,10 @@ void Player::onCreatureDisappear(const Creature* creature, uint32_t stackpos, bo
 	}
 }
 
-void Player::openShopWindow(const std::list<ShopInfo>& shop)
+void Player::openShopWindow(Npc* npc, const std::list<ShopInfo>& shop)
 {
 	shopItemList = shop;
-	sendShop();
+	sendShop(npc);
 	sendSaleItemList();
 }
 
@@ -1788,7 +1787,15 @@ void Player::onThink(uint32_t interval)
 		addMessageBuffer();
 	}
 
-	if(!getTile()->hasFlag(TILESTATE_NOLOGOUT) && !mayNotMove && !isAccessPlayer())
+	if(accountManagerEx)
+	{
+		idleTime += interval;
+		if(idleTime > 150000)
+			kickPlayer(true);
+		else if(client && idleTime == 120000)
+			client->sendTextMessage(MSG_STATUS_WARNING, "You have been idle for two minutes, you will be disconnected in 30 seconds if you are still idle then.");
+	}
+	else if(!getTile()->hasFlag(TILESTATE_NOLOGOUT) && !mayNotMove && !isAccessPlayer())
 	{
 		idleTime += interval;
 		if(idleTime > (g_config.getNumber(ConfigManager::KICK_AFTER_MINUTES) * 60000) + 60000)
@@ -1853,25 +1860,12 @@ void Player::drainHealth(Creature* attacker, CombatType_t combatType, int32_t da
 {
 	Creature::drainHealth(attacker, combatType, damage);
 	sendStats();
-	char buffer[150];
-	if(attacker)
-		sprintf(buffer, "You lose %d hitpoint%s due to an attack by %s.", damage, (damage != 1 ? "s" : ""), attacker->getNameDescription().c_str());
-	else
-		sprintf(buffer, "You lose %d hitpoint%s.", damage, (damage != 1 ? "s" : ""));
-
-	sendTextMessage(MSG_EVENT_DEFAULT, buffer);
 }
 
 void Player::drainMana(Creature* attacker, int32_t manaLoss)
 {
 	Creature::drainMana(attacker, manaLoss);
 	sendStats();
-	char buffer[150];
-	if(attacker)
-		sprintf(buffer, "You lose %d mana blocking an attack by %s.", manaLoss, attacker->getNameDescription().c_str());
-	else
-		sprintf(buffer, "You lose %d mana.", manaLoss);
-	sendTextMessage(MSG_EVENT_DEFAULT, buffer);
 }
 
 void Player::addManaSpent(uint64_t amount, bool withMultiplier /*= true*/)
@@ -1936,9 +1930,27 @@ void Player::addExperience(uint64_t exp, bool useMult/* = false*/, bool sendText
 	experience += gainExp;
 	if(sendText)
 	{
-		std::stringstream strExp;
-		strExp << gainExp;
-		g_game.addAnimatedText(getPosition(), TEXTCOLOR_WHITE_EXP, strExp.str());
+		std::stringstream ssExp;
+		ssExp << getNameDescription() << " gained " << gainExp << " experience points.";
+		std::string strExp = ssExp.str();
+
+		const Position& targetPos = getPosition();
+		const SpectatorVec& list = g_game.getSpectators(targetPos);
+		Player* tmpPlayer = NULL;
+		for(SpectatorVec::const_iterator it = list.begin(); it != list.end(); ++it)
+		{
+			if((tmpPlayer = (*it)->getPlayer()))
+			{
+				if(tmpPlayer == this)
+				{
+					std::stringstream ss;
+					ss << "You gained " << gainExp << " experience points.";
+					sendExperienceMessage(MSG_EXPERIENCE, ss.str(), targetPos, gainExp, TEXTCOLOR_WHITE_EXP);
+				}
+				else
+					tmpPlayer->sendExperienceMessage(MSG_EXPERIENCE_OTHERS, strExp, targetPos, gainExp, TEXTCOLOR_WHITE_EXP);
+			}
+		}
 	}
 
 	while(experience >= nextLevelExp)
@@ -2800,6 +2812,33 @@ Cylinder* Player::__queryDestination(int32_t& index, const Thing* thing, Item** 
 			Container* tmpContainer = containerList.front();
 			containerList.pop_front();
 
+			if(!(autoStack && item->isStackable()))
+			{
+				//we need to find first empty container as fast as we can for non-stackable items
+				uint32_t n = tmpContainer->capacity() - tmpContainer->size();
+				while(n)
+				{
+					if(tmpContainer->__queryAdd(tmpContainer->capacity() - n, item, item->getItemCount(), flags) == RET_NOERROR)
+					{
+						index = tmpContainer->capacity() - n;
+						*destItem = NULL;
+						return tmpContainer;
+					}
+					n--;
+				}
+
+				for(n = 0; n < tmpContainer->capacity(); ++n)
+				{
+					Item* tmpItem = tmpContainer->getItem(n);
+					if(tmpItem)
+					{
+						if(Container* subContainer = tmpItem->getContainer())
+							containerList.push_back(subContainer);
+					}
+				}
+				continue;
+			}
+
 			for(uint32_t n = 0; n < tmpContainer->capacity(); ++n)
 			{
 				Item* tmpItem = tmpContainer->getItem(n);
@@ -2812,30 +2851,16 @@ Cylinder* Player::__queryDestination(int32_t& index, const Thing* thing, Item** 
 					if(tmpItem == item)
 						continue;
 
-					if(autoStack && item->isStackable())
+					//try find an already existing item to stack with
+					if(tmpItem != item && tmpItem->getID() == item->getID() && tmpItem->getItemCount() < 100)
 					{
-						//try find an already existing item to stack with
-						if(tmpItem != item && tmpItem->getID() == item->getID() && tmpItem->getItemCount() < 100)
-						{
-							index = n;
-							*destItem = tmpItem;
-							return tmpContainer;
-						}
-
-						if(Container* subContainer = tmpItem->getContainer())
-							containerList.push_back(subContainer);
+						index = n;
+						*destItem = tmpItem;
+						return tmpContainer;
 					}
-					else if(Container* subContainer = tmpItem->getContainer())
-					{
-						if(subContainer->__queryAdd(INDEX_WHEREEVER, item, item->getItemCount(), flags) == RET_NOERROR)
-						{
-							index = INDEX_WHEREEVER;
-							*destItem = NULL;
-							return subContainer;
-						}
 
+					if(Container* subContainer = tmpItem->getContainer())
 						containerList.push_back(subContainer);
-					}
 				}
 				else if(tmpContainer->__queryAdd(n, item, item->getItemCount(), flags) == RET_NOERROR) //empty slot
 				{
@@ -3690,10 +3715,6 @@ void Player::onAttackedCreatureDrainHealth(Creature* target, int32_t points)
 				getParty()->addPlayerDamageMonster(this, points);
 			}
 		}
-
-		std::stringstream ss;
-		ss << "You deal " << points << " damage to " << target->getNameDescription() << ".";
-		sendTextMessage(MSG_EVENT_DEFAULT, ss.str());
 	}
 }
 
@@ -4558,6 +4579,7 @@ void Player::manageAccount(const std::string &text)
 			msg << "Sorry, but I can't understand you, please try to repeat that.";
 	}
 	sendTextMessage(MSG_STATUS_CONSOLE_BLUE, msg.str().c_str());
+	resetIdleTime();
 }
 
 bool Player::isInvitedToGuild(uint32_t guild_id) const

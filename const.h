@@ -98,7 +98,9 @@ enum MagicEffectClasses
 	NM_ME_SMOKE		= 0x43, //67
 	NM_ME_INSECTS		= 0x44, //68
 	NM_ME_DRAGONHEAD	= 0x45, //69
-	NM_ME_LAST		= NM_ME_DRAGONHEAD,
+	NM_ME_ORCSHAMAN		= 0x46, //70
+	NM_ME_ORCSHAMAN_FIRE	= 0x47, //71
+	NM_ME_LAST		= NM_ME_ORCSHAMAN_FIRE,
 
 	//for internal use, dont send to client
 	NM_ME_NONE             = 0xFF,
@@ -160,40 +162,46 @@ enum ShootType_t
 
 enum SpeakClasses
 {
-	SPEAK_FIRST		= 0x01,
-	SPEAK_SAY		= SPEAK_FIRST,
+	SPEAK_SAY		= 0x01,
 	SPEAK_WHISPER		= 0x02,
 	SPEAK_YELL		= 0x03,
-	SPEAK_PRIVATE_PN	= 0x04,
-	SPEAK_PRIVATE_NP	= 0x05,
-	SPEAK_PRIVATE		= 0x06,
+	SPEAK_PRIVATE_FROM	= 0x04,
+	SPEAK_PRIVATE_TO	= 0x05,
 	SPEAK_CHANNEL_Y		= 0x07,
-	SPEAK_CHANNEL_W		= 0x08,
-	SPEAK_BROADCAST		= 0x09,
-	SPEAK_CHANNEL_R1        = 0x0A, //red - #c text
-	SPEAK_PRIVATE_RED       = 0x0B, //@name@text
-	SPEAK_CHANNEL_O         = 0x0C,
-	SPEAK_MONSTER_SAY	= 0x0D,
-	SPEAK_MONSTER_YELL	= 0x0E,
-	SPEAK_LAST		= SPEAK_MONSTER_YELL,
+	SPEAK_CHANNEL_O		= 0x08,
+	SPEAK_PRIVATE_PN	= 0x0A,
+	SPEAK_PRIVATE_NP	= 0x0B,
+	SPEAK_BROADCAST		= 0x0C,
+	SPEAK_CHANNEL_R1        = 0x0D, //red - #c text
+	SPEAK_PRIVATE_RED_FROM	= 0x0E, //@name@text
+	SPEAK_PRIVATE_RED_TO	= 0x0F, //@name@text
+	SPEAK_MONSTER_SAY	= 0x22,
+	SPEAK_MONSTER_YELL	= 0x23,
 
-	SPEAK_CHANNEL_R2	= 0xFF + 4 //#d
+	SPEAK_CHANNEL_R2	= 0xFF + 4, //#d
+	SPEAK_CHANNEL_W		= 0xFF + 5
 };
 
 enum MessageClasses
 {
-	MSG_CLASS_FIRST			= 0x0D,
-	MSG_EVENT_ORANGE		= MSG_CLASS_FIRST, /*Orange message in the console*/
-	MSG_STATUS_CONSOLE_ORANGE	= 0x0E, /*Orange message in the console*/
-	MSG_STATUS_WARNING		= 0x0F, /*Red message in game window and in the console*/
-	MSG_EVENT_ADVANCE		= 0x10, /*White message in game window and in the console*/
-	MSG_EVENT_DEFAULT		= 0x11, /*White message at the bottom of the game window and in the console*/
-	MSG_STATUS_DEFAULT		= 0x12, /*White message at the bottom of the game window and in the console*/
-	MSG_INFO_DESCR			= 0x13, /*Green message in game window and in the console*/
-	MSG_STATUS_SMALL		= 0x14, /*White message at the bottom of the game window"*/
-	MSG_STATUS_CONSOLE_BLUE		= 0x15, /*Blue message in the console*/
-	MSG_STATUS_CONSOLE_RED		= 0x16, /*Red message in the console*/
-	MSG_CLASS_LAST			= MSG_STATUS_CONSOLE_RED
+	MSG_STATUS_CONSOLE_BLUE		= 0x04, /*FIXME Blue message in the console*/
+	MSG_STATUS_CONSOLE_RED		= 0x0C, /*Red message in the console*/
+	MSG_STATUS_DEFAULT		= 0x10, /*White message at the bottom of the game window and in the console*/
+	MSG_STATUS_WARNING		= 0x11, /*Red message in game window and in the console*/
+	MSG_EVENT_ADVANCE		= 0x12, /*White message in game window and in the console*/
+	MSG_STATUS_SMALL		= 0x13, /*White message at the bottom of the game window"*/
+	MSG_INFO_DESCR			= 0x14, /*Green message in game window and in the console*/
+	MSG_DAMAGE_DEALT		= 0x15,
+	MSG_DAMAGE_RECEIVED		= 0x16,
+	MSG_HEALED			= 0x17,
+	MSG_EXPERIENCE			= 0x18,
+	MSG_DAMAGE_OTHERS		= 0x19,
+	MSG_HEALED_OTHERS		= 0x1A,
+	MSG_EXPERIENCE_OTHERS		= 0x1B,
+	MSG_EVENT_DEFAULT		= 0x1C, /*White message at the bottom of the game window and in the console*/
+	MSG_LOOT			= 0x1D,
+	MSG_EVENT_ORANGE		= 0x22, /*Orange message in the console*/
+	MSG_STATUS_CONSOLE_ORANGE	= 0x23  /*Orange message in the console*/
 };
 
 enum FluidColors_t
@@ -315,7 +323,9 @@ enum Icons_t
 	ICON_CURSED = 2048,
 	ICON_PARTY_BUFF = 4096,
 	ICON_REDSWORDS = 8192,
-	ICON_PIGEON = 16384
+	ICON_PIGEON = 16384,
+	ICON_BLEEDING = 32768,
+	ICON_HUNGRY = 65536
 };
 
 enum WeaponType_t
@@ -561,13 +571,13 @@ const int violationReasons[6] =
 };
 
 #define CHANNEL_GUILD 0x00
-#define CHANNEL_GAMEMASTER 0x01
+#define CHANNEL_PARTY 0x01
 #define CHANNEL_TUTOR 0x02
 #define CHANNEL_WORLDCHAT 0x03
-#define CHANNEL_ADVERTISING 0x04
-#define CHANNEL_ADVERTISINGROOKGAARD 0x05
-#define CHANNEL_HELP 0x06
-#define CHANNEL_PARTY 0x07
+#define CHANNEL_GAMEMASTER 0x04
+#define CHANNEL_ADVERTISING 0x05
+#define CHANNEL_ADVERTISINGROOKGAARD 0x06
+#define CHANNEL_HELP 0x07
 #define CHANNEL_PRIVATE 0xFFFF
 
 //Reserved player storage key ranges

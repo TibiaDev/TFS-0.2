@@ -23,10 +23,10 @@
 #ifdef __USE_MYSQL__
 #include "otsystem.h"
 
-#ifdef __MYSQL_ALT_INCLUDE__
-#include <mysql.h>
-#else
+#ifdef WIN32
 #include <mysql/mysql.h>
+#else
+#include <mysql.h>
 #endif
 #include "database.h"
 

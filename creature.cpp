@@ -840,7 +840,6 @@ void Creature::dropCorpse()
 	if(corpse)
 	{
 		g_game.internalAddItem(tile, corpse, INDEX_WHEREEVER, FLAG_NOLIMIT);
-		dropLoot(corpse->getContainer());
 		g_game.startDecay(corpse);
 	}
 
@@ -848,6 +847,9 @@ void Creature::dropCorpse()
 	CreatureEvent* eventDeath = getCreatureEvent(CREATURE_EVENT_DEATH);
 	if(eventDeath)
 		eventDeath->executeOnDeath(this, corpse, _lastHitCreature, _mostDamageCreature, lastHitUnjustified, mostDamageUnjustified);
+
+	if(corpse)
+		dropLoot(corpse->getContainer());
 
 	g_game.removeCreature(this, false);
 }
@@ -1242,9 +1244,27 @@ void Creature::onGainExperience(uint64_t gainExp, Creature* target)
 			getMaster()->onGainExperience(gainExp, target);
 		}
 
-		std::stringstream strExp;
-		strExp << gainExp;
-		g_game.addAnimatedText(getPosition(), TEXTCOLOR_WHITE_EXP, strExp.str());
+		std::stringstream ssExp;
+		ssExp << getNameDescription() << " gained " << gainExp << " experience points.";
+		std::string strExp = ssExp.str();
+
+		const Position& targetPos = getPosition();
+		const SpectatorVec& list = g_game.getSpectators(targetPos);
+		Player* tmpPlayer = NULL;
+		for(SpectatorVec::const_iterator it = list.begin(); it != list.end(); ++it)
+		{
+			if((tmpPlayer = (*it)->getPlayer()))
+			{
+				if(tmpPlayer == getPlayer())
+				{
+					std::stringstream ss;
+					ss << "You gained " << gainExp << " experience points.";
+					tmpPlayer->sendExperienceMessage(MSG_EXPERIENCE, ss.str(), targetPos, gainExp, TEXTCOLOR_WHITE_EXP);
+				}
+				else
+					tmpPlayer->sendExperienceMessage(MSG_EXPERIENCE_OTHERS, strExp, targetPos, gainExp, TEXTCOLOR_WHITE_EXP);
+			}
+		}
 	}
 }
 
@@ -1252,9 +1272,27 @@ void Creature::onGainSharedExperience(uint64_t gainExp)
 {
 	if(gainExp > 0)
 	{
-		std::stringstream strExp;
-		strExp << gainExp;
-		g_game.addAnimatedText(getPosition(), TEXTCOLOR_WHITE_EXP, strExp.str());
+		std::stringstream ssExp;
+		ssExp << getNameDescription() << " gained " << gainExp << " experience points.";
+		std::string strExp = ssExp.str();
+
+		const Position& targetPos = getPosition();
+		const SpectatorVec& list = g_game.getSpectators(targetPos);
+		Player* tmpPlayer = NULL;
+		for(SpectatorVec::const_iterator it = list.begin(); it != list.end(); ++it)
+		{
+			if((tmpPlayer = (*it)->getPlayer()))
+			{
+				if(tmpPlayer == getPlayer())
+				{
+					std::stringstream ss;
+					ss << "You gained " << gainExp << " experience points.";
+					tmpPlayer->sendExperienceMessage(MSG_EXPERIENCE, ss.str(), targetPos, gainExp, TEXTCOLOR_WHITE_EXP);
+				}
+				else
+					tmpPlayer->sendExperienceMessage(MSG_EXPERIENCE_OTHERS, strExp, targetPos, gainExp, TEXTCOLOR_WHITE_EXP);
+			}
+		}
 	}
 }
 

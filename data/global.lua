@@ -204,6 +204,9 @@ CONST_ME_YALAHARIGHOST = 65
 CONST_ME_BATS = 66
 CONST_ME_SMOKE = 67
 CONST_ME_INSECTS = 68
+CONST_ME_DRAGONHEAD = 69
+CONST_ME_ORCSHAMAN = 70
+CONST_ME_ORCSHAMAN_FIRE = 71
 CONST_ME_NONE = 255
 
 CONST_ANI_SPEAR = 0
@@ -254,35 +257,40 @@ CONST_ANI_NONE = 255
 TALKTYPE_SAY = 1
 TALKTYPE_WHISPER = 2
 TALKTYPE_YELL = 3
-TALKTYPE_PRIVATE_PN = 4
-TALKTYPE_PRIVATE_NP = 5
-TALKTYPE_PRIVATE = 6
+TALKTYPE_PRIVATE_FROM = 4
+TALKTYPE_PRIVATE_TO = 5
 TALKTYPE_CHANNEL_Y = 7
-TALKTYPE_CHANNEL_W = 8
-TALKTYPE_BROADCAST = 9
-TALKTYPE_CHANNEL_R1 = 10
-TALKTYPE_PRIVATE_RED = 11
-TALKTYPE_CHANNEL_O = 12
-TALKTYPE_ORANGE_1 = 13
-TALKTYPE_ORANGE_2 = 14
+TALKTYPE_CHANNEL_O = 8
+TALKTYPE_PRIVATE_PN = 10
+TALKTYPE_PRIVATE_NP = 11
+TALKTYPE_BROADCAST = 12
+TALKTYPE_CHANNEL_R1 = 13
+TALKTYPE_PRIVATE_RED_FROM = 14
+TALKTYPE_PRIVATE_RED_TO = 15
+TALKTYPE_ORANGE_1 = 34
+TALKTYPE_ORANGE_2 = 35
+
+TALKTYPE_PRIVATE = TALKTYPE_PRIVATE_TO
+TALKTYPE_PRIVATE_RED = TALKTYPE_PRIVATE_RED_TO
 
 -- for internal use
 TALKTYPE_RVR_CHANNEL = 256
 TALKTYPE_RVR_ANSWER = 257
 TALKTYPE_RVR_CONTINUE = 258
 TALKTYPE_CHANNEL_R2 = 259
+TALKTYPE_CHANNEL_W = 260
 --
 
-MESSAGE_EVENT_ORANGE = 13
-MESSAGE_STATUS_CONSOLE_ORANGE = 14
-MESSAGE_STATUS_WARNING = 15
-MESSAGE_EVENT_ADVANCE = 16
-MESSAGE_EVENT_DEFAULT = 17
-MESSAGE_STATUS_DEFAULT = 18
-MESSAGE_INFO_DESCR = 19
-MESSAGE_STATUS_SMALL = 20
-MESSAGE_STATUS_CONSOLE_BLUE = 21
-MESSAGE_STATUS_CONSOLE_RED = 22
+MESSAGE_STATUS_CONSOLE_BLUE = 4
+MESSAGE_STATUS_CONSOLE_RED = 12
+MESSAGE_STATUS_DEFAULT = 16
+MESSAGE_STATUS_WARNING = 17
+MESSAGE_EVENT_ADVANCE = 18
+MESSAGE_STATUS_SMALL = 19
+MESSAGE_INFO_DESCR = 20
+MESSAGE_EVENT_DEFAULT = 28
+MESSAGE_EVENT_ORANGE = 34
+MESSAGE_STATUS_CONSOLE_ORANGE = 35
 
 TEXTCOLOR_BLUE = 5
 TEXTCOLOR_LIGHTBLUE = 35
@@ -290,15 +298,36 @@ TEXTCOLOR_LIGHTGREEN = 30
 TEXTCOLOR_GREEN = 54
 TEXTCOLOR_TEAL = 65
 TEXTCOLOR_PLATINUMBLUE = 89
-TEXTCOLOR_DARKRED = 108
 TEXTCOLOR_LIGHTGREY = 129
 TEXTCOLOR_SKYBLUE = 143
+TEXTCOLOR_DARKRED = 144
 TEXTCOLOR_PURPLE = 154
 TEXTCOLOR_RED = 180
 TEXTCOLOR_ORANGE = 198
 TEXTCOLOR_YELLOW = 210
 TEXTCOLOR_WHITE_EXP = 215
 TEXTCOLOR_NONE = 255
+
+MAPMARK_TICK = 0
+MAPMARK_QUESTION = 1
+MAPMARK_EXCLAMATION = 2
+MAPMARK_STAR = 3
+MAPMARK_CROSS = 4
+MAPMARK_TEMPLE = 5
+MAPMARK_KISS = 6
+MAPMARK_SHOVEL = 7
+MAPMARK_SWORD = 8
+MAPMARK_FLAG = 9
+MAPMARK_LOCK = 10
+MAPMARK_BAG = 11
+MAPMARK_SKULL = 12
+MAPMARK_DOLLAR = 13
+MAPMARK_REDNORTH = 14
+MAPMARK_REDSOUTH = 15
+MAPMARK_REDEAST = 16
+MAPMARK_REDWEST = 17
+MAPMARK_GREENNORTH = 18
+MAPMARK_GREENSOUTH = 19
 
 ITEM_TYPE_DEPOT = 1
 ITEM_TYPE_MAILBOX = 2
@@ -469,7 +498,7 @@ levelDoors = {1227, 1229, 1245, 1247, 1259, 1261, 3540, 3549, 5103, 5112, 5121, 
 keys = {2086, 2087, 2088, 2089, 2090, 2091, 2092, 10032}
 
 BLUEBERRYBUSH_DECAY_INTERVAL = 300000
-CONTAINER_POSITION = 65535
+CONTAINER_POSITION = 0xFFFF
 ITEMCOUNT_MAX = 100
 
 ITEM_GOLD_COIN = 2148
@@ -484,30 +513,54 @@ ITEM_PARCEL = 2595
 ITEM_LABEL = 2599
 
 function doPlayerGiveItem(cid, itemid, count, charges)
-	local hasCharges = (isItemRune(itemid) == TRUE or isItemFluidContainer(itemid) == TRUE)
-	if(hasCharges and charges == nil) then
+	local isFluidContainer = isItemFluidContainer(itemid) == TRUE
+	if isFluidContainer and charges == nil then
 		charges = 1
 	end
 	while count > 0 do
 		local tempcount = 1
 		if(isItemStackable(itemid) == TRUE) then
-			tempcount = math.min (100, count)
+			tempcount = math.min(100, count)
 		end
-		local ret = doPlayerAddItem(cid, itemid, tempcount, charges)
-		if(not ret) then
+		local ret = doPlayerAddItem(cid, itemid, tempcount, TRUE, charges)
+		if ret == false then
 			ret = doCreateItem(itemid, tempcount, getPlayerPosition(cid))
 		end
+
 		if(ret) then
-			if(hasCharges) then
+			if(isFluidContainer) then
 				count = count - 1
+			elseif isItemRune(itemid) then
+				return LUA_NO_ERROR
 			else
 				count = count - tempcount
 			end
 		else
-			return false
+			return LUA_ERROR
 		end
 	end
-	return true
+	return LUA_NO_ERROR
+end
+
+function doCreatureSayWithRadius(cid, text, type, radiusx, radiusy, position)
+	for i, tid in ipairs(getSpectators(position or getCreaturePosition(cid), radiusx, radiusy, false)) do
+		if(isPlayer(tid) == TRUE) then
+			doCreatureSay(cid, text, type, false, tid, position or getCreaturePosition(cid))
+		end
+	end
+	return TRUE
+end
+
+function doSummonCreatures(monsters, positions)
+	for _, positions in pairs(positions) do
+		doSummonCreature(monsters, positions)
+	end
+end
+
+function setPlayerMultipleStorageValues(cid, storage, value)
+	for _, storage in pairs(storage) do
+		setPlayerStorageValue(cid, storage, value)
+	end
 end
 
 function doPlayerTakeItem(cid, itemid, count)
@@ -520,17 +573,17 @@ function doPlayerTakeItem(cid, itemid, count)
 				tempcount = 1
 			end
 			local ret = doPlayerRemoveItem(cid, itemid, tempcount)
-			if(ret) then
+			if(ret ~= LUA_ERROR) then
 				count = count-tempcount
 			else
-				return false
+				return LUA_ERROR
 			end
 		end
 		if(count == 0) then
-			return true
+			return LUA_NO_ERROR
 		end
 	else
-		return false
+		return LUA_ERROR
 	end
 end
 
@@ -538,7 +591,7 @@ function doPlayerBuyItem(cid, itemid, count, cost, charges)
 	if(doPlayerRemoveMoney(cid, cost) == TRUE) then
 		return doPlayerGiveItem(cid, itemid, count, charges)
 	end
-	return false
+	return LUA_ERROR
 end
 
 function doPlayerSellItem(cid, itemid, count, cost)
@@ -546,16 +599,16 @@ function doPlayerSellItem(cid, itemid, count, cost)
 		if doPlayerAddMoney(cid, cost) ~= TRUE then
 			error('Could not add money to ' .. getPlayerName(cid) .. '(' .. cost .. 'gp)')
 		end
-		return true
+		return LUA_NO_ERROR
 	end
-	return false
+	return LUA_ERROR
 end
 
 function isInRange(pos, fromPos, toPos)
 	if pos.x >= fromPos.x and pos.y >= fromPos.y and pos.z >= fromPos.z and pos.x <= toPos.x and pos.y <= toPos.y and pos.z <= toPos.z then
-		return true
+		return TRUE
 	end
-	return false
+	return FALSE
 end
 
 function isPremium(cid)
@@ -589,7 +642,7 @@ function getArticle(str)
 end
 
 function isNumber(str)
-	return tonumber(str) ~= nil and true or false
+	return tonumber(str) ~= nil and TRUE or FALSE
 end
 
 function getDistanceBetween(firstPosition, secondPosition)
@@ -604,11 +657,11 @@ function getDistanceBetween(firstPosition, secondPosition)
 end
 
 function doPlayerAddAddons(cid, addon)
-	for i = 0, table.maxn(maleOutfits) do
+	for i = 0, #maleOutfits do
 		doPlayerAddOutfit(cid, maleOutfits[i], addon)
 	end
 
-	for i = 0, table.maxn(femaleOutfits) do
+	for i = 0, #femaleOutfits do
 		doPlayerAddOutfit(cid, femaleOutfits[i], addon)
 	end
 end
@@ -630,7 +683,7 @@ function isSorcerer(cid)
 		return false
 	end
 
-	return isInArray({1,5}, getPlayerVocation(cid))
+	return (isInArray({1,5}, getPlayerVocation(cid)) == TRUE)
 end
 
 function isDruid(cid)
@@ -639,7 +692,7 @@ function isDruid(cid)
 		return false
 	end
 
-	return isInArray({2,6}, getPlayerVocation(cid))
+	return (isInArray({2,6}, getPlayerVocation(cid)) == TRUE)
 end
 
 function isPaladin(cid)
@@ -648,7 +701,7 @@ function isPaladin(cid)
 		return false
 	end
 
-	return isInArray({3,7}, getPlayerVocation(cid))
+	return (isInArray({3,7}, getPlayerVocation(cid)) == TRUE)
 end
 
 function isKnight(cid)
@@ -671,51 +724,408 @@ function getPlayerMoney(cid)
 	return ((getPlayerItemCount(cid, ITEM_CRYSTAL_COIN) * 10000) + (getPlayerItemCount(cid, ITEM_PLATINUM_COIN) * 100) + getPlayerItemCount(cid, ITEM_GOLD_COIN))
 end
 
-function table.find(table, value)
-	for i,v in pairs(table) do
-		if (v == value) then
+function doPlayerBuyItemContainer(cid, containerid, itemid, count, cost, charges)
+	if(doPlayerRemoveMoney(cid, cost) ~= TRUE) then
+		return LUA_ERROR
+	end
+
+	for i = 1, count do
+		local container = doCreateItemEx(containerid, 1)
+		for x = 1, getContainerCapById(containerid) do
+			doAddContainerItem(container, itemid, charges)
+		end
+
+		if(doPlayerAddItemEx(cid, container, TRUE) ~= RETURNVALUE_NOERROR) then
+			return LUA_ERROR
+		end
+	end
+
+	return LUA_NO_ERROR
+end
+
+function getDirectionTo(pos1, pos2)
+	local dir = NORTH
+	if(pos1.x > pos2.x) then
+		dir = WEST
+		if(pos1.y > pos2.y) then
+			dir = NORTHWEST
+		elseif(pos1.y < pos2.y) then
+			dir = SOUTHWEST
+		end
+	elseif(pos1.x < pos2.x) then
+		dir = EAST
+		if(pos1.y > pos2.y) then
+			dir = NORTHEAST
+		elseif(pos1.y < pos2.y) then
+			dir = SOUTHEAST
+		end
+	else
+		if(pos1.y > pos2.y) then
+			dir = NORTH
+		elseif(pos1.y < pos2.y) then
+			dir = SOUTH
+		end
+	end
+	return dir
+end
+
+function getPlayerLookPos(cid)
+	return getPosByDir(getThingPos(cid), getPlayerLookDir(cid))
+end
+
+function getPosByDir(fromPosition, direction, size)
+	local n = size or 1
+
+	local pos = fromPosition
+	if(direction == NORTH) then
+		pos.y = pos.y - n
+	elseif(direction == SOUTH) then
+		pos.y = pos.y + n
+	elseif(direction == WEST) then
+		pos.x = pos.x - n
+	elseif(direction == EAST) then
+		pos.x = pos.x + n
+	elseif(direction == NORTHWEST) then
+		pos.y = pos.y - n
+		pos.x = pos.x - n
+	elseif(direction == NORTHEAST) then
+		pos.y = pos.y - n
+		pos.x = pos.x + n
+	elseif(direction == SOUTHWEST) then
+		pos.y = pos.y + n
+		pos.x = pos.x - n
+	elseif(direction == SOUTHEAST) then
+		pos.y = pos.y + n
+		pos.x = pos.x + n
+	end
+
+	return pos
+end
+
+function getCreaturesInRange(position, radiusx, radiusy, showMonsters, showPlayers, showSummons)
+	local creaturesList = {}
+	for x = -radiusx, radiusx do
+		for y = -radiusy, radiusy do
+			if not (x == 0 and y == 0) then
+				creature = getTopCreature({x = position.x+x, y = position.y+y, z = position.z})
+				if (creature.type == 1 and showPlayers == 1) or (creature.type == 2 and showMonsters == 1 and (showSummons ~= 1 or (showSummons == 1 and getCreatureMaster(creature.uid) == (creature.uid)))) then
+					table.insert(creaturesList, creature.uid)
+				end
+			end
+		end
+	end
+
+	local creature = getTopCreature(position)
+	if (creature.type == 1 and showPlayers == 1) or (creature.type == 2 and showMonsters == 1 and (showSummons ~= 1 or (showSummons == 1 and getCreatureMaster(creature.uid) == (creature.uid)))) then
+		if not(table.find(creaturesList, creature.uid)) then
+			table.insert(creaturesList, creature.uid)
+		end
+	end
+	return creaturesList
+end
+
+function addContainerWithItems(cid, container, item, item_count, count)
+	local Container = doPlayerAddItem(cid, container, 1)
+	for i = 1, count do
+		doAddContainerItem(Container, item, item_count)
+	end
+end
+
+function tableToPos(t)
+	if type(t) == "table" and #t == 3 and tonumber(table.concat(t)) then
+		return {x = tonumber(t[1]), y = tonumber(t[2]), z = tonumber(t[3])}
+	end
+	return FALSE
+end
+
+function positionExists(pos)
+ 	pos.stackpos = -1
+	return type(getTileThingByPos(pos)) == "table"
+end
+
+function warnPlayer(cid, msg)
+	doSendMagicEffect(getPlayerPosition(cid), CONST_ME_POFF)
+	return doPlayerSendCancel(cid, msg)
+end
+
+string.split = function (str)
+	local t = {}
+	local function helper(word)
+		table.insert(t, word)
+		return ""
+	end
+
+	if(not str:gsub("%w+", helper):find("%S")) then
+		return t
+	end
+end
+
+string.trim = function(str)
+	return (string.gsub(str, "^%s*(.-)%s*$", "%1"))
+end
+
+string.explode = function(str, sep)
+	local pos, t = 1, {}
+	if #sep == 0 or #str == 0 then
+		return
+	end
+
+	for s, e in function() return str:find(sep, pos) end do
+		table.insert(t, str:sub(pos, s - 1):trim())
+		pos = e + 1
+	end
+
+	table.insert(t, str:sub(pos):trim())
+	return t
+end
+
+function getCount(string)
+	local b, e = string:find("%d+")
+	return b and e and tonumber(string:sub(b, e)) or -1
+end
+
+ -- Returns player name if player exists in database or 0
+function playerExists(name)
+	dofile("./config.lua")
+	if sqlType == "mysql" then
+		env = assert(luasql.mysql())
+		con = assert(env:connect(mysqlDatabase, mysqlUser, mysqlPass, mysqlHost, mysqlPort))
+	else
+		env = assert(luasql.sqlite3())
+		con = assert(env:connect(sqliteDatabase))
+	end
+
+	local cur = assert(con:execute("SELECT `name` FROM `players` WHERE `name` = '" .. escapeString(name) .. "';"))
+	local row = cur:fetch({}, "a")
+
+	local name_ = ""
+	if row ~= nil then
+		name_ = row.name
+	end
+
+	cur:close()
+	con:close()
+	env:close()
+	return name_
+end
+
+function isSummon(cid)
+	return (isCreature(cid) == TRUE and (getCreatureMaster(cid) ~= cid)) and TRUE or FALSE
+end
+
+function isPlayerSummon(cid)
+	return (isSummon(cid) == TRUE and isPlayer(getCreatureMaster(cid)) == TRUE) and TRUE or FALSE
+end
+
+function doCopyItem(item, attributes)
+	local attributes = attributes or false
+
+	local ret = doCreateItemEx(item.itemid, item.type)
+	if(attributes) then
+		if(item.actionid > 0) then
+			doSetItemActionId(ret, item.actionid)
+		end
+	end
+
+	if(isContainer(item.uid) == TRUE) then
+		for i = (getContainerSize(item.uid) - 1), 0, -1 do
+			local tmp = getContainerItem(item.uid, i)
+			if(tmp.itemid > 0) then
+				doAddContainerItemEx(ret, doCopyItem(tmp, true).uid)
+			end
+		end
+	end
+
+	return getThing(ret)
+end
+
+function getTibianTime()
+	local worldTime = getWorldTime()
+	local minutes = worldTime % 60
+
+	local suffix = 'pm'
+	if worldTime >= 720 then
+		suffix = 'am'
+		if worldTime >= 780 then
+			worldTime = worldTime - 720
+		end
+	end
+
+	local hours = math.floor(worldTime / 60)
+	if minutes < 10 then
+		minutes = '0' .. minutes
+	end
+	return hours .. ':' .. minutes .. ' ' .. suffix
+end
+
+looktypes = {
+	["citizen"] = {
+		looktypeMale = 128,
+		looktypeFemale = 136
+	},
+	["hunter"] = {
+		looktypeMale = 129,
+		looktypeFemale = 137
+	},
+	["mage"] = {
+		looktypeMale = 130,
+		looktypeFemale = 138
+	},
+	["knight"] = {
+		looktypeMale = 131,
+		looktypeFemale = 139
+	},
+	["nobleman"] = {
+		looktypeMale = 132,
+		looktypeFemale = 140
+	},
+	["summoner"] = {
+		looktypeMale = 133,
+		looktypeFemale = 141
+	},
+	["warrior"] = {
+		looktypeMale = 134,
+		looktypeFemale = 142
+	},
+	["barbarian"] = {
+		looktypeMale = 143,
+		looktypeFemale = 147
+	},
+	["druid"] = {
+		looktypeMale = 144,
+		looktypeFemale = 148
+	},
+	["wizard"] = {
+		looktypeMale = 145,
+		looktypeFemale = 149
+	},
+	["oriental"] = {
+		looktypeMale = 146,
+		looktypeFemale = 150
+	},
+	["pirate"] = {
+		looktypeMale = 151,
+		looktypeFemale = 155
+	},
+	["assassin"] = {
+		looktypeMale = 152,
+		looktypeFemale = 156
+	},
+	["beggar"] = {
+		looktypeMale = 153,
+		looktypeFemale = 157
+	},
+	["shaman"] = {
+		looktypeMale = 154,
+		looktypeFemale = 158
+	},
+	["norseman"] = {
+		looktypeMale = 251,
+		looktypeFemale = 252
+	},
+	["nightmare"] = {
+		looktypeMale = 268,
+		looktypeFemale = 269
+	},
+	["jester"] = {
+		looktypeMale = 273,
+		looktypeFemale = 270
+	},
+	["brotherhood"] = {
+		looktypeMale = 278,
+		looktypeFemale = 279
+	},
+	["demonhunter"] = {
+		looktypeMale = 289,
+		looktypeFemale = 288
+	},
+	["yalaharian"] = {
+		looktypeMale = 325,
+		looktypeFemale = 324
+	},
+	["warmaster"] = {
+		looktypeMale = 335,
+		looktypeFemale = 336
+	},
+
+	["potionbelt"] = {
+		looktypeMale = 133,
+		looktypeFemale = 138
+	},
+	["tiara"] = {
+		looktypeMale = 133,
+		looktypeFemale = 138
+	},
+	["ferumbrashat"] = {
+		looktypeMale = 130,
+		looktypeFemale = 141
+	},
+	["wand"] = {
+		looktypeMale = 130,
+		looktypeFemale = 141
+	}
+}
+
+function hasAddon(cid, looktype, addon)
+	if looktypes[looktype] ~= nil then
+		if looktype == "beggar" or looktype == "hunter" then
+			if addon == 1 then
+				return canPlayerWearOutfit(cid, looktypes[looktype].looktypeMale, 1) == TRUE or canPlayerWearOutfit(cid, looktypes[looktype].looktypeFemale, 2) == TRUE
+			else
+				return canPlayerWearOutfit(cid, looktypes[looktype].looktypeMale, 2) == TRUE or canPlayerWearOutfit(cid, looktypes[looktype].looktypeFemale, 1) == TRUE
+			end
+		end
+		return canPlayerWearOutfit(cid, looktypes[looktype].looktypeMale, addon) == TRUE or canPlayerWearOutfit(cid, looktypes[looktype].looktypeFemale, addon) == TRUE
+	end
+	return false
+end
+
+function addAddon(cid, looktype, addon)
+	if looktypes[looktype] ~= nil then
+		if looktype == "beggar" or looktype == "hunter" then
+			if addon == 1 then
+				doPlayerAddOutfit(cid, looktypes[looktype].looktypeMale, 1)
+				doPlayerAddOutfit(cid, looktypes[looktype].looktypeFemale, 2)
+			else
+				doPlayerAddOutfit(cid, looktypes[looktype].looktypeMale, 2)
+				doPlayerAddOutfit(cid, looktypes[looktype].looktypeFemale, 1)
+			end
+		else
+			doPlayerAddOutfit(cid, looktypes[looktype].looktypeMale, addon)
+			doPlayerAddOutfit(cid, looktypes[looktype].looktypeFemale, addon)
+		end
+		doSendMagicEffect(getCreaturePosition(cid), CONST_ME_MAGIC_RED)
+	end
+end
+
+table.find = function (table, value)
+	for i, v in pairs(table) do
+		if(v == value) then
 			return i
 		end
 	end
 	return nil
 end
 
-function doPlayerBuyItemContainer(cid, containerid, itemid, count, cost, charges)
-	if doPlayerRemoveMoney(cid, cost) == TRUE then
-		for i = 1, count do
-			local container = doCreateItemEx(containerid, 1)
-			for x = 1, getContainerCapById(containerid) do
-				doAddContainerItem(container, itemid, charges)
-			end
-			doPlayerAddItemEx(cid, container, 1)
+table.isStrIn = function (txt, str)
+	for i, v in pairs(str) do
+		if(txt:find(v) and not txt:find('(%w+)' .. v) and not txt:find(v .. '(%w+)')) then
+			return true
 		end
-		return true
 	end
 	return false
 end
 
-function string:trim()
-	return self:gsub("^%s*(.-)%s*$", "%1")
-end
-
-function string:explode(sep, limit)
-	if(type(sep) ~= 'string' or isInArray({tostring(self):len(), sep:len()}, 0)) then
-		return {}
-	end
-
-	local i, pos, tmp, t = 0, 1, "", {}
-	for s, e in function() return string.find(self, sep, pos) end do
-		tmp = self:sub(pos, s - 1):trim()
-		table.insert(t, tmp)
-		pos = e + 1
-
-		i = i + 1
-		if(limit ~= nil and i == limit) then
-			break
+function isMonsterInRange(monsterName, fromPos, toPos)
+	for _x = fromPos.x, toPos.x do
+		for _y = fromPos.y, toPos.y do
+			for _z = fromPos.z, toPos.z do
+				creature = getTopCreature({x = _x, y = _y, z = _z})
+				if creature.type == 2 and getCreatureName(creature.uid):lower() == monsterName:lower() then
+					return true
+				end
+			end
 		end
 	end
-
-	tmp = self:sub(pos):trim()
-	table.insert(t, tmp)
-	return t
+	return false
 end

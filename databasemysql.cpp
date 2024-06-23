@@ -27,10 +27,10 @@
 #endif
 #include "databasemysql.h"
 
-#ifdef __MYSQL_ALT_INCLUDE__
-#include "errmsg.h"
-#else
+#ifdef WIN32
 #include <mysql/errmsg.h>
+#else
+#include <errmsg.h>
 #endif
 
 #include "configmanager.h"
