@@ -49,7 +49,7 @@
 	maxPlayers = "1000"
 	motd = "Welcome to the Forgotten Server!"
 	onePlayerOnlinePerAccount = "yes"
-	allowClones = 0
+	allowClones = "no"
 	serverName = "Forgotten"
 	loginMessage = "Welcome to the Forgotten Server!"
 	adminLogsEnabled = "no"
@@ -85,7 +85,7 @@
 	mapStorageType = "relational"
 
 	-- Messaging
-	enableRuleViolationReports = "yes"
+	enableRuleViolationReports = "no"
 	maxMessageBuffer = 4
 
 	-- MySQL

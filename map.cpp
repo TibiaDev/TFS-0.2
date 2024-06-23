@@ -110,25 +110,19 @@ bool Map::saveMap()
 	return saved;
 }
 
-Tile* Map::getTile(uint16_t x, uint16_t y, uint16_t z)
+Tile* Map::getTile(int32_t x, int32_t y, int32_t z)
 {
-	if(z < MAP_MAX_LAYERS)
-	{
-		//QTreeLeafNode* leaf = getLeaf(x, y);
-		QTreeLeafNode* leaf = QTreeNode::getLeafStatic(&root, x, y);
-		if(leaf)
-		{
-			Floor* floor = leaf->getFloor(z);
-			if(floor)
-				return floor->tiles[x & FLOOR_MASK][y & FLOOR_MASK];
-			else
-				return NULL;
-		}
-		else
-			return NULL;
-	}
-	else
+	if(x < 0 || x > 0xFFFF || y < 0 || y > 0xFFFF || z  < 0 || z >= MAP_MAX_LAYERS)
 		return NULL;
+
+	QTreeLeafNode* leaf = QTreeNode::getLeafStatic(&root, x, y);
+	if(leaf)
+	{
+		Floor* floor = leaf->getFloor(z);
+		if(floor)
+			return floor->tiles[x & FLOOR_MASK][y & FLOOR_MASK];
+	}
+	return NULL;
 }
 
 Tile* Map::getTile(const Position& pos)
@@ -1173,9 +1167,9 @@ int32_t AStarNodes::getEstimatedDistance(int32_t x, int32_t y, int32_t xGoal, in
 
 Floor::Floor()
 {
-	for(unsigned int i = 0; i < FLOOR_SIZE; ++i)
+	for(uint32_t i = 0; i < FLOOR_SIZE; ++i)
 	{
-		for(unsigned int j = 0; j < FLOOR_SIZE; ++j)
+		for(uint32_t j = 0; j < FLOOR_SIZE; ++j)
 			tiles[i][j] = 0;
 	}
 }
@@ -1253,8 +1247,7 @@ QTreeLeafNode* QTreeNode::createLeaf(uint32_t x, uint32_t y, uint32_t level)
 		}
 		return m_child[index]->createLeaf(x*2, y*2, level - 1);
 	}
-	else
-		return static_cast<QTreeLeafNode*>(this);
+	return static_cast<QTreeLeafNode*>(this);
 }
 
 
@@ -1262,7 +1255,7 @@ QTreeLeafNode* QTreeNode::createLeaf(uint32_t x, uint32_t y, uint32_t level)
 bool QTreeLeafNode::newLeaf = false;
 QTreeLeafNode::QTreeLeafNode()
 {
-	for(unsigned int i = 0; i < MAP_MAX_LAYERS; ++i)
+	for(uint32_t i = 0; i < MAP_MAX_LAYERS; ++i)
 		m_array[i] = NULL;
 
 	m_isLeaf = true;
@@ -1272,7 +1265,7 @@ QTreeLeafNode::QTreeLeafNode()
 
 QTreeLeafNode::~QTreeLeafNode()
 {
-	for(unsigned int i = 0; i < MAP_MAX_LAYERS; ++i)
+	for(uint32_t i = 0; i < MAP_MAX_LAYERS; ++i)
 		delete m_array[i];
 }
 
@@ -1286,7 +1279,8 @@ Floor* QTreeLeafNode::createFloor(uint32_t z)
 
 uint32_t Map::clean()
 {
-	g_game.setGameState(GAME_STATE_MAINTAIN);
+	if(g_game.getGameState() == GAME_STATE_NORMAL)
+		g_game.setGameState(GAME_STATE_MAINTAIN);
 
 	g_game.setStateTime(0);
 	uint64_t start = OTSYS_TIME();
@@ -1342,6 +1336,7 @@ uint32_t Map::clean()
 			else
 				leafE = getLeaf(nx + FLOOR_SIZE, ny);
 		}
+
 		if(leafS)
 			leafS = leafS->stepSouth();
 		else
@@ -1349,7 +1344,10 @@ uint32_t Map::clean()
 	}
 
 	std::cout << "> Cleaning time: " << (OTSYS_TIME() - start) / (1000.) << " seconds, collected " << count << " item" << (count != 1 ? "s" : "") << "." << std::endl;
+
 	g_game.setStateTime(OTSYS_TIME() + STATE_TIME);
-	g_game.setGameState(GAME_STATE_NORMAL);
+	if(g_game.getGameState() == GAME_STATE_MAINTAIN)
+		g_game.setGameState(GAME_STATE_NORMAL);
+
 	return count;
 }
