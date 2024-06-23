@@ -205,6 +205,9 @@ class Player : public Creature, public Cylinder
 		void addBlessing(int16_t blessing) {blessings += blessing;}
 		bool hasBlessing(int16_t value) const {return (0 != (blessings & ((int16_t)1 << value)));}
 
+		bool isFemale() const {return sex == PLAYERSEX_FEMALE;}
+		bool isMale() const {return sex == PLAYERSEX_MALE;}
+
 		bool isOffline() const {return (getID() == 0);}
 		void disconnect() {if(client) client->disconnect();}
 		uint32_t getIP() const;
@@ -237,7 +240,7 @@ class Player : public Creature, public Cylinder
 		uint32_t getAccount() const {return accountNumber;}
 		AccountType_t getAccountType() const {return accountType;}
 		uint32_t getLevel() const {return level;}
-		uint32_t getMagicLevel() const {return getPlayerInfo(PLAYERINFO_MAGICLEVEL);}
+		int32_t getMagicLevel() const {return getPlayerInfo(PLAYERINFO_MAGICLEVEL);}
 		bool isAccessPlayer() const {return accessLevel;}
 		bool isPremium() const;
 
@@ -303,6 +306,8 @@ class Player : public Creature, public Cylinder
 
 		Depot* getDepot(uint32_t depotId, bool autoCreateDepot);
 		bool addDepot(Depot* depot, uint32_t depotId);
+		void onReceiveMail(uint32_t depotId);
+		bool isNearDepotBox(uint32_t depotId);
 
 		virtual bool canSee(const Position& pos) const;
 		virtual bool canSeeCreature(const Creature* creature) const;
@@ -315,12 +320,11 @@ class Player : public Creature, public Cylinder
 		Item* getTradeItem() {return tradeItem;}
 
 		//shop functions
-		void setShopOwner(Npc* owner, int32_t onBuy, int32_t onSell, ShopInfoList offer)
+		void setShopOwner(Npc* owner, int32_t onBuy, int32_t onSell)
 		{
 			shopOwner = owner;
 			purchaseCallback = onBuy;
 			saleCallback = onSell;
-			shopOffer = offer;
 		}
 
 		Npc* getShopOwner(int32_t& onBuy, int32_t& onSell)
@@ -336,8 +340,6 @@ class Player : public Creature, public Cylinder
 			onSell = saleCallback;
 			return shopOwner;
 		}
-
-		bool hasShopItemForSale(uint32_t itemId);
 
 		//V.I.P. functions
 		void notifyLogIn(Player* player);
@@ -357,8 +359,10 @@ class Player : public Creature, public Cylinder
 		virtual void onWalkComplete();
 
 		void stopWalk();
-		void openShopWindow();
-		void closeShopWindow(Npc* npc = NULL, int32_t onBuy = -1, int32_t onSell = -1);
+		void openShopWindow(const std::list<ShopInfo>& shop);
+		void closeShopWindow(bool sendCloseShopWindow = true);
+		void updateSaleShopList(uint32_t itemId);
+		bool hasShopItemForSale(uint32_t itemId, uint8_t subType);
 
 		void setChaseMode(chaseMode_t mode);
 		void setFightMode(fightMode_t mode);
@@ -393,7 +397,7 @@ class Player : public Creature, public Cylinder
 
 		virtual void drainHealth(Creature* attacker, CombatType_t combatType, int32_t damage);
 		virtual void drainMana(Creature* attacker, int32_t manaLoss);
-		void addManaSpent(uint64_t amount);
+		void addManaSpent(uint64_t amount, bool withMultiplier = true);
 		void addSkillAdvance(skills_t skill, uint32_t count);
 
 		virtual int32_t getArmor() const;
@@ -418,7 +422,7 @@ class Player : public Creature, public Cylinder
 		virtual void onAttacked();
 		virtual void onAttackedCreatureDrainHealth(Creature* target, int32_t points);
 		virtual void onTargetCreatureGainHealth(Creature* target, int32_t points);
-		virtual void onKilledCreature(Creature* target, bool lastHit = true);
+		virtual bool onKilledCreature(Creature* target, bool lastHit = true);
 		virtual void onGainExperience(uint64_t gainExp);
 		virtual void onGainSharedExperience(uint64_t gainExp);
 		virtual void onAttackedCreatureBlockHit(Creature* target, BlockType_t blockType);
@@ -472,8 +476,8 @@ class Player : public Creature, public Cylinder
 
 		void sendCreatureTurn(const Creature* creature)
 			{if(client) client->sendCreatureTurn(creature, creature->getTile()->getClientIndexOfThing(this, creature));}
-		void sendCreatureSay(const Creature* creature, SpeakClasses type, const std::string& text)
-			{if(client) client->sendCreatureSay(creature, type, text);}
+		void sendCreatureSay(const Creature* creature, SpeakClasses type, const std::string& text, Position* pos = NULL)
+			{if(client) client->sendCreatureSay(creature, type, text, pos);}
 		void sendCreatureSquare(const Creature* creature, SquareColor_t color)
 			{if(client) client->sendCreatureSquare(creature, color);}
 		void sendCreatureChangeOutfit(const Creature* creature, const Outfit_t& outfit)
@@ -579,9 +583,9 @@ class Player : public Creature, public Cylinder
 		void sendToChannel(Creature* creature, SpeakClasses type, const std::string& text, uint16_t channelId, uint32_t time = 0) const
 			{if(client) client->sendToChannel(creature, type, text, channelId, time);}
 		void sendShop() const
-			{if(client) client->sendShop(shopOffer);}
-		void sendGoods() const
-			{if(client) client->sendGoods(goodsMap);}
+			{if(client) client->sendShop(shopItemList);}
+		void sendSaleItemList() const
+			{if(client) client->sendSaleItemList(shopItemList);}
 		void sendCloseShop() const
 			{if(client) client->sendCloseShop();}
 		void sendTradeItemRequest(const Player* player, const Item* item, bool ack) const
@@ -652,7 +656,7 @@ class Player : public Creature, public Cylinder
 		bool hasCapacity(const Item* item, uint32_t count) const;
 
 		void gainExperience(uint64_t exp);
-		void addExperience(uint64_t exp);
+		void addExperience(uint64_t exp, bool useMult = false, bool sendText = false);
 
 		void updateInventoryWeight();
 		void postUpdateGoods(uint32_t itemId);
@@ -686,6 +690,7 @@ class Player : public Creature, public Cylinder
 		virtual int32_t __getFirstIndex() const;
 		virtual int32_t __getLastIndex() const;
 		virtual uint32_t __getItemTypeCount(uint16_t itemId, int32_t subType = -1, bool itemCount = true) const;
+		virtual std::map<uint32_t, uint32_t>& __getAllItemTypeCount(std::map<uint32_t, uint32_t>& countMap, bool itemCount = true) const;
 		virtual Thing* __getThing(uint32_t index) const;
 
 		virtual void __internalAddThing(Thing* thing);
@@ -796,7 +801,7 @@ class Player : public Creature, public Cylinder
 		Npc* shopOwner;
 		int32_t purchaseCallback;
 		int32_t saleCallback;
-		ShopInfoList shopOffer;
+		std::list<ShopInfo> shopItemList;
 
 		std::map<uint32_t, uint32_t> goodsMap;
 
@@ -845,7 +850,7 @@ class Player : public Creature, public Cylinder
 			if(!hasFlag(PlayerFlag_SetMaxSpeed))
 				baseSpeed = 220 + (2* (level - 1));
 			else
-				baseSpeed = 900;
+				baseSpeed = PLAYER_MAX_SPEED;
 		}
 
 		bool isPromoted();

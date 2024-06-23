@@ -1526,8 +1526,7 @@ bool ConditionSpeed::startCondition(Creature* creature)
 
 	if(speedDelta == 0)
 	{
-		int32_t min;
-		int32_t max;
+		int32_t min, max;
 		getFormulaValues(creature->getBaseSpeed(), min, max);
 		speedDelta = random_range(min, max);
 	}
@@ -1548,36 +1547,38 @@ void ConditionSpeed::endCondition(Creature* creature, ConditionEnd_t reason)
 
 void ConditionSpeed::addCondition(Creature* creature, const Condition* addCondition)
 {
-	if(updateCondition(addCondition))
+	if(conditionType != addCondition->getType())
+		return;
+
+	if(getTicks() == -1 && addCondition->getTicks() > 0)
+		return;
+
+	setTicks(addCondition->getTicks());
+
+	const ConditionSpeed& conditionSpeed = static_cast<const ConditionSpeed&>(*addCondition);
+	int32_t oldSpeedDelta = speedDelta;
+	speedDelta = conditionSpeed.speedDelta;
+	mina = conditionSpeed.mina;
+	maxa = conditionSpeed.maxa;
+	minb = conditionSpeed.minb;
+	maxb = conditionSpeed.maxb;
+
+	if(speedDelta == 0)
 	{
-		setTicks(addCondition->getTicks());
-
-		const ConditionSpeed& conditionSpeed = static_cast<const ConditionSpeed&>(*addCondition);
-		int32_t oldSpeedDelta = speedDelta;
-		speedDelta = conditionSpeed.speedDelta;
-		mina = conditionSpeed.mina;
-		maxa = conditionSpeed.maxa;
-		minb = conditionSpeed.minb;
-		maxb = conditionSpeed.maxb;
-
-		if(speedDelta == 0)
-		{
-			int32_t min;
-			int32_t max;
-			getFormulaValues(creature->getBaseSpeed(), min, max);
-			speedDelta = random_range(min, max);
-		}
-
-		int32_t newSpeedChange = (speedDelta - oldSpeedDelta);
-		if(newSpeedChange != 0)
-			g_game.changeSpeed(creature, newSpeedChange);
+		int32_t min;
+		int32_t max;
+		getFormulaValues(creature->getBaseSpeed(), min, max);
+		speedDelta = random_range(min, max);
 	}
+
+	int32_t newSpeedChange = (speedDelta - oldSpeedDelta);
+	if(newSpeedChange != 0)
+		g_game.changeSpeed(creature, newSpeedChange);
 }
 
 uint32_t ConditionSpeed::getIcons() const
 {
 	uint32_t icons = Condition::getIcons();
-
 	switch(conditionType)
 	{
 		case CONDITION_HASTE:

@@ -428,7 +428,10 @@ bool Spell::configureSpell(xmlNodePtr p)
 			"firecondition",
 			"poisoncondition",
 			"energycondition",
-			"drowncondition"
+			"drowncondition",
+			"freezecondition",
+			"cursecondition",
+			"dazzlecondition"
 		};
 
 		for(uint32_t i = 0; i < sizeof(reservedList)/sizeof(const char*); ++i)

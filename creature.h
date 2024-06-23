@@ -278,7 +278,7 @@ class Creature : public AutoID, virtual public Thing
 		virtual void onAttackedCreatureDrainHealth(Creature* target, int32_t points);
 		virtual void onTargetCreatureGainHealth(Creature* target, int32_t points);
 		virtual void onAttackedCreatureKilled(Creature* target);
-		virtual void onKilledCreature(Creature* target, bool lastHit = true);
+		virtual bool onKilledCreature(Creature* target, bool lastHit = true);
 		virtual void onGainExperience(uint64_t gainExp);
 		virtual void onGainSharedExperience(uint64_t gainExp);
 		virtual void onAttackedCreatureBlockHit(Creature* target, BlockType_t blockType);
@@ -312,13 +312,14 @@ class Creature : public AutoID, virtual public Thing
 		virtual void onFollowCreatureDisappear(bool isLogout) {}
 
 		virtual void onCreatureTurn(const Creature* creature, uint32_t stackPos) {}
-		virtual void onCreatureSay(const Creature* creature, SpeakClasses type, const std::string& text) {}
+		virtual void onCreatureSay(const Creature* creature, SpeakClasses type, const std::string& text,
+			Position* pos = NULL) {}
 
 		virtual void onCreatureChangeOutfit(const Creature* creature, const Outfit_t& outfit) {}
 		virtual void onCreatureConvinced(const Creature* convincer, const Creature* creature) {}
 		virtual void onCreatureChangeVisible(const Creature* creature, bool visible);
-		virtual void onPlacedCreature() {};
-		virtual void onRemovedCreature() {};
+		virtual void onPlacedCreature() {}
+		virtual void onRemovedCreature() {}
 
 		virtual WeaponType_t getWeaponType() {return WEAPON_NONE;}
 		virtual bool getCombatValues(int32_t& min, int32_t& max) {return false;}
@@ -398,6 +399,9 @@ class Creature : public AutoID, virtual public Thing
 		//combat variables
 		Creature* attackedCreature;
 		Creature* _lastHitCreature;
+		Creature* _mostDamageCreature;
+		bool lastHitUnjustified;
+		bool mostDamageUnjustified;
 
 		struct CountBlock_t
 		{

@@ -617,7 +617,7 @@ ReturnValue Tile::__queryAdd(int32_t index, const Thing* thing, uint32_t count,
 		}
 		else if(const Player* player = creature->getPlayer())
 		{
-			if(creatures && !creatures->empty() && !hasBitSet(FLAG_IGNOREBLOCKCREATURE, flags))
+			if(creatures && !creatures->empty() && !hasBitSet(FLAG_IGNOREBLOCKCREATURE, flags) && !player->isAccessPlayer())
 			{
 				for(CreatureVector::const_iterator cit = creatures->begin(); cit != creatures->end(); ++cit)
 				{
@@ -741,15 +741,13 @@ ReturnValue Tile::__queryAdd(int32_t index, const Thing* thing, uint32_t count,
 					}
 					else if(iiType.blockSolid)
 					{
-						if(item->isPickupable())
-						{
-							if(iitem->getTrashHolder())
-								continue;
+						if(iiType.allowPickupable && !item->isMagicField() && !item->isBlocking())
+							continue;
 
-							if(!iiType.hasHeight || iiType.pickupable || iiType.isBed())
-								return RET_NOTENOUGHROOM;
-						}
-						else
+						if(!item->isPickupable())
+							return RET_NOTENOUGHROOM;
+
+						if(!iiType.hasHeight || iiType.pickupable || iiType.isBed())
 							return RET_NOTENOUGHROOM;
 					}
 				}
@@ -826,8 +824,14 @@ Cylinder* Tile::__queryDestination(int32_t& index, const Thing* thing, Item** de
 					if(downTile->floorChange(SOUTH))
 						dy -= 1;
 
+					if(downTile->floorChange(SOUTH_ALT))
+						dy -= 2;
+
 					if(downTile->floorChange(EAST))
 						dx -= 1;
+
+					if(downTile->floorChange(EAST_ALT))
+						dx -= 2;
 
 					if(downTile->floorChange(WEST))
 						dx += 1;
@@ -1396,7 +1400,7 @@ int32_t Tile::getClientIndexOfThing(const Player* player, const Thing* thing) co
 
 	if(const CreatureVector* creatures = getCreatures())
 	{
-		for(CreatureVector::const_iterator cit = creatures->begin(); cit != creatures->end(); ++cit)
+		for(CreatureVector::const_reverse_iterator cit = creatures->rbegin(); cit != creatures->rend(); ++cit)
 		{
 			if((*cit) == thing || !(*cit)->isInGhostMode() || player->isAccessPlayer())
 				++n;
@@ -1725,6 +1729,9 @@ void Tile::updateTileFlags(Item* item, bool removing)
 
 		if(item->getBed())
 			setFlag(TILESTATE_BED);
+
+		if(item->getContainer() && item->getContainer()->getDepot())
+			setFlag(TILESTATE_DEPOT);
 	}
 	else
 	{
@@ -1802,5 +1809,16 @@ void Tile::updateTileFlags(Item* item, bool removing)
 
 		if(item->getBed())
 			resetFlag(TILESTATE_BED);
+
+		if(item->getContainer() && item->getContainer()->getDepot())
+			resetFlag(TILESTATE_DEPOT);
 	}
+}
+
+bool Tile::isMoveableBlocking() const
+{
+	if(!ground || hasFlag(TILESTATE_BLOCKSOLID))
+		return true;
+
+	return false;
 }

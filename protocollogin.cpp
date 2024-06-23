@@ -56,7 +56,7 @@ void ProtocolLogin::deleteProtocolTask()
 
 void ProtocolLogin::disconnectClient(uint8_t error, const char* message)
 {
-	OutputMessage* output = OutputMessagePool::getInstance()->getOutputMessage(this, false);
+	OutputMessage_ptr output = OutputMessagePool::getInstance()->getOutputMessage(this, false);
 	if(output)
 	{
 		TRACK_MESSAGE(output);
@@ -86,7 +86,7 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 	msg.SkipBytes(12);
 
 	if(version <= 760)
-		disconnectClient(0x0A, "Only clients with protocol 8.5 allowed!");
+		disconnectClient(0x0A, "Only clients with protocol 8.54 allowed!");
 
 	if(!RSA_decrypt(msg))
 	{
@@ -119,9 +119,9 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 		}
 	}
 
-	if(version < 850)
+	if(version < 854)
 	{
-		disconnectClient(0x0A, "Only clients with protocol 8.5 allowed!");
+		disconnectClient(0x0A, "Only clients with protocol 8.54 allowed!");
 		return false;
 	}
 
@@ -170,7 +170,7 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 
 	g_bans.addLoginAttempt(clientip, true);
 
-	OutputMessage* output = OutputMessagePool::getInstance()->getOutputMessage(this, false);
+	OutputMessage_ptr output = OutputMessagePool::getInstance()->getOutputMessage(this, false);
 	if(output)
 	{
 		TRACK_MESSAGE(output);

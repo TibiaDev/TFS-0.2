@@ -106,9 +106,8 @@ typedef std::map< uint32_t, shared_ptr<RuleViolation> > RuleViolationsMap;
 #define EVENT_DECAY_BUCKETS 16
 #define STATE_TIME 1000
 
+typedef std::map<int32_t, int32_t> StageList;
 typedef std::vector< std::pair<std::string, unsigned int> > Highscore;
-
-typedef std::list<std::string> BlackList;
 
 /**
   * Main Game class.
@@ -131,9 +130,6 @@ class Game
 		void autoSave();
 		void prepareServerSave();
 		void serverSave();
-
-		void fetchBlackList();
-		BlackList blacklist;
 
 		/**
 		  * Load a map.
@@ -383,7 +379,8 @@ class Game
 		  * \param type Type of message
 		  * \param text The text to say
 		  */
-		bool internalCreatureSay(Creature* creature, SpeakClasses type, const std::string& text);
+		bool internalCreatureSay(Creature* creature, SpeakClasses type, const std::string& text,
+			bool ghostMode, SpectatorVec* listPtr = NULL, Position* pos = NULL);
 
 		Position getClosestFreeTile(Player* player, Creature* teleportedCreature, Position toPos, bool toCreature);
 
@@ -444,7 +441,8 @@ class Game
 		bool playerLookInTrade(uint32_t playerId, bool lookAtCounterOffer, int index);
 		bool playerPurchaseItem(uint32_t playerId, uint16_t spriteId, uint8_t count, uint8_t amount,
 			bool ignoreCap = false, bool inBackpacks = false);
-		bool playerSellItem(uint32_t playerId, uint16_t spriteId, uint8_t count, uint8_t amount);
+		bool playerSellItem(uint32_t playerId, uint16_t spriteId, uint8_t count,
+			uint8_t amount);
 		bool playerCloseShop(uint32_t playerId);
 		bool playerLookInShop(uint32_t playerId, uint16_t spriteId, uint8_t count);
 		bool playerCloseTrade(uint32_t playerId);
@@ -500,6 +498,7 @@ class Game
 		void saveGameState();
 		void loadGameState();
 		void refreshMap();
+		void cleanMap() {map->clean();}
 
 		//Events
 		void checkCreatureWalk(uint32_t creatureId);
@@ -622,7 +621,6 @@ class Game
 		int32_t lastMotdNum;
 		uint32_t lastPlayersRecord;
 
-		typedef std::map<int32_t,int32_t> StageList;
 		StageList stages;
 		bool stagesEnabled;
 		uint32_t lastStageLevel;
