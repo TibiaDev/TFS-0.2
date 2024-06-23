@@ -738,12 +738,19 @@ bool Commands::getInfo(Creature* creature, const std::string& cmd, const std::st
 
 bool Commands::closeServer(Creature* creature, const std::string& cmd, const std::string& param)
 {
-	Dispatcher::getDispatcher().addTask(
-		createTask(boost::bind(&Game::setGameState, &g_game, GAME_STATE_CLOSED)));
+	if(param == "shutdown")
+	{
+		Dispatcher::getDispatcher().addTask(
+			createTask(boost::bind(&Game::setGameState, &g_game, GAME_STATE_SHUTDOWN)));
+	}
+	else
+	{
+		Dispatcher::getDispatcher().addTask(
+			createTask(boost::bind(&Game::setGameState, &g_game, GAME_STATE_CLOSED)));
 
-	if(creature->getPlayer())
-		creature->getPlayer()->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Server is now closed.");
-
+		if(creature->getPlayer())
+			creature->getPlayer()->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Server is now closed.");
+	}
 	return true;
 }
 
@@ -1025,7 +1032,8 @@ bool Commands::whoIsOnline(Creature* creature, const std::string &cmd, const std
 				{
 					ss << (it != Player::listPlayer.list.end() ? "," : ".");
 					player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, ss.str());
-					ss.str("");	i = 0;
+					ss.str("");
+					i = 0;
 				}
 			}
 		}
@@ -1034,13 +1042,15 @@ bool Commands::whoIsOnline(Creature* creature, const std::string &cmd, const std
 			while(it != Player::listPlayer.list.end())
 			{
 				ss << (i > 0 ? ", " : "") << (*it).second->name << " [" << (*it).second->level << "]";
-				++it; ++i;
+				++it;
+				++i;
 
 				if(i == 10)
 				{
 					ss << (it != Player::listPlayer.list.end() ? "," : ".");
 					player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, ss.str());
-					ss.str("");	i = 0;
+					ss.str("");
+					i = 0;
 				}
 			}
 		}
@@ -1146,7 +1156,7 @@ bool Commands::newType(Creature* creature, const std::string& cmd, const std::st
 	int32_t lookType = atoi(param.c_str());
 	if(player)
 	{
-		if(lookType < 0 || lookType == 1 || lookType == 135 || (lookType > 160 && lookType < 192) || lookType > 302)
+		if(lookType < 0 || lookType == 1 || lookType == 135 || (lookType > 160 && lookType < 192) || lookType > 326)
 			player->sendTextMessage(MSG_STATUS_SMALL, "This looktype does not exist.");
 		else
 		{

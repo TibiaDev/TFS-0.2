@@ -93,11 +93,11 @@ bool Raids::loadFromXml()
 
 				//interval2 is the average interval between
 				// 2 executions of the raid in minutes
-				if(readXMLInteger(raidNode, "interval2", intValue))
+				if(readXMLInteger(raidNode, "interval2", intValue) && intValue > 0)
 					interval = intValue * 60;
 				else
 				{
-					std::cout << "[Error] Raids: interval2 tag missing for raid " << name << std::endl;
+					std::cout << "[Error] Raids: interval2 tag missing or divided by 0 for raid " << name << std::endl;
 					raidNode = raidNode->next;
 					continue;
 				}
@@ -705,14 +705,9 @@ bool AreaSpawnEvent::executeEvent()
 LuaScriptInterface ScriptEvent::m_scriptInterface("Raid Interface");
 
 ScriptEvent::ScriptEvent() :
-Event(&m_scriptInterface)
+	Event(&m_scriptInterface)
 {
 	m_scriptInterface.initState();
-}
-
-void ScriptEvent::reInitScriptInterface()
-{
-	m_scriptInterface.reInitState();
 }
 
 bool ScriptEvent::configureRaidEvent(xmlNodePtr eventNode)

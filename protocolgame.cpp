@@ -404,7 +404,7 @@ bool ProtocolGame::login(const std::string& name, uint32_t accnumber, const std:
 
 		if(!g_game.placeCreature(player, player->getLoginPosition()))
 		{
-			if(!g_game.placeCreature(player, player->getTemplePosition(), true))
+			if(!g_game.placeCreature(player, player->getTemplePosition(), false, true))
 			{
 				disconnectClient(0x14, "Temple position is wrong. Contact the administrator.");
 				return false;
@@ -421,7 +421,7 @@ bool ProtocolGame::login(const std::string& name, uint32_t accnumber, const std:
 		if(eventConnect != 0 || g_config.getString(ConfigManager::REPLACE_KICK_ON_LOGIN) != "yes")
 		{
 			//Already trying to connect
-			disconnectClient(0x14, "Your already logged in.");
+			disconnectClient(0x14, "You are already logged in.");
 			return false;
 		}
 
@@ -450,7 +450,7 @@ bool ProtocolGame::connect(uint32_t playerId)
 	Player* _player = g_game.getPlayerByID(playerId);
 	if(!_player || _player->isRemoved() || _player->client)
 	{
-		disconnectClient(0x14, "Your already logged in.");
+		disconnectClient(0x14, "You are already logged in.");
 		return false;
 	}
 
@@ -542,9 +542,9 @@ bool ProtocolGame::parseFirstPacket(NetworkMessage& msg)
 	const std::string name = msg.GetString();
 	std::string password = msg.GetString();
 
-	if(version < 830)
+	if(version < 840)
 	{
-		disconnectClient(0x0A, "Only clients with protocol 8.3 allowed!");
+		disconnectClient(0x0A, "Only clients with protocol 8.4 allowed!");
 		return false;
 	}
 
@@ -922,7 +922,7 @@ void ProtocolGame::parsePacket(NetworkMessage &msg)
 				break;
 
 			default:
-				std::cout << "Unknown byte received: 0x" << std::hex << (int16_t)recvbyte << std::dec << ", from player: " << player->getName() << "." << std::endl;
+				std::cout << "Player: " << player->getName() << " sent an unknown packet header: 0x" << std::hex << (int16_t)recvbyte << std::dec << "!" << std::endl;
 				break;
 		}
 	}
@@ -1805,8 +1805,9 @@ void ProtocolGame::sendClosePrivate(uint16_t channelId)
 	if(msg)
 	{
 		TRACK_MESSAGE(msg);
-		if(channelId == 0x00)
+		if(channelId == 0x00 || channelId == 0x08)
 			g_chat.removeUserFromChannel(player, channelId);
+
 		msg->AddByte(0xB3);
 		msg->AddU16(channelId);
 	}
@@ -2181,7 +2182,7 @@ void ProtocolGame::sendDistanceShoot(const Position& from, const Position& to, u
 
 void ProtocolGame::sendMagicEffect(const Position& pos, uint8_t type)
 {
-	if(canSee(pos) && type <= 56)
+	if(canSee(pos) && type <= 66)
 	{
 		NetworkMessage* msg = getOutputBuffer();
 		if(msg)
@@ -2880,6 +2881,7 @@ void ProtocolGame::AddCreatureSpeak(NetworkMessage* msg, const Creature* creatur
 		case SPEAK_CHANNEL_R1:
 		case SPEAK_CHANNEL_R2:
 		case SPEAK_CHANNEL_O:
+		case SPEAK_CHANNEL_W:
 			msg->AddU16(channelId);
 			break;
 
@@ -3163,7 +3165,12 @@ void ProtocolGame::AddShopItem(NetworkMessage* msg, const ShopInfo item)
 {
 	const ItemType& it = Item::items[item.itemId];
 	msg->AddU16(it.clientId);
-	msg->AddByte(item.subType);
+	if(it.stackable || it.isRune())
+		msg->AddByte(item.subType);
+	else if(it.isSplash() || it.isFluidContainer())
+		msg->AddByte(fluidMap[item.subType % 8]);
+	else
+		msg->AddByte(0x01);
 	msg->AddString(item.itemName);
 	msg->AddU32(uint32_t(it.weight * 100));
 	msg->AddU32(item.buyPrice);

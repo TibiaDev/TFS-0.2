@@ -46,7 +46,7 @@ class Weapons : public BaseEvents
 		const Weapon* getWeapon(const Item* item) const;
 
 		static int32_t getMaxMeleeDamage(int32_t attackSkill, int32_t attackValue);
-		static int32_t getMaxWeaponDamage(int32_t attackSkill, int32_t attackValue, float attackFactor);
+		static int32_t getMaxWeaponDamage(uint32_t level, int32_t attackSkill, int32_t attackValue, float attackFactor);
 
 	protected:
 		virtual void clear();
@@ -70,6 +70,7 @@ class Weapon : public Event
 		virtual bool configureEvent(xmlNodePtr p);
 		virtual bool loadFunction(const std::string& functionName);
 		virtual bool configureWeapon(const ItemType& it);
+		virtual bool interruptSwing() const {return false;}
 
 		virtual int32_t playerWeaponCheck(Player* player, Creature* target) const;
 		static bool useFist(Player* player, Creature* target);
@@ -149,6 +150,7 @@ class WeaponDistance : public Weapon
 
 		virtual bool configureEvent(xmlNodePtr p);
 		virtual bool configureWeapon(const ItemType& it);
+		virtual bool interruptSwing() const {return true;}
 
 		virtual int32_t playerWeaponCheck(Player* player, Creature* target) const;
 		virtual bool useWeapon(Player* player, Item* item, Creature* target) const;

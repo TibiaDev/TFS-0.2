@@ -137,22 +137,29 @@ bool Weapons::registerEvent(Event* event, xmlNodePtr p)
 {
 	Weapon* weapon = dynamic_cast<Weapon*>(event);
 	if(weapon)
+	{
+		if(weapons.find(weapon->getID()) != weapons.end())
+		{
+			std::cout << "[Warning - Weapons::registerEvent] Duplicate registered item with id: " << weapon->getID() << std::endl;
+			return false;
+		}
+
 		weapons[weapon->getID()] = weapon;
-	else
-		return false;
-	return true;
+		return true;
+	}
+	return false;
 }
 
 //monsters
 int32_t Weapons::getMaxMeleeDamage(int32_t attackSkill, int32_t attackValue)
 {
-	return ((int32_t)std::ceil((attackSkill * (attackValue * 0.05)) + (attackValue * 0.5)));
+	return ((int32_t)ceil((attackSkill * (attackValue * 0.05)) + (attackValue * 0.5)));
 }
 
 //players
-int32_t Weapons::getMaxWeaponDamage(int32_t attackSkill, int32_t attackValue, float attackFactor)
+int32_t Weapons::getMaxWeaponDamage(uint32_t level, int32_t attackSkill, int32_t attackValue, float attackFactor)
 {
-	return ((int32_t)std::ceil(((float)(attackSkill * (attackValue * 0.0425) + (attackValue * 0.2)) / attackFactor)) * 2);
+	return (int32_t)ceil((2 * (attackValue * (attackSkill + 5.8) / 25 + (level - 1) / 10.)) / attackFactor);
 }
 
 Weapon::Weapon(LuaScriptInterface* _interface) :
@@ -391,7 +398,7 @@ bool Weapon::useFist(Player* player, Creature* target)
 		int32_t attackSkill = player->getSkill(SKILL_FIST, SKILL_LEVEL);
 		int32_t attackValue = 7;
 
-		int32_t maxDamage = Weapons::getMaxWeaponDamage(attackSkill, attackValue, attackFactor);
+		int32_t maxDamage = Weapons::getMaxWeaponDamage(player->getLevel(), attackSkill, attackValue, attackFactor);
 		if(random_range(1, 100) <= g_config.getNumber(ConfigManager::CRITICAL_HIT_CHANCE))
 			maxDamage <<= 1;
 		int32_t damage = -random_range(0, maxDamage, DISTRO_NORMAL);
@@ -663,7 +670,7 @@ int32_t WeaponMelee::getElementDamage(const Player* player, const Item* item) co
 {
 	int32_t attackSkill = player->getWeaponSkill(item);
 	float attackFactor = player->getAttackFactor();
-	int32_t maxValue = Weapons::getMaxWeaponDamage(attackSkill, elementDamage, attackFactor);
+	int32_t maxValue = Weapons::getMaxWeaponDamage(player->getLevel(), attackSkill, elementDamage, attackFactor);
 
 	Vocation* vocation = player->getVocation();
 	if(vocation && vocation->meleeDamageMultipler != 1.0)
@@ -679,7 +686,7 @@ int32_t WeaponMelee::getWeaponDamage(const Player* player, const Creature* targe
 	int32_t attackValue = std::max((int32_t)0, ((int32_t)item->getAttack() - elementDamage));
 	float attackFactor = player->getAttackFactor();
 
-	int32_t maxValue = Weapons::getMaxWeaponDamage(attackSkill, attackValue, attackFactor);
+	int32_t maxValue = Weapons::getMaxWeaponDamage(player->getLevel(), attackSkill, attackValue, attackFactor);
 	if(random_range(1, 100) <= g_config.getNumber(ConfigManager::CRITICAL_HIT_CHANCE))
 		maxValue <<= 1;
 
@@ -931,7 +938,7 @@ int32_t WeaponDistance::getWeaponDamage(const Player* player, const Creature* ta
 	int32_t attackSkill = player->getSkill(SKILL_DIST, SKILL_LEVEL);
 	float attackFactor = player->getAttackFactor();
 
-	int32_t maxValue = Weapons::getMaxWeaponDamage(attackSkill, attackValue, attackFactor);
+	int32_t maxValue = Weapons::getMaxWeaponDamage(player->getLevel(), attackSkill, attackValue, attackFactor);
 	if(random_range(1, 100) <= g_config.getNumber(ConfigManager::CRITICAL_HIT_CHANCE))
 		maxValue <<= 1;
 

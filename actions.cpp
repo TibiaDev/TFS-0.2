@@ -45,7 +45,7 @@ extern Actions* g_actions;
 extern ConfigManager g_config;
 
 Actions::Actions() :
-m_scriptInterface("Action Interface")
+	m_scriptInterface("Action Interface")
 {
 	m_scriptInterface.initState();
 }
@@ -99,35 +99,105 @@ bool Actions::registerEvent(Event* event, xmlNodePtr p)
 	if(!action)
 		return false;
 
-	int32_t id, id2;
+	int32_t id, id2, from;
+	bool success = true;
 	if(readXMLInteger(p, "itemid", id))
+	{
+		if(useItemMap.find(id) != useItemMap.end())
+		{
+			std::cout << "[Warning - Actions::registerEvent] Duplicate registered item with id: " << id << std::endl;
+			return false;
+		}
 		useItemMap[id] = action;
+	}
 	else if(readXMLInteger(p, "fromid", id) && readXMLInteger(p, "toid", id2))
 	{
-		useItemMap[id] = action;
+		from = id;
+		if(useItemMap.find(id) != useItemMap.end())
+		{
+			std::cout << "[Warning - Actions::registerEvent] Duplicate registered item with id: " << id << " in fromid: " << from << ", toid: " << id2 << std::endl;
+			success = false;
+		}
+		else
+			useItemMap[id] = action;
+
 		while(id < id2)
-			useItemMap[++id] = new Action(action);
+		{
+			id++;
+			if(useItemMap.find(id) != useItemMap.end())
+			{
+				std::cout << "[Warning - Actions::registerEvent] Duplicate registered item with id: " << id << " in fromid: " << from << ", toid: " << id2 << std::endl;
+				continue;
+			}
+			useItemMap[id] = new Action(action);
+		}
 	}
 	else if(readXMLInteger(p, "uniqueid", id))
+	{
+		if(uniqueItemMap.find(id) != uniqueItemMap.end())
+		{
+			std::cout << "[Warning - Actions::registerEvent] Duplicate registered item with uniqueid: " << id << std::endl;
+			return false;
+		}
 		uniqueItemMap[id] = action;
+	}
 	else if(readXMLInteger(p, "fromuid", id) && readXMLInteger(p, "touid", id2))
 	{
-		uniqueItemMap[id] = action;
+		from = id;
+		if(uniqueItemMap.find(id) != uniqueItemMap.end())
+		{
+			std::cout << "[Warning - Actions::registerEvent] Duplicate registered item with uniqueid: " << id << " in fromuid: " << from << ", touid: " << id2 << std::endl;
+			success = false;
+		}
+		else
+			uniqueItemMap[id] = action;
+
 		while(id < id2)
-			uniqueItemMap[++id] = new Action(action);
+		{
+			id++;
+			if(uniqueItemMap.find(id) != uniqueItemMap.end())
+			{
+				std::cout << "[Warning - Actions::registerEvent] Duplicate registered item with uniqueid: " << id << " in fromuid: " << from << ", touid: " << id2 << std::endl;
+				continue;
+			}
+			uniqueItemMap[id] = new Action(action);
+		}
 	}
 	else if(readXMLInteger(p, "actionid", id))
+	{
+		if(actionItemMap.find(id) != actionItemMap.end())
+		{
+			std::cout << "[Warning - Actions::registerEvent] Duplicate registered item with actionid: " << id << std::endl;
+			return false;
+		}
 		actionItemMap[id] = action;
+	}
 	else if(readXMLInteger(p, "fromaid", id) && readXMLInteger(p, "toaid", id2))
 	{
-		actionItemMap[id] = action;
+		from = id;
+		if(actionItemMap.find(id) != actionItemMap.end())
+		{
+			std::cout << "[Warning - Actions::registerEvent] Duplicate registered item with actionid: " << id << " in fromaid: " << from << ", toaid: " << id2 << std::endl;
+			success = false;
+		}
+		else
+			actionItemMap[id] = action;
+
 		while(id < id2)
-			actionItemMap[++id] = new Action(action);
+		{
+			id++;
+			if(actionItemMap.find(id) != actionItemMap.end())
+			{
+				std::cout << "[Warning - Actions::registerEvent] Duplicate registered item with actionid: " << id << " in fromaid: " << from << ", toaid: " << id2 << std::endl;
+				continue;
+			}
+			actionItemMap[id] = new Action(action);
+		}
 	}
 	else
-		return false;
+		success = false;
 
-	return true;
+	return success;
 }
 
 ReturnValue Actions::canUse(const Player* player, const Position& pos)
@@ -205,21 +275,10 @@ Action* Actions::getAction(const Item* item)
 ReturnValue Actions::internalUseItem(Player* player, const Position& pos,
 	uint8_t index, Item* item, uint32_t creatureId)
 {
-	bool executedAction = false;
-
 	if(Door* door = item->getDoor())
 	{
 		if(!door->canUse(player))
 			return RET_CANNOTUSETHISOBJECT;
-	}
-
-	if(BedItem* bed = item->getBed())
-	{
-		if(!bed->canUse(player))
-			return RET_CANNOTUSETHISOBJECT;
-
-		bed->sleep(player);
-		executedAction = true;
 	}
 
 	Action* action = getAction(item);
@@ -242,6 +301,50 @@ ReturnValue Actions::internalUseItem(Player* player, const Position& pos,
 		}
 	}
 
+	if(BedItem* bed = item->getBed())
+	{
+		if(!bed->canUse(player))
+			return RET_CANNOTUSETHISOBJECT;
+
+		bed->sleep(player);
+		return RET_NOERROR;
+	}
+
+	if(Container* container = item->getContainer())
+	{
+		Container* openContainer = NULL;
+		//depot container
+		if(Depot* depot = container->getDepot())
+		{
+			Depot* myDepot = player->getDepot(depot->getDepotId(), true);
+			myDepot->setParent(depot->getParent());
+			openContainer = myDepot;
+		}
+		else
+			openContainer = container;
+
+		if(container->getCorpseOwner() != 0)
+		{
+			if(!player->canOpenCorpse(container->getCorpseOwner()))
+				return RET_YOUARENOTTHEOWNER;
+		}
+
+		//open/close container
+		int32_t oldcid = player->getContainerID(openContainer);
+		if(oldcid != -1)
+		{
+			player->onCloseContainer(openContainer);
+			player->closeContainer(oldcid);
+		}
+		else
+		{
+			player->addContainer(index, openContainer);
+			player->onSendContainer(openContainer);
+		}
+
+		return RET_NOERROR;
+	}
+
 	if(item->isReadable())
 	{
 		if(item->canWriteText())
@@ -254,17 +357,9 @@ ReturnValue Actions::internalUseItem(Player* player, const Position& pos,
 			player->setWriteItem(NULL);
 			player->sendTextWindow(item, 0, false);
 		}
+
 		return RET_NOERROR;
 	}
-
-	if(Container* container = item->getContainer())
-	{
-		if(openContainer(player, container, index))
-			return RET_NOERROR;
-	}
-
-	if(executedAction)
-		return RET_NOERROR;
 
 	return RET_CANNOTUSETHISOBJECT;
 }
@@ -370,43 +465,9 @@ void Actions::showUseHotkeyMessage(Player* player, int32_t id, uint32_t count)
 	player->sendTextMessage(MSG_INFO_DESCR, buffer);
 }
 
-bool Actions::openContainer(Player* player, Container* container, const uint8_t index)
+bool Actions::hasAction(const Item* item)
 {
-	Container* openContainer = NULL;
-
-	//depot container
-	if(Depot* depot = container->getDepot())
-	{
-		Depot* myDepot = player->getDepot(depot->getDepotId(), true);
-		myDepot->setParent(depot->getParent());
-		openContainer = myDepot;
-	}
-	else
-		openContainer = container;
-
-	if(container->getCorpseOwner() != 0)
-	{
-		if(!player->canOpenCorpse(container->getCorpseOwner()))
-		{
-			player->sendCancel("You are not the owner.");
-			return true;
-		}
-	}
-
-	//open/close container
-	int32_t oldcid = player->getContainerID(openContainer);
-	if(oldcid != -1)
-	{
-		player->onCloseContainer(openContainer);
-		player->closeContainer(oldcid);
-	}
-	else
-	{
-		player->addContainer(index, openContainer);
-		player->onSendContainer(openContainer);
-	}
-
-	return true;
+	return getAction(item);
 }
 
 Action::Action(LuaScriptInterface* _interface) :

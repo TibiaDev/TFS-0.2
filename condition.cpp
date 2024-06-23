@@ -30,9 +30,10 @@
 extern Game g_game;
 
 Condition::Condition(ConditionId_t _id, ConditionType_t _type, int32_t _ticks) :
-id(_id),
-ticks(_ticks),
-conditionType(_type)
+	id(_id),
+	ticks(_ticks),
+	endTime(0),
+	conditionType(_type)
 {
 	//
 }
@@ -151,15 +152,21 @@ bool Condition::serialize(PropWriteStream& propWriteStream)
 	return true;
 }
 
+void Condition::setTicks(int32_t newTicks)
+{
+	ticks = newTicks;
+	endTime = ticks + OTSYS_TIME();
+}
+
 bool Condition::executeCondition(Creature* creature, int32_t interval)
 {
-	if(ticks != -1)
-	{
-		setTicks(getTicks() - interval);
-		return (getTicks() > 0);
-	}
+	if(ticks == -1)
+		return true;
 
-	return true;
+	int32_t newTicks = std::max(((int32_t)0), ((int32_t)getTicks() - interval));
+	//Not using set ticks here since it would reset endTime
+	ticks = newTicks;
+	return (getEndTime() >= OTSYS_TIME());
 }
 
 Condition* Condition::createCondition(ConditionId_t _id, ConditionType_t _type, int32_t _ticks, int32_t param)
@@ -277,6 +284,14 @@ Condition* Condition::createCondition(PropStream& propStream)
 	return createCondition((ConditionId_t)_id, (ConditionType_t)_type, _ticks, 0);
 }
 
+bool Condition::startCondition(Creature* creature)
+{
+	if(getTicks() > 0)
+		endTime = getTicks() + OTSYS_TIME();
+
+	return true;
+}
+
 bool Condition::isPersistent() const
 {
 	if(ticks == -1)
@@ -310,7 +325,7 @@ Condition(_id, _type, _ticks)
 
 bool ConditionGeneric::startCondition(Creature* creature)
 {
-	return true;
+	return Condition::startCondition(creature);
 }
 
 bool ConditionGeneric::executeCondition(Creature* creature, int32_t interval)
@@ -326,7 +341,7 @@ void ConditionGeneric::endCondition(Creature* creature, ConditionEnd_t reason)
 void ConditionGeneric::addCondition(Creature* creature, const Condition* addCondition)
 {
 	if(updateCondition(addCondition))
-		ticks = addCondition->getTicks();
+		setTicks(addCondition->getTicks());
 }
 
 uint32_t ConditionGeneric::getIcons() const
@@ -368,7 +383,7 @@ void ConditionAttributes::addCondition(Creature* creature, const Condition* addC
 {
 	if(updateCondition(addCondition))
 	{
-		ticks = addCondition->getTicks();
+		setTicks(addCondition->getTicks());
 
 		const ConditionAttributes& conditionAttrs = static_cast<const ConditionAttributes&>(*addCondition);
 		//Remove the old condition
@@ -480,6 +495,9 @@ bool ConditionAttributes::serialize(PropWriteStream& propWriteStream)
 
 bool ConditionAttributes::startCondition(Creature* creature)
 {
+	if(!Condition::startCondition(creature))
+		return false;
+
 	if(Player* player = creature->getPlayer())
 	{
 		updateSkills(player);
@@ -748,7 +766,7 @@ void ConditionRegeneration::addCondition(Creature* creature, const Condition* ad
 {
 	if(updateCondition(addCondition))
 	{
-		ticks = addCondition->getTicks();
+		setTicks(addCondition->getTicks());
 
 		const ConditionRegeneration& conditionRegen = static_cast<const ConditionRegeneration&>(*addCondition);
 
@@ -935,7 +953,7 @@ void ConditionSoul::addCondition(Creature* creature, const Condition* addConditi
 {
 	if(updateCondition(addCondition))
 	{
-		ticks = addCondition->getTicks();
+		setTicks(addCondition->getTicks());
 
 		const ConditionSoul& conditionSoul = static_cast<const ConditionSoul&>(*addCondition);
 
@@ -1351,6 +1369,9 @@ bool ConditionDamage::init()
 
 bool ConditionDamage::startCondition(Creature* creature)
 {
+	if(!Condition::startCondition(creature))
+		return false;
+
 	if(!init())
 		return false;
 
@@ -1396,6 +1417,7 @@ bool ConditionDamage::executeCondition(Creature* creature, int32_t interval)
 		if(!bRemove)
 			interval = 0;
 	}
+
 	return Condition::executeCondition(creature, interval);
 }
 
@@ -1446,7 +1468,7 @@ void ConditionDamage::addCondition(Creature* creature, const Condition* addCondi
 
 		if(updateCondition(&conditionDamage))
 		{
-			ticks = addCondition->getTicks();
+			setTicks(addCondition->getTicks());
 			owner = conditionDamage.owner;
 			maxDamage = conditionDamage.maxDamage;
 			minDamage = conditionDamage.minDamage;
@@ -1723,6 +1745,9 @@ bool ConditionSpeed::serialize(PropWriteStream& propWriteStream)
 
 bool ConditionSpeed::startCondition(Creature* creature)
 {
+	if(!Condition::startCondition(creature))
+		return false;
+
 	if(speedDelta == 0)
 	{
 		int32_t min;
@@ -1749,7 +1774,7 @@ void ConditionSpeed::addCondition(Creature* creature, const Condition* addCondit
 {
 	if(updateCondition(addCondition))
 	{
-		ticks = addCondition->getTicks();
+		setTicks(addCondition->getTicks());
 
 		const ConditionSpeed& conditionSpeed = static_cast<const ConditionSpeed&>(*addCondition);
 		int32_t oldSpeedDelta = speedDelta;
@@ -1801,6 +1826,9 @@ ConditionGeneric(_id, _type, _ticks)
 
 bool ConditionInvisible::startCondition(Creature* creature)
 {
+	if(!Condition::startCondition(creature))
+		return false;
+
 	g_game.internalCreatureChangeVisible(creature, false);
 	return true;
 }
@@ -1913,6 +1941,9 @@ bool ConditionOutfit::serialize(PropWriteStream& propWriteStream)
 
 bool ConditionOutfit::startCondition(Creature* creature)
 {
+	if(!Condition::startCondition(creature))
+		return false;
+
 	changeOutfit(creature);
 	return true;
 }
@@ -1943,7 +1974,7 @@ void ConditionOutfit::addCondition(Creature* creature, const Condition* addCondi
 {
 	if(updateCondition(addCondition))
 	{
-		ticks = addCondition->getTicks();
+		setTicks(addCondition->getTicks());
 
 		const ConditionOutfit& conditionOutfit = static_cast<const ConditionOutfit&>(*addCondition);
 		outfits = conditionOutfit.outfits;
@@ -1968,6 +1999,9 @@ Condition(_id, _type, _ticks)
 
 bool ConditionLight::startCondition(Creature* creature)
 {
+	if(!Condition::startCondition(creature))
+		return false;
+
 	internalLightTicks = 0;
 	lightChangeInterval = ticks / lightInfo.level;
 	creature->setCreatureLight(lightInfo);
@@ -2003,7 +2037,7 @@ void ConditionLight::addCondition(Creature* creature, const Condition* addCondit
 {
 	if(updateCondition(addCondition))
 	{
-		ticks = addCondition->getTicks();
+		setTicks(addCondition->getTicks());
 
 		const ConditionLight& conditionLight = static_cast<const ConditionLight&>(*addCondition);
 		lightInfo.level = conditionLight.lightInfo.level;
