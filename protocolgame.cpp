@@ -251,12 +251,6 @@ void ProtocolGame::setPlayer(Player* p)
 void ProtocolGame::deleteProtocolTask()
 {
 	//dispatcher thread
-	if(eventConnect != 0)
-	{
-		Scheduler::getScheduler().stopEvent(eventConnect);
-		eventConnect = 0;
-	}
-
 	if(player)
 	{
 		#ifdef __DEBUG_NET_DETAIL__
@@ -390,11 +384,14 @@ bool ProtocolGame::login(const std::string& name, uint32_t accnumber, const std:
 				<< currentSlot << " on the waiting list.";
 
 			OutputMessage* output = OutputMessagePool::getInstance()->getOutputMessage(this, false);
-			TRACK_MESSAGE(output);
-			output->AddByte(0x16);
-			output->AddString(ss.str());
-			output->AddByte(retryTime);
-			OutputMessagePool::getInstance()->send(output);
+			if(output)
+			{
+				TRACK_MESSAGE(output);
+				output->AddByte(0x16);
+				output->AddString(ss.str());
+				output->AddByte(retryTime);
+				OutputMessagePool::getInstance()->send(output);
+			}
 			getConnection()->closeConnection();
 			return false;
 		}
@@ -433,11 +430,14 @@ bool ProtocolGame::login(const std::string& name, uint32_t accnumber, const std:
 			g_chat.removeUserFromAllChannels(_player);
 			_player->disconnect();
 			_player->isConnecting = true;
+			addRef();
 			eventConnect = Scheduler::getScheduler().addEvent(
 				createSchedulerTask(1000, boost::bind(&ProtocolGame::connect, this, _player->getID())));
 
 			return true;
 		}
+
+		addRef();
 		return connect(_player->getID());
 	}
 	return false;
@@ -445,6 +445,7 @@ bool ProtocolGame::login(const std::string& name, uint32_t accnumber, const std:
 
 bool ProtocolGame::connect(uint32_t playerId)
 {
+	unRef();
 	eventConnect = 0;
 	Player* _player = g_game.getPlayerByID(playerId);
 	if(!_player || _player->isRemoved() || _player->isOnline())
@@ -603,10 +604,13 @@ void ProtocolGame::onRecvFirstMessage(NetworkMessage& msg)
 void ProtocolGame::disconnectClient(uint8_t error, const char* message)
 {
 	OutputMessage* output = OutputMessagePool::getInstance()->getOutputMessage(this, false);
-	TRACK_MESSAGE(output);
-	output->AddByte(error);
-	output->AddString(message);
-	OutputMessagePool::getInstance()->send(output);
+	if(output)
+	{
+		TRACK_MESSAGE(output);
+		output->AddByte(error);
+		output->AddString(message);
+		OutputMessagePool::getInstance()->send(output);
+	}
 	disconnect();
 }
 
@@ -1081,7 +1085,7 @@ void ProtocolGame::checkCreatureAsKnown(uint32_t id, bool &known, uint32_t &remo
 
 bool ProtocolGame::canSee(const Creature* c) const
 {
-	if(c->isRemoved())
+	if(!player || !c || c->isRemoved())
 		return false;
 
 	if(c->isInGhostMode() && !player->isAccessPlayer())
@@ -1097,6 +1101,9 @@ bool ProtocolGame::canSee(const Position& pos) const
 
 bool ProtocolGame::canSee(int32_t x, int32_t y, int32_t z) const
 {
+	if(!player)
+		return false;
+
 #ifdef __DEBUG__
 	if(z < 0 || z >= MAP_MAX_LAYERS)
 		std::cout << "WARNING! ProtocolGame::canSee() Z-value is out of range!" << std::endl;
@@ -1936,21 +1943,20 @@ void ProtocolGame::sendContainer(uint32_t cid, const Container* container, bool 
 	}
 }
 
-void ProtocolGame::sendShop(const std::list<ShopInfo>& shop)
+void ProtocolGame::sendShop(const ShopInfoList& itemList)
 {
 	NetworkMessage* msg = getOutputBuffer();
 	if(msg)
 	{
 		TRACK_MESSAGE(msg);
 		msg->AddByte(0x7A);
-		if(shop.size() > 255)
+		if(itemList.size() > 255)
 			msg->AddByte(255);
 		else
-			msg->AddByte(shop.size());
+			msg->AddByte(itemList.size());
 
-		std::list<ShopInfo>::const_iterator it;
 		uint32_t i = 0;
-		for(it = shop.begin(); it != shop.end() && i < 255; ++it, ++i)
+		for(ShopInfoList::const_iterator it = itemList.begin(); it != itemList.end() && i < 255; ++it, ++i)
 			AddShopItem(msg, (*it));
 	}
 }
@@ -1965,18 +1971,18 @@ void ProtocolGame::sendCloseShop()
 	}
 }
 
-void ProtocolGame::sendPlayerGoods(uint32_t money, std::map<uint16_t, uint8_t> itemMap)
+void ProtocolGame::sendGoods(const std::map<uint32_t, uint32_t>& itemMap)
 {
 	NetworkMessage* msg = getOutputBuffer();
 	if(msg)
 	{
 		TRACK_MESSAGE(msg);
 		msg->AddByte(0x7B);
-		msg->AddU32(money);
+		msg->AddU32(g_game.getMoney(player));
 		msg->AddByte(std::min((size_t)255, itemMap.size()));
 
 		uint32_t i = 0;
-		for(std::map<uint16_t, uint8_t>::iterator it = itemMap.begin(); it != itemMap.end() && i < 255; ++it, ++i)
+		for(std::map<uint32_t, uint32_t>::const_iterator it = itemMap.begin(); it != itemMap.end() && i < 255; ++it, ++i)
 		{
 			msg->AddItemId(it->first);
 			msg->AddByte(it->second);

@@ -307,11 +307,12 @@ class Player : public Creature, public Cylinder
 		Item* getTradeItem() {return tradeItem;}
 
 		//shop functions
-		void setShopOwner(Npc* owner, int32_t onBuy, int32_t onSell)
+		void setShopOwner(Npc* owner, int32_t onBuy, int32_t onSell, ShopInfoList offer)
 		{
 			shopOwner = owner;
 			purchaseCallback = onBuy;
 			saleCallback = onSell;
+			shopOffer = offer;
 		}
 
 		Npc* getShopOwner(int32_t& onBuy, int32_t& onSell)
@@ -327,8 +328,6 @@ class Player : public Creature, public Cylinder
 			onSell = saleCallback;
 			return shopOwner;
 		}
-
-		std::map<uint16_t, uint8_t> parseGoods(const std::list<ShopInfo>& shop);
 
 		//V.I.P. functions
 		void notifyLogIn(Player* player);
@@ -348,11 +347,12 @@ class Player : public Creature, public Cylinder
 		virtual void onWalkComplete();
 
 		void stopWalk();
-		void closeShopWindow();
+		void openShopWindow();
+		void closeShopWindow(Npc* npc = NULL, int32_t onBuy = -1, int32_t onSell = -1);
 
 		void setChaseMode(chaseMode_t mode);
 		void setFightMode(fightMode_t mode);
-		void setSecureMode(secureMode_t mode) { secureMode = mode; }
+		void setSecureMode(secureMode_t mode) {secureMode = mode;}
 
 		//combat functions
 		virtual bool setAttackedCreature(Creature* creature);
@@ -553,7 +553,7 @@ class Player : public Creature, public Cylinder
 		void sendClosePrivate(uint16_t channelId) const
 			{if(client) client->sendClosePrivate(channelId);}
 		void sendIcons() const;
-		void sendMagicEffect(const Position& pos, unsigned char type) const
+		void sendMagicEffect(const Position& pos, uint8_t type) const
 			{if(client) client->sendMagicEffect(pos, type);}
 		void sendPing(uint32_t interval);
 		void sendStats();
@@ -569,10 +569,10 @@ class Player : public Creature, public Cylinder
 			{if(client) client->sendTextWindow(windowTextId, itemId, text);}
 		void sendToChannel(Creature* creature, SpeakClasses type, const std::string& text, uint16_t channelId, uint32_t time = 0) const
 			{if(client) client->sendToChannel(creature, type, text, channelId, time);}
-		void sendShop(const std::list<ShopInfo>& shop) const
-			{if(client) client->sendShop(shop);}
-		void sendGoods(uint32_t money, std::map<uint16_t, uint8_t> itemMap) const
-			{if(client) client->sendPlayerGoods(money, itemMap);}
+		void sendShop() const
+			{if(client) client->sendShop(shopOffer);}
+		void sendGoods() const
+			{if(client) client->sendGoods(goodsMap);}
 		void sendCloseShop() const
 			{if(client) client->sendCloseShop();}
 		void sendTradeItemRequest(const Player* player, const Item* item, bool ack) const
@@ -646,6 +646,7 @@ class Player : public Creature, public Cylinder
 		void addExperience(uint64_t exp);
 
 		void updateInventoryWeigth();
+		void postUpdateGoods(uint32_t itemId);
 
 		void setNextWalkActionTask(SchedulerTask* task);
 		void setNextWalkTask(SchedulerTask* task);
@@ -778,9 +779,14 @@ class Player : public Creature, public Cylinder
 		Player* tradePartner;
 		tradestate_t tradeState;
 		Item* tradeItem;
+
+		//shop variables
 		Npc* shopOwner;
 		int32_t purchaseCallback;
 		int32_t saleCallback;
+		ShopInfoList shopOffer;
+
+		std::map<uint32_t, uint32_t> goodsMap;
 
 		std::string name;
 		std::string nameDescription;
