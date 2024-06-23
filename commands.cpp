@@ -54,6 +54,7 @@
 #include "status.h"
 #include "protocollogin.h"
 #endif
+
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 
@@ -573,11 +574,6 @@ void Commands::reloadInfo(Player* player, const std::string& cmd, const std::str
 		g_creatureEvents->reload();
 		player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Reloaded creature scripts.");
 	}
-	else if(tmpParam == "highscore" || tmpParam == "highscores")
-	{
-		g_game.reloadHighscores();
-		player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Reloaded highscores.");
-	}
 	else if(tmpParam == "monster" || tmpParam == "monsters")
 	{
 		g_monsters.reload();
@@ -823,12 +819,6 @@ void Commands::sellHouse(Player* player, const std::string& cmd, const std::stri
 		return;
 	}
 
-	if(Houses::getInstance().getHouseByPlayerId(tradePartner->guid))
-	{
-		player->sendCancel("Trade player already owns a house.");
-		return;
-	}
-
 	if(!Position::areInRange<2,2,0>(tradePartner->getPosition(), player->getPosition()))
 	{
 		player->sendCancel("Trade player is too far away.");
@@ -838,6 +828,12 @@ void Commands::sellHouse(Player* player, const std::string& cmd, const std::stri
 	if(!tradePartner->isPremium())
 	{
 		player->sendCancel("Trade player does not have a premium account.");
+		return;
+	}
+
+	if(Houses::getInstance().getHouseByPlayerId(tradePartner->guid))
+	{
+		player->sendCancel("Trade player already owns a house.");
 		return;
 	}
 
@@ -930,23 +926,24 @@ void Commands::buyHouse(Player* player, const std::string& cmd, const std::strin
 		}
 	}
 
-	uint32_t price = 0;
+	uint64_t price = 0;
 	for(HouseTileList::iterator it = house->getHouseTileBegin(), end = house->getHouseTileEnd(); it != end; ++it)
 		price += g_config.getNumber(ConfigManager::HOUSE_PRICE);
 
-	if(g_game.getMoney(player) >= price && g_game.removeMoney(player, price))
+	if(!g_game.removeMoney(player, price))
 	{
-		house->setHouseOwner(player->guid);
-		player->sendTextMessage(MSG_INFO_DESCR, "You have successfully bought this house, be sure to have the money for the rent in your depot of this city.");
-	}
-	else
 		player->sendCancel("You do not have enough money.");
+		return;
+	}
+
+	house->setHouseOwner(player->guid);
+	player->sendTextMessage(MSG_INFO_DESCR, "You have successfully bought this house, be sure to have the money for the rent in your depot of this city.");
 }
 
 void Commands::whoIsOnline(Player* player, const std::string& cmd, const std::string& param)
 {
 	std::ostringstream ss;
-	ss << Player::listPlayer.list.size() << " players online:" << std::endl;
+	ss << Player::listPlayer.list.size() << " players online:";
 	player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, ss.str());
 
 	ss.str("");
@@ -1056,7 +1053,7 @@ void Commands::removeThing(Player* player, const std::string& cmd, const std::st
 {
 	Position pos = player->getPosition();
 	pos = getNextPosition(player->direction, pos);
-	Tile *removeTile = g_game.getMap()->getTile(pos);
+	Tile* removeTile = g_game.getMap()->getTile(pos);
 	if(!removeTile)
 	{
 		player->sendTextMessage(MSG_STATUS_SMALL, "Tile not found.");
@@ -1064,7 +1061,7 @@ void Commands::removeThing(Player* player, const std::string& cmd, const std::st
 		return;
 	}
 
-	Thing *thing = removeTile->getTopVisibleThing(player);
+	Thing* thing = removeTile->getTopVisibleThing(player);
 	if(!thing)
 	{
 		player->sendTextMessage(MSG_STATUS_SMALL, "Object not found.");
@@ -1072,13 +1069,13 @@ void Commands::removeThing(Player* player, const std::string& cmd, const std::st
 		return;
 	}
 
-	if(Creature *creature = thing->getCreature())
+	if(Creature* creature = thing->getCreature())
 	{
 		g_game.removeCreature(creature, true);
 	}
 	else
 	{
-		Item *item = thing->getItem();
+		Item* item = thing->getItem();
 		if(item)
 		{
 			if(item->isGroundTile())
@@ -1088,7 +1085,7 @@ void Commands::removeThing(Player* player, const std::string& cmd, const std::st
 				return;
 			}
 
-			g_game.internalRemoveItem(item, std::max(1, std::min(atoi(param.c_str()), (int32_t)item->getItemCount())));
+			g_game.internalRemoveItem(item, std::max(1, std::min<int32_t>(atoi(param.c_str()), item->getItemCount())));
 			g_game.addMagicEffect(pos, NM_ME_MAGIC_BLOOD);
 		}
 	}
@@ -1097,7 +1094,7 @@ void Commands::removeThing(Player* player, const std::string& cmd, const std::st
 void Commands::newType(Player* player, const std::string& cmd, const std::string& param)
 {
 	int32_t lookType = atoi(param.c_str());
-	if(lookType >= 0 && lookType != 1 && lookType != 135 && lookType != 411 && lookType != 415 && lookType != 424 && (lookType <= 160 || lookType >= 192) && lookType != 439 && lookType != 440 && lookType != 468 && lookType != 469 && lookType <= 517 && (lookType < 474 || lookType > 485))
+	if(lookType >= 0 && lookType != 1 && lookType != 135 && lookType != 411 && lookType != 415 && lookType != 424 && (lookType <= 160 || lookType >= 192) && lookType != 439 && lookType != 440 && lookType != 468 && lookType != 469 && lookType <= 542 && (lookType < 474 || lookType > 485) && lookType != 518 && lookType != 519 && lookType != 520 && lookType != 524 && lookType != 525 && lookType != 536 && lookType)
 	{
 		Outfit_t newOutfit = player->getDefaultOutfit();
 		newOutfit.lookType = lookType;
@@ -1158,6 +1155,7 @@ void Commands::addSkill(Player* player, const std::string& cmd, const std::strin
 	param2 = parseParams(cmdit, cmdtokens.end());
 	trimString(param1);
 	trimString(param2);
+	toLowerCaseString(param2);
 
 	Player* paramPlayer = g_game.getPlayerByName(param1);
 	if(!paramPlayer)
@@ -1167,11 +1165,14 @@ void Commands::addSkill(Player* player, const std::string& cmd, const std::strin
 	}
 
 	if(param2[0] == 'l' || param2[0] == 'e')
-		paramPlayer->addExperience(Player::getExpForLevel(paramPlayer->getLevel() + 1) - paramPlayer->experience);
+		paramPlayer->addExperience(Player::getExpForLevel(paramPlayer->getLevel() + 1) - paramPlayer->experience, false, false);
 	else if(param2[0] == 'm')
-		paramPlayer->addManaSpent(player->vocation->getReqMana(paramPlayer->getMagicLevel() + 1) - paramPlayer->manaSpent, false);
+		paramPlayer->addManaSpent(paramPlayer->vocation->getReqMana(paramPlayer->getBaseMagicLevel() + 1) - paramPlayer->manaSpent, false);
 	else
-		paramPlayer->addSkillAdvance(getSkillId(param2), paramPlayer->vocation->getReqSkillTries(getSkillId(param2), paramPlayer->getSkill(getSkillId(param2), SKILL_LEVEL) + 1));
+	{
+		skills_t skillId = getSkillId(param2);
+		paramPlayer->addSkillAdvance(skillId, paramPlayer->vocation->getReqSkillTries(skillId, paramPlayer->getSkill(skillId, SKILL_LEVEL) + 1));
+	}
 }
 
 void Commands::joinGuild(Player* player, const std::string& cmd, const std::string& param)
@@ -1436,64 +1437,54 @@ void Commands::serverDiag(Player* player, const std::string& cmd, const std::str
 void Commands::ghost(Player* player, const std::string& cmd, const std::string& param)
 {
 	player->switchGhostMode();
-	Player* tmpPlayer;
 
 	SpectatorVec list;
-	g_game.getSpectators(list, player->getPosition(), true);
-
-	SpectatorVec::const_iterator it;
-	for(it = list.begin(); it != list.end(); ++it)
+	g_game.getSpectators(list, player->getPosition(), true, true);
+	for(SpectatorVec::const_iterator it = list.begin(), end = list.end(); it != end; ++it)
 	{
-		if((tmpPlayer = (*it)->getPlayer()))
+		Player* tmpPlayer = (*it)->getPlayer();
+		tmpPlayer->sendCreatureChangeVisible(player, !player->isInGhostMode());
+		if(tmpPlayer != player && !tmpPlayer->isAccessPlayer())
 		{
-			tmpPlayer->sendCreatureChangeVisible(player, !player->isInGhostMode());
-			if(tmpPlayer != player && !tmpPlayer->isAccessPlayer())
-			{
-				if(player->isInGhostMode())
-					tmpPlayer->sendCreatureDisappear(player, player->getTile()->getClientIndexOfThing(tmpPlayer, player), true);
-				else
-					tmpPlayer->sendCreatureAppear(player, player->getPosition(), true);
+			if(player->isInGhostMode())
+				tmpPlayer->sendCreatureDisappear(player, player->getTile()->getClientIndexOfThing(tmpPlayer, player), true);
+			else
+				tmpPlayer->sendCreatureAppear(player, player->getPosition(), true);
 
-				tmpPlayer->sendUpdateTile(player->getTile(), player->getPosition());
-			}
+			tmpPlayer->sendUpdateTile(player->getTile(), player->getPosition());
 		}
 	}
-
-	for(it = list.begin(); it != list.end(); ++it)
-		(*it)->onUpdateTile(player->getTile(), player->getPosition());
 
 	if(player->isInGhostMode())
 	{
 		for(AutoList<Player>::listiterator it = Player::listPlayer.list.begin(); it != Player::listPlayer.list.end(); ++it)
 		{
 			if(!it->second->isAccessPlayer())
-				it->second->notifyLogOut(player);
+				it->second->notifyStatusChange(player, VIPSTATUS_OFFLINE);
 		}
 
 		IOLoginData::getInstance()->updateOnlineStatus(player->getGUID(), false);
 		player->sendTextMessage(MSG_INFO_DESCR, "You are now invisible.");
-		g_game.addMagicEffect(player->getPosition(), NM_ME_YALAHARIGHOST);
+		g_game.addMagicEffect(list, player->getPosition(), NM_ME_YALAHARIGHOST);
 	}
 	else
 	{
 		for(AutoList<Player>::listiterator it = Player::listPlayer.list.begin(); it != Player::listPlayer.list.end(); ++it)
 		{
 			if(!it->second->isAccessPlayer())
-				it->second->notifyLogIn(player);
+				it->second->notifyStatusChange(player, VIPSTATUS_ONLINE);
 		}
 
 		IOLoginData::getInstance()->updateOnlineStatus(player->getGUID(), true);
 		player->sendTextMessage(MSG_INFO_DESCR, "You are visible again.");
 		Position pos = player->getPosition();
 		pos.x += 1;
-		g_game.addMagicEffect(pos, NM_ME_SMOKE);
+		g_game.addMagicEffect(list, pos, NM_ME_SMOKE);
 	}
 }
 
 void Commands::multiClientCheck(Player* player, const std::string& cmd, const std::string& param)
 {
-	std::list<uint32_t> ipList;
-
 	player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Multiclient Check List:");
 	std::map< uint32_t, std::vector<Player*> > ipMap;
 	for(AutoList<Player>::listiterator it = Player::listPlayer.list.begin(); it != Player::listPlayer.list.end(); ++it)

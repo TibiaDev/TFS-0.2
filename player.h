@@ -24,7 +24,6 @@
 #include "otsystem.h"
 #include "creature.h"
 #include "container.h"
-#include "depot.h"
 #include "cylinder.h"
 #include "outfit.h"
 #include "enums.h"
@@ -32,6 +31,9 @@
 #include "protocolgame.h"
 #include "ioguild.h"
 #include "party.h"
+#include "inbox.h"
+#include "depotchest.h"
+#include "depotlocker.h"
 
 #include <vector>
 #include <ctime>
@@ -44,6 +46,7 @@ class ProtocolGame;
 class Npc;
 class Party;
 class SchedulerTask;
+class Bed;
 
 enum skillsid_t
 {
@@ -118,11 +121,21 @@ struct AccountManager
 	}
 };
 
+struct VIPEntry
+{
+	uint32_t guid;
+	std::string name;
+	std::string description;
+	uint32_t icon;
+	bool notify;
+};
+
 typedef std::pair<uint32_t, Container*> containervector_pair;
 typedef std::vector<containervector_pair> ContainerVector;
-typedef std::map<uint32_t, Depot*> DepotMap;
+typedef std::map<uint32_t, DepotChest*> DepotMap;
+typedef std::map<uint32_t, DepotLocker*> DepotLockerMap;
 typedef std::map<uint32_t, int32_t> StorageMap;
-typedef std::set<uint32_t> VIPListSet;
+typedef OTSERV_HASH_SET<uint32_t> VIPListSet;
 typedef std::map<uint32_t, uint32_t> MuteCountMap;
 typedef std::list<std::string> LearnedInstantSpellList;
 typedef std::list<uint32_t> InvitedToGuildsList;
@@ -163,9 +176,9 @@ class Player : public Creature, public Cylinder
 
 		void setDepotChange(bool b) {depotChange = b;}
 
-		void manageAccount(const std::string &text);
+		void manageAccount(const std::string& text);
 
-		void sendFYIBox(std::string message)
+		void sendFYIBox(const std::string& message)
 			{if(client) client->sendFYIBox(message);}
 
 		void setGUID(uint32_t _guid) {guid = _guid;}
@@ -177,16 +190,24 @@ class Player : public Creature, public Cylinder
 		void addList();
 		void kickPlayer(bool displayEffect);
 
-		static uint64_t getExpForLevel(int32_t level)
+		static uint64_t getExpForLevel(int32_t lv)
 		{
-			level--;
-			return ((50ULL * level * level * level) - (150ULL * level * level) + (400ULL * level))/3ULL;
+			lv--;
+			return ((50ULL * lv * lv * lv) - (150ULL * lv * lv) + (400ULL * lv)) / 3ULL;
 		}
 
+		uint16_t getStaminaMinutes() const { return staminaMinutes; }
+		void regenerateStamina(int32_t offlineTime);
+		void useStamina();
+
+		bool addOfflineTrainingTries(skills_t skill, int32_t tries);
+
 		void addOfflineTrainingTime(int32_t addTime) { offlineTrainingTime = std::min(12 * 3600 * 1000, offlineTrainingTime + addTime); }
+		void removeOfflineTrainingTime(int32_t removeTime) { offlineTrainingTime = std::max(0, offlineTrainingTime - removeTime); }
+		int32_t getOfflineTrainingTime() const { return offlineTrainingTime; }
+
+		int32_t getOfflineTrainingSkill() const { return offlineTrainingSkill; }
 		void setOfflineTrainingSkill(int32_t skill) { offlineTrainingSkill = skill; }
-		int32_t getOfflineTrainingSkill() { return offlineTrainingSkill; }
-		int32_t getOfflineTrainingTime() { return offlineTrainingTime; }
 
 		uint64_t getBankBalance() const {return bankBalance;}
 		void setBankBalance(uint64_t balance) {bankBalance = balance;}
@@ -199,10 +220,16 @@ class Player : public Creature, public Cylinder
 
 		bool isGuildMate(const Player* player) const;
 
+		void setLastWalkthroughAttempt(int64_t walkthroughAttempt) { lastWalkthroughAttempt = walkthroughAttempt; }
+		void setLastWalkthroughPosition(Position walkthroughPosition) { lastWalkthroughPosition = walkthroughPosition; }
+
 		bool hasRequestedOutfit() const {return requestedOutfit;}
 		void hasRequestedOutfit(bool newValue) {requestedOutfit = newValue;}
 
-		const DepotMap& getDepots() const { return depots; }
+		Inbox* getInbox() const { return inbox; }
+		const DepotMap& getDepotChests() const { return depotChests; }
+
+		uint32_t getClientIcons() const;
 
 		GuildWarList getGuildWarList() const {return guildWarList;}
 		void setGuildWarList(GuildWarList _guildWarList) {guildWarList = _guildWarList;}
@@ -211,6 +238,9 @@ class Player : public Creature, public Cylinder
 
 		OperatingSystem_t getOperatingSystem() const {return operatingSystem;}
 		void setOperatingSystem(OperatingSystem_t clientos) {operatingSystem = clientos;}
+
+		uint16_t getProtocolVersion() const {return protocolVersion;}
+		void setProtocolVersion(uint16_t protocolversion) {protocolVersion = protocolversion;}
 
 		secureMode_t getSecureMode() const {return secureMode;}
 
@@ -242,6 +272,9 @@ class Player : public Creature, public Cylinder
 		void setFlags(uint64_t flags){groupFlags = flags;}
 		bool hasFlag(PlayerFlags value) const {return (0 != (groupFlags & ((uint64_t)1 << value)));}
 
+		BedItem* getBedItem() { return bedItem; }
+		void setBedItem(BedItem* b) { bedItem = b; }
+
 		void addBlessing(int16_t blessing) {blessings += blessing;}
 		bool hasBlessing(int16_t value) const {return (0 != (blessings & ((int16_t)1 << value)));}
 
@@ -271,6 +304,9 @@ class Player : public Creature, public Cylinder
 
 		void setMarketDepotId(int16_t newId) { marketDepotId = newId; }
 		int16_t getMarketDepotId() const { return marketDepotId; }
+
+		void setLastDepotId(int16_t newId) { lastDepotId = newId; }
+		int16_t getLastDepotId() const { return lastDepotId; }
 
 		void resetIdleTime() {idleTime = 0;}
 		bool getNoMove() const {return mayNotMove;}
@@ -307,6 +343,10 @@ class Player : public Creature, public Cylinder
 		const Position& getTemplePosition() const {return masterPos;}
 		uint32_t getTown() const {return town;}
 		void setTown(uint32_t _town) {town = _town;}
+
+		void clearModalWindows();
+		bool hasModalWindowOpen(uint32_t modalWindowId) const;
+		void onModalWindowHandled(uint32_t modalWindowId);
 
 		virtual bool isPushable() const;
 		virtual int32_t getThrowRange() const {return 1;}
@@ -353,13 +393,16 @@ class Player : public Creature, public Cylinder
 
 		void setConditionSuppressions(uint32_t conditions, bool remove);
 
-		Depot* getDepot(uint32_t depotId, bool autoCreateDepot);
-		bool addDepot(Depot* depot, uint32_t depotId);
-		void onReceiveMail(uint32_t depotId);
-		bool isNearDepotBox(uint32_t depotId);
+		DepotChest* getDepotChest(uint32_t depotId, bool autoCreate);
+		DepotLocker* getDepotLocker(uint32_t depotId);
+		void onReceiveMail();
+		bool isNearDepotBox();
 
 		virtual bool canSee(const Position& pos) const;
 		virtual bool canSeeCreature(const Creature* creature) const;
+
+		bool canWalkthrough(const Creature* creature) const;
+		bool canWalkthroughEx(const Creature* creature) const;
 
 		virtual RaceType_t getRace() const {return RACE_BLOOD;}
 
@@ -391,10 +434,11 @@ class Player : public Creature, public Cylinder
 		}
 
 		//V.I.P. functions
-		void notifyLogIn(Player* player);
-		void notifyLogOut(Player* player);
+		void notifyStatusChange(Player* player, VipStatus_t status);
 		bool removeVIP(uint32_t guid);
-		bool addVIP(uint32_t guid, std::string& name, bool isOnline, bool interal = false);
+		bool addVIP(uint32_t guid, std::string& name, VipStatus_t status);
+		bool addVIPInternal(uint32_t guid);
+		bool editVIP(uint32_t _guid, const std::string& description, uint32_t icon, bool notify);
 
 		//follow functions
 		virtual bool setFollowCreature(Creature* creature, bool fullPathSearch = false);
@@ -425,7 +469,7 @@ class Player : public Creature, public Cylinder
 		bool hasShield() const;
 		virtual bool isAttackable() const;
 
-		virtual void changeHealth(int32_t healthChange);
+		virtual void changeHealth(int32_t healthChange, bool sendHealthChange = true);
 		virtual void changeMana(int32_t manaChange);
 		void changeSoul(int32_t soulChange);
 
@@ -515,7 +559,7 @@ class Player : public Creature, public Cylinder
 		void sendUpdateTile(const Tile* tile, const Position& pos)
 			{if(client) client->sendUpdateTile(tile, pos);}
 
-		void sendChannelMessage(std::string author, std::string text, SpeakClasses type, unsigned char channel)
+		void sendChannelMessage(const std::string& author, const std::string& text, SpeakClasses type, uint16_t channel)
 			{if(client) client->sendChannelMessage(author, text, type, channel);}
 		void sendChannelEvent(uint16_t channelId, const std::string& playerName, ChannelEvent_t channelEvent)
 			{if(client) client->sendChannelEvent(channelId, playerName, channelEvent);}
@@ -547,9 +591,10 @@ class Player : public Creature, public Cylinder
 		}
 		void sendCreatureLight(const Creature* creature)
 			{if(client) client->sendCreatureLight(creature);}
+		void sendCreatureWalkthrough(const Creature* creature, bool walkthrough)
+			{if(client) client->sendCreatureWalkthrough(creature, walkthrough);}
 		void sendCreatureShield(const Creature* creature)
 			{if(client) client->sendCreatureShield(creature);}
-
 		void sendSpellCooldown(uint8_t spellId, uint32_t time)
 			{if(client) client->sendSpellCooldown(spellId, time);}
 		void sendSpellGroupCooldown(SpellGroup_t groupId, uint32_t time)
@@ -563,29 +608,24 @@ class Player : public Creature, public Cylinder
 			{if(client) client->sendHealMessage(mclass, message, pos, heal, color);}
 		void sendExperienceMessage(MessageClasses mclass, const std::string& message, const Position& pos, uint32_t exp, TextColor_t color)
 			{if(client) client->sendExperienceMessage(mclass, message, pos, exp, color);}
+		void sendModalWindow(const ModalWindow& modalWindow);
 
 		//container
 		void sendAddContainerItem(const Container* container, const Item* item);
 		void sendUpdateContainerItem(const Container* container, uint8_t slot, const Item* oldItem, const Item* newItem);
-		void sendRemoveContainerItem(const Container* container, uint8_t slot, const Item* item);
+		void sendRemoveContainerItem(const Container* container, uint8_t slot, const Item* lastItem);
 		void sendContainer(uint32_t cid, const Container* container, bool hasParent)
 			{if(client) client->sendContainer(cid, container, hasParent); }
 
 		//inventory
-		void sendAddInventoryItem(slots_t slot, const Item* item)
-			{if(client) client->sendAddInventoryItem(slot, item);}
-		void sendUpdateInventoryItem(slots_t slot, const Item* oldItem, const Item* newItem)
-			{if(client) client->sendUpdateInventoryItem(slot, newItem);}
-		void sendRemoveInventoryItem(slots_t slot, const Item* item)
-			{if(client) client->sendRemoveInventoryItem(slot);}
+		void sendInventoryItem(slots_t slot, const Item* item)
+			{if(client) client->sendInventoryItem(slot, item);}
 
 		//event methods
-		virtual void onAddTileItem(const Tile* tile, const Position& pos, const Item* item);
 		virtual void onUpdateTileItem(const Tile* tile, const Position& pos, const Item* oldItem,
 			const ItemType& oldType, const Item* newItem, const ItemType& newType);
 		virtual void onRemoveTileItem(const Tile* tile, const Position& pos, const ItemType& iType,
 			const Item* item);
-		virtual void onUpdateTile(const Tile* tile, const Position& pos);
 
 		virtual void onCreatureAppear(const Creature* creature, bool isLogin);
 		virtual void onCreatureDisappear(const Creature* creature, uint32_t stackpos, bool isLogout);
@@ -629,7 +669,8 @@ class Player : public Creature, public Cylinder
 			{if(client) client->sendCreatePrivateChannel(channelId, channelName);}
 		void sendClosePrivate(uint16_t channelId) const
 			{if(client) client->sendClosePrivate(channelId);}
-		void sendIcons() const;
+		void sendIcons() const
+			{if(client) client->sendIcons(getClientIcons());}
 		void sendMagicEffect(const Position& pos, uint8_t type) const
 			{if(client) client->sendMagicEffect(pos, type);}
 		void sendPing();
@@ -642,8 +683,8 @@ class Player : public Creature, public Cylinder
 			{if(client) client->sendSkills();}
 		void sendTextMessage(MessageClasses mclass, const std::string& message, Position* pos = NULL, uint32_t value = 0, TextColor_t color = TEXTCOLOR_NONE) const
 			{if(client) client->sendTextMessage(mclass, message, pos, value, color);}
-		void sendReLoginWindow() const
-			{if(client) client->sendReLoginWindow();}
+		void sendReLoginWindow(uint8_t unfairFightReduction) const
+			{if(client) client->sendReLoginWindow(unfairFightReduction);}
 		void sendTextWindow(Item* item, uint16_t maxlen, bool canWrite) const
 			{if(client) client->sendTextWindow(windowTextId, item, maxlen, canWrite);}
 		void sendTextWindow(uint32_t itemId, const std::string& text) const
@@ -693,9 +734,11 @@ class Player : public Creature, public Cylinder
 		void sendAddMarker(const Position& pos, uint8_t markType, const std::string& desc)
 			{if(client) client->sendAddMarker(pos, markType, desc);}
 		void sendQuestLog()
-			{if(client) client->sendQuestLog(); }
+			{if(client) client->sendQuestLog();}
 		void sendQuestLine(const Quest* quest)
-			{if(client) client->sendQuestLine(quest); }
+			{if(client) client->sendQuestLine(quest);}
+		void sendEnterWorld()
+			{if(client) client->sendEnterWorld();}
 
 		void receivePing() {lastPong = OTSYS_TIME();}
 
@@ -726,10 +769,10 @@ class Player : public Creature, public Cylinder
 
 		//items
 		ContainerVector containerVec;
-		void preSave();
 
 		//depots
-		DepotMap depots;
+		DepotMap depotChests;
+		DepotLockerMap depotLockerMap;
 		uint32_t maxDepotLimit;
 
 	protected:
@@ -737,7 +780,7 @@ class Player : public Creature, public Cylinder
 		bool hasCapacity(const Item* item, uint32_t count) const;
 
 		void gainExperience(uint64_t exp);
-		void addExperience(uint64_t exp, bool useMult = false, bool sendText = false);
+		void addExperience(uint64_t exp, bool useMult = false, bool sendText = false, bool applyStaminaChange = false);
 
 		void updateInventoryWeight();
 		void postUpdateGoods(uint32_t itemId);
@@ -747,7 +790,7 @@ class Player : public Creature, public Cylinder
 		void setNextActionTask(SchedulerTask* task);
 
 		void death();
-		virtual void dropCorpse();
+		virtual bool dropCorpse();
 		virtual Item* getCorpse();
 
 		//cylinder implementations
@@ -812,8 +855,11 @@ class Player : public Creature, public Cylinder
 		int32_t idleTime;
 		int32_t groupId;
 		OperatingSystem_t operatingSystem;
+		uint16_t protocolVersion;
 		bool ghostMode;
 		bool depotChange;
+
+		std::list<uint32_t> modalWindows;
 
 		int32_t offlineTrainingSkill;
 		int32_t offlineTrainingTime;
@@ -821,6 +867,7 @@ class Player : public Creature, public Cylinder
 		AccountManager* accountManager;
 
 		int16_t marketDepotId;
+		int16_t lastDepotId;
 
 		bool mayNotMove;
 		bool requestedOutfit;
@@ -884,6 +931,8 @@ class Player : public Creature, public Cylinder
 
 		std::map<uint32_t, uint32_t> goodsMap;
 
+		Inbox* inbox;
+
 		std::string name;
 		std::string nameDescription;
 		uint32_t guid;
@@ -894,6 +943,10 @@ class Player : public Creature, public Cylinder
 
 		uint16_t lastStatsTrainingTime;
 
+		Position lastWalkthroughPosition;
+		int64_t lastWalkthroughAttempt;
+		int64_t lastToggleMount;
+
 		//guild variables
 		uint32_t guildId;
 		std::string guildName;
@@ -902,9 +955,17 @@ class Player : public Creature, public Cylinder
 		int8_t guildLevel;
 
 		StorageMap storageMap;
+		int64_t lastQuestlogUpdate;
+
 		LightInfo itemsLight;
 
 		OutfitList m_playerOutfits;
+
+		BedItem* bedItem;
+
+		//stamina
+		uint16_t staminaMinutes;
+		time_t nextUseStaminaTime;
 
 		//read/write storage data
 		uint32_t windowTextId;
@@ -915,7 +976,7 @@ class Player : public Creature, public Cylinder
 
 		int64_t skullTicks;
 		Skulls_t skull;
-		typedef std::set<uint32_t> AttackedSet;
+		typedef OTSERV_HASH_SET<uint32_t> AttackedSet;
 		AttackedSet attackedSet;
 
 		void updateItemsLight(bool internal = false);
@@ -931,7 +992,7 @@ class Player : public Creature, public Cylinder
 		void updateBaseSpeed()
 		{
 			if(!hasFlag(PlayerFlag_SetMaxSpeed))
-				baseSpeed = vocation->getBaseSpeed() + (2* (level - 1));
+				baseSpeed = vocation->getBaseSpeed() + (2 * (level - 1));
 			else
 				baseSpeed = PLAYER_MAX_SPEED;
 		}

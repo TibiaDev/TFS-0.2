@@ -70,10 +70,6 @@
 	minGuildNameLength = 4
 	maxGuildNameLength = 20
 
-	-- Highscores
-	highscoreDisplayPlayers = 15
-	updateHighscoresAfterMinutes = 60
-
 	-- Houses
 	housePriceEachSQM = 1000
 	houseRentPeriod = "never"
@@ -141,7 +137,10 @@
 	deSpawnRange = 2
 	deSpawnRadius = 50
 
-	-- SqLite
+	-- Stamina
+	staminaSystem = "yes"
+
+	-- SQLite
 	sqliteDatabase = "forgottenserver.s3db"
 
 	-- SQL

@@ -21,9 +21,9 @@
 #ifndef __OTSERV_DEFINITIONS_H__
 #define __OTSERV_DEFINITIONS_H__
 
-#define CLIENT_VERSION_MIN 960
-#define CLIENT_VERSION_MAX 961
-#define CLIENT_VERSION_STR "9.61"
+#define CLIENT_VERSION_MIN 972
+#define CLIENT_VERSION_MAX 978
+#define CLIENT_VERSION_STR "9.86"
 
 #ifdef _WIN32
 #ifndef WIN32
@@ -135,6 +135,10 @@ enum passwordType_t
 
 	#ifndef NOMINMAX
 		#define NOMINMAX
+	#endif
+
+	#ifndef _USE_MATH_DEFINES
+		#define _USE_MATH_DEFINES
 	#endif
 
 	#include <hash_map>

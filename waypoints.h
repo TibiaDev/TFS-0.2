@@ -15,38 +15,47 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ////////////////////////////////////////////////////////////////////////
 
-#ifndef __DATABASE_MANAGER__
-#define __DATABASE_MANAGER__
-#include "database.h"
+#ifndef __WAYPOINTS__
+#define __WAYPOINTS__
+#include "otsystem.h"
 
-class DatabaseManager
+class Waypoint
 {
 	public:
-		DatabaseManager() {}
-		virtual ~DatabaseManager() {}
+		Waypoint(const std::string& _name, const Position& _pos):
+		name(_name), pos(_pos) {}
 
-		static DatabaseManager* getInstance()
-		{
-			static DatabaseManager instance;
-			return &instance;
-		}
-
-		bool tableExists(const std::string& table);
-		bool triggerExists(const std::string& trigger);
-
-		int32_t getDatabaseVersion();
-		bool isDatabaseSetup();
-
-		bool optimizeTables();
-		uint32_t updateDatabase();
-
-		bool getDatabaseConfig(const std::string& config, int32_t &value);
-		void registerDatabaseConfig(const std::string& config, int32_t value);
-
-		bool getDatabaseConfig(const std::string& config, std::string& value);
-		void registerDatabaseConfig(const std::string& config, const std::string& value);
-
-		void checkEncryption();
-		void checkTriggers();
+		std::string name;
+		Position pos;
 };
+
+typedef boost::shared_ptr<Waypoint> WaypointPtr;
+typedef std::map<std::string, WaypointPtr> WaypointMap;
+
+class Waypoints
+{
+	public:
+		// Does not require either constructor nor destructor
+		inline void addWaypoint(WaypointPtr waypoint);
+		WaypointPtr getWaypointByName(const std::string& name) const;
+		const WaypointMap& getWaypointsMap() const {return waypoints;}
+
+	protected:
+		WaypointMap waypoints;
+};
+
+
+inline void Waypoints::addWaypoint(WaypointPtr waypoint)
+{
+	waypoints[waypoint->name] = waypoint;
+}
+
+inline WaypointPtr Waypoints::getWaypointByName(const std::string& name) const
+{
+	WaypointMap::const_iterator it = waypoints.find(name);
+	if(it != waypoints.end())
+		return it->second;
+
+	return WaypointPtr();
+}
 #endif

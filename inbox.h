@@ -18,78 +18,27 @@
 // Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //////////////////////////////////////////////////////////////////////
 
-#ifndef __TEMPLATES_H__
-#define __TEMPLATES_H__
+#ifndef __OTSERV_INBOX_H__
+#define __OTSERV_INBOX_H__
 
-#include <set>
-#include <map>
+#include "container.h"
 
-#include "creature.h"
-#include "otsystem.h"
-
-template<class T> class AutoList
+class Inbox : public Container
 {
 	public:
-		AutoList() {}
+		Inbox(uint16_t _type);
+		~Inbox();
 
-		virtual ~AutoList()
-		{
-			list.clear();
-		}
+		//cylinder implementations
+		ReturnValue __queryAdd(int32_t index, const Thing* thing, uint32_t count,
+			uint32_t flags, Creature* actor = NULL) const;
 
-		void addList(T* t)
-		{
-			list[t->getID()] = t;
-		}
+		void postAddNotification(Thing* thing, const Cylinder* oldParent, int32_t index, cylinderlink_t link = LINK_OWNER);
+		void postRemoveNotification(Thing* thing, const Cylinder* newParent, int32_t index, bool isCompleteRemoval, cylinderlink_t link = LINK_OWNER);
 
-		void removeList(uint32_t _id)
-		{
-			list.erase(_id);
-		}
-
-		typedef std::map<uint32_t, T*> list_type;
-
-		list_type list;
-		typedef typename list_type::iterator listiterator;
-};
-
-class AutoID
-{
-	public:
-		AutoID()
-		{
-			OTSYS_THREAD_LOCK_CLASS lockClass(autoIDLock);
-			count++;
-			if(count >= 0xFFFFFF)
-				count = 1000;
-
-			while(list.find(count) != list.end())
-			{
-				if(count >= 0xFFFFFF)
-					count = 1000;
-				else
-					count++;
-			}
-
-			list.insert(count);
-			auto_id = count;
-		}
-
-		virtual ~AutoID()
-		{
-			list_type::iterator it = list.find(auto_id);
-			if(it != list.end())
-				list.erase(it);
-		}
-
-		typedef OTSERV_HASH_SET<uint32_t> list_type;
-
-		uint32_t auto_id;
-		static OTSYS_THREAD_LOCKVAR autoIDLock;
-
-	protected:
-		static uint32_t count;
-		static list_type list;
+		//overrides
+		bool canRemove() const {return false;}
 };
 
 #endif
+

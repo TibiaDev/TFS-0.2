@@ -27,7 +27,6 @@
 #include "thing.h"
 
 class Action;
-class Container;
 
 class Actions : public BaseEvents
 {
@@ -102,7 +101,6 @@ class Action : public Event
 	protected:
 		virtual std::string getScriptEventName();
 
-		static ActionFunction highscoreBook;
 		static ActionFunction increaseItemId;
 		static ActionFunction decreaseItemId;
 		static ActionFunction enterMarket;

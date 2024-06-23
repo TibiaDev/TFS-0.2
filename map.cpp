@@ -297,18 +297,15 @@ bool Map::removeCreature(Creature* creature)
 	return false;
 }
 
-void Map::getSpectatorsInternal(SpectatorVec& list, const Position& centerPos, bool checkforduplicate,
-	int32_t minRangeX, int32_t maxRangeX,
-	int32_t minRangeY, int32_t maxRangeY,
-	int32_t minRangeZ, int32_t maxRangeZ)
+void Map::getSpectatorsInternal(SpectatorVec& list, const Position& centerPos, int32_t minRangeX, int32_t maxRangeX, int32_t minRangeY, int32_t maxRangeY, int32_t minRangeZ, int32_t maxRangeZ, bool onlyPlayers)
 {
 	int32_t minoffset = centerPos.z - maxRangeZ;
-	int32_t x1 = std::min((int32_t)0xFFFF, std::max((int32_t)0, (centerPos.x + minRangeX + minoffset)));
-	int32_t y1 = std::min((int32_t)0xFFFF, std::max((int32_t)0, (centerPos.y + minRangeY + minoffset)));
+	int32_t x1 = std::min<int32_t>(0xFFFF, std::max<int32_t>(0, (centerPos.x + minRangeX + minoffset)));
+	int32_t y1 = std::min<int32_t>(0xFFFF, std::max<int32_t>(0, (centerPos.y + minRangeY + minoffset)));
 
 	int32_t maxoffset = centerPos.z - minRangeZ;
-	int32_t x2 = std::min((int32_t)0xFFFF, std::max((int32_t)0, (centerPos.x + maxRangeX + maxoffset)));
-	int32_t y2 = std::min((int32_t)0xFFFF, std::max((int32_t)0, (centerPos.y + maxRangeY + maxoffset)));
+	int32_t x2 = std::min<int32_t>(0xFFFF, std::max<int32_t>(0, (centerPos.x + maxRangeX + maxoffset)));
+	int32_t y2 = std::min<int32_t>(0xFFFF, std::max<int32_t>(0, (centerPos.y + maxRangeY + maxoffset)));
 
 	int32_t startx1 = x1 - (x1 % FLOOR_SIZE);
 	int32_t starty1 = y1 - (y1 % FLOOR_SIZE);
@@ -329,7 +326,12 @@ void Map::getSpectatorsInternal(SpectatorVec& list, const Position& centerPos, b
 		{
 			if(leafE)
 			{
-				CreatureVector& node_list = leafE->creature_list;
+				CreatureVector node_list;
+				if(onlyPlayers)
+					node_list = leafE->player_list;
+				else
+					node_list = leafE->creature_list;
+
 				CreatureVector::const_iterator node_iter = node_list.begin();
 				CreatureVector::const_iterator node_end = node_list.end();
 				if(node_iter != node_end)
@@ -338,6 +340,7 @@ void Map::getSpectatorsInternal(SpectatorVec& list, const Position& centerPos, b
 					{
 						Creature* creature = *node_iter;
 						const Position& cpos = creature->getPosition();
+
 						int32_t offsetZ = centerPos.z - cpos.z;
 						if(cpos.z < minRangeZ || cpos.z > maxRangeZ)
 							continue;
@@ -348,13 +351,7 @@ void Map::getSpectatorsInternal(SpectatorVec& list, const Position& centerPos, b
 						if(cpos.x < (centerPos.x + minRangeX + offsetZ) || cpos.x > (centerPos.x + maxRangeX + offsetZ))
 							continue;
 
-						if(checkforduplicate)
-						{
-							if(std::find(list.begin(), list.end(), creature) == list.end())
-								list.push_back(creature);
-						}
-						else
-							list.push_back(creature);
+						list.insert(creature);
 					}
 					while(++node_iter != node_end);
 				}
@@ -371,8 +368,7 @@ void Map::getSpectatorsInternal(SpectatorVec& list, const Position& centerPos, b
 	}
 }
 
-void Map::getSpectators(SpectatorVec& list, const Position& centerPos,
-	bool checkforduplicate /*= false*/, bool multifloor /*= false*/,
+void Map::getSpectators(SpectatorVec& list, const Position& centerPos, bool multifloor /*= false*/, bool onlyPlayers /*= false*/,
 	int32_t minRangeX /*= 0*/, int32_t maxRangeX /*= 0*/,
 	int32_t minRangeY /*= 0*/, int32_t maxRangeY /*= 0*/)
 {
@@ -381,25 +377,44 @@ void Map::getSpectators(SpectatorVec& list, const Position& centerPos,
 
 	bool foundCache = false;
 	bool cacheResult = false;
-	if(minRangeX == 0 && maxRangeX == 0 && minRangeY == 0 && maxRangeY == 0 && multifloor == true && checkforduplicate == false)
+
+	minRangeX = (minRangeX == 0 ? -maxViewportX : -minRangeX);
+	maxRangeX = (maxRangeX == 0 ? maxViewportX : maxRangeX);
+	minRangeY = (minRangeY == 0 ? -maxViewportY : -minRangeY);
+	maxRangeY = (maxRangeY == 0 ? maxViewportY : maxRangeY);
+
+	if(minRangeX == -maxViewportX && maxRangeX == maxViewportX && minRangeY == -maxViewportY && maxRangeY == maxViewportY && multifloor)
 	{
 		SpectatorCache::iterator it = spectatorCache.find(centerPos);
 		if(it != spectatorCache.end())
 		{
-			list = *it->second;
+			if(!onlyPlayers)
+			{
+				if(!list.empty())
+				{
+					const SpectatorVec& cachedList = *it->second;
+					list.insert(cachedList.begin(), cachedList.end());
+				}
+				else
+					list = *it->second;
+			}
+			else
+			{
+				const SpectatorVec& cachedList = *it->second;
+				for(SpectatorVec::const_iterator iter = cachedList.begin(), end = cachedList.end(); iter != end; ++iter)
+				{
+					if((*iter)->getPlayer())
+						list.insert(*iter);
+				}
+			}
 			foundCache = true;
 		}
-		else
+		else if(!onlyPlayers)
 			cacheResult = true;
 	}
 
 	if(!foundCache)
 	{
-		minRangeX = (minRangeX == 0 ? -maxViewportX : -minRangeX);
-		maxRangeX = (maxRangeX == 0 ? maxViewportX : maxRangeX);
-		minRangeY = (minRangeY == 0 ? -maxViewportY : -minRangeY);
-		maxRangeY = (maxRangeY == 0 ? maxViewportY : maxRangeY);
-
 		int32_t minRangeZ;
 		int32_t maxRangeZ;
 
@@ -410,8 +425,8 @@ void Map::getSpectators(SpectatorVec& list, const Position& centerPos,
 				//underground
 
 				//8->15
-				minRangeZ = std::max(centerPos.z - 2, (int32_t)0);
-				maxRangeZ = std::min(centerPos.z + 2, (int32_t)MAP_MAX_LAYERS - 1);
+				minRangeZ = std::max<int32_t>(centerPos.z - 2, 0);
+				maxRangeZ = std::min<int32_t>(centerPos.z + 2, MAP_MAX_LAYERS - 1);
 			}
 			//above ground
 			else if(centerPos.z == 6)
@@ -436,10 +451,7 @@ void Map::getSpectators(SpectatorVec& list, const Position& centerPos,
 			maxRangeZ = centerPos.z;
 		}
 
-		getSpectatorsInternal(list, centerPos, true,
-			minRangeX, maxRangeX,
-			minRangeY, maxRangeY,
-			minRangeZ, maxRangeZ);
+		getSpectatorsInternal(list, centerPos, minRangeX, maxRangeX, minRangeY, maxRangeY, minRangeZ, maxRangeZ, onlyPlayers);
 
 		if(cacheResult)
 			spectatorCache[centerPos].reset(new SpectatorVec(list));
@@ -458,52 +470,44 @@ const SpectatorVec& Map::getSpectators(const Position& centerPos)
 	SpectatorCache::iterator it = spectatorCache.find(centerPos);
 	if(it != spectatorCache.end())
 		return *it->second;
+
+	boost::shared_ptr<SpectatorVec> p(new SpectatorVec());
+	spectatorCache[centerPos] = p;
+	SpectatorVec& list = *p;
+
+	int32_t minRangeX = -maxViewportX;
+	int32_t maxRangeX = maxViewportX;
+	int32_t minRangeY = -maxViewportY;
+	int32_t maxRangeY = maxViewportY;
+	int32_t minRangeZ, maxRangeZ;
+
+	if(centerPos.z > 7)
+	{
+		//underground
+
+		//8->15
+		minRangeZ = std::max<int32_t>(centerPos.z - 2, 0);
+		maxRangeZ = std::min<int32_t>(centerPos.z + 2, MAP_MAX_LAYERS - 1);
+	}
+	//above ground
+	else if(centerPos.z == 6)
+	{
+		minRangeZ = 0;
+		maxRangeZ = 8;
+	}
+	else if(centerPos.z == 7)
+	{
+		minRangeZ = 0;
+		maxRangeZ = 9;
+	}
 	else
 	{
-		boost::shared_ptr<SpectatorVec> p(new SpectatorVec());
-		spectatorCache[centerPos] = p;
-		SpectatorVec& list = *p;
-
-		int32_t minRangeX = -maxViewportX;
-		int32_t maxRangeX = maxViewportX;
-		int32_t minRangeY = -maxViewportY;
-		int32_t maxRangeY = maxViewportY;
-
-		int32_t minRangeZ;
-		int32_t maxRangeZ;
-
-		if(centerPos.z > 7)
-		{
-			//underground
-
-			//8->15
-			minRangeZ = std::max(centerPos.z - 2, (int32_t)0);
-			maxRangeZ = std::min(centerPos.z + 2, (int32_t)MAP_MAX_LAYERS - 1);
-		}
-		//above ground
-		else if(centerPos.z == 6)
-		{
-			minRangeZ = 0;
-			maxRangeZ = 8;
-		}
-		else if(centerPos.z == 7)
-		{
-			minRangeZ = 0;
-			maxRangeZ = 9;
-		}
-		else
-		{
-			minRangeZ = 0;
-			maxRangeZ = 7;
-		}
-
-		getSpectatorsInternal(list, centerPos, false,
-			minRangeX, maxRangeX,
-			minRangeY, maxRangeY,
-			minRangeZ, maxRangeZ);
-
-		return list;
+		minRangeZ = 0;
+		maxRangeZ = 7;
 	}
+
+	getSpectatorsInternal(list, centerPos, minRangeX, maxRangeX, minRangeY, maxRangeY, minRangeZ, maxRangeZ, false);
+	return list;
 }
 
 void Map::clearSpectatorCache()
@@ -520,13 +524,12 @@ bool Map::canThrowObjectTo(const Position& fromPos, const Position& toPos, bool 
 	if((fromPos.z >= 8 && toPos.z < 8) || (toPos.z >= 8 && fromPos.z < 8))
 		return false;
 
-	if(std::abs(fromPos.z - toPos.z) > 2)
+	int32_t deltaz = std::abs(fromPos.z - toPos.z);
+	if(deltaz > 2)
 		return false;
 
-	int deltax, deltay, deltaz;
-	deltax = std::abs(fromPos.x - toPos.x);
-	deltay = std::abs(fromPos.y - toPos.y);
-	deltaz = std::abs(fromPos.z - toPos.z);
+	int32_t deltax = std::abs(fromPos.x - toPos.x);
+	int32_t deltay = std::abs(fromPos.y - toPos.y);
 
 	//distance checks
 	if(deltax - deltaz > rangex || deltay - deltaz > rangey)
@@ -540,126 +543,44 @@ bool Map::canThrowObjectTo(const Position& fromPos, const Position& toPos, bool 
 
 bool Map::checkSightLine(const Position& fromPos, const Position& toPos) const
 {
-	Position start = fromPos;
-	Position end = toPos;
+	if(fromPos == toPos)
+		return true;
 
-	int32_t x, y, z;
-	int32_t dx, dy, dz;
-	int32_t sx, sy, sz;
-	int32_t ey, ez;
+	Position start(fromPos.z > toPos.z ? toPos : fromPos);
+	Position destination(fromPos.z > toPos.z ? fromPos : toPos);
 
-	dx = abs(start.x - end.x);
-	dy = abs(start.y - end.y);
-	dz = abs(start.z - end.z);
+	const int8_t mx = start.x < destination.x ? 1 : start.x == destination.x ? 0 : -1;
+	const int8_t my = start.y < destination.y ? 1 : start.y == destination.y ? 0 : -1;
 
-	int32_t max = dx, dir = 0;
-	if(dy > max)
+	int32_t A = destination.y - start.y;
+	int32_t B = start.x - destination.x;
+	int32_t C = -(A*destination.x + B*destination.y);
+
+	while(!Position::areInRange<0,0,15>(start, destination))
 	{
-		max = dy;
-		dir = 1;
+		int32_t move_hor = std::abs(A * (start.x + mx) + B * (start.y) + C);
+		int32_t move_ver = std::abs(A * (start.x) + B * (start.y + my) + C);
+		int32_t move_cross = std::abs(A * (start.x + mx) + B * (start.y + my) + C);
+
+		if(start.y != destination.y && (start.x == destination.x || move_hor > move_ver || move_hor > move_cross))
+			start.y += my;
+
+		if(start.x != destination.x && (start.y == destination.y || move_ver > move_hor || move_ver > move_cross))
+			start.x += mx;
+
+		const Tile* tile = const_cast<Map*>(this)->getTile(start.x, start.y, start.z);
+		if(tile && tile->hasProperty(BLOCKPROJECTILE))
+			return false;
 	}
 
-	if(dz > max)
+	// now we need to perform a jump between floors to see if everything is clear (literally)
+	while(start.z != destination.z)
 	{
-		max = dz;
-		dir = 2;
-	}
+		const Tile* tile = const_cast<Map*>(this)->getTile(start.x, start.y, start.z);
+		if(tile && tile->getThingCount() > 0)
+			return false;
 
-	switch(dir)
-	{
-		case 0:
-			//x -> x
-			//y -> y
-			//z -> z
-			break;
-
-		case 1:
-			//x -> y
-			//y -> x
-			//z -> z
-			std::swap(start.x, start.y);
-			std::swap(end.x, end.y);
-			std::swap(dx, dy);
-			break;
-
-		case 2:
-			//x -> z
-			//y -> y
-			//z -> x
-			std::swap(start.x, start.z);
-			std::swap(end.x, end.z);
-			std::swap(dx, dz);
-			break;
-	}
-
-	sx = ((start.x < end.x) ? 1 : -1);
-	sy = ((start.y < end.y) ? 1 : -1);
-	sz = ((start.z < end.z) ? 1 : -1);
-
-	ey = 0, ez = 0;
-	x = start.x;
-	y = start.y;
-	z = start.z;
-
-	int32_t lastrx = 0, lastry = 0, lastrz = 0;
-
-	for(; x != end.x + sx; x += sx)
-	{
-		int32_t rx, ry, rz;
-		switch(dir)
-		{
-			case 1:
-				rx = y; ry = x; rz = z;
-				break;
-
-			case 2:
-				rx = z; ry = y; rz = x;
-				break;
-
-			default:
-				rx = x; ry = y; rz = z;
-				break;
-		}
-
-		if(lastrx == 0 && lastry == 0 && lastrz == 0)
-		{
-			//first time initialization
-			lastrx = rx; lastry = ry; lastrz = rz;
-		}
-
-		if(lastrz != rz ||
-			(!(toPos.x == rx && toPos.y == ry && toPos.z == rz) &&
-			!(fromPos.x == rx && fromPos.y == ry && fromPos.z == rz)))
-		{
-			if(lastrz != rz)
-			{
-				if(const_cast<Map*>(this)->getTile(lastrx, lastry, std::min(lastrz, rz)))
-					return false;
-			}
-			lastrx = rx; lastry = ry; lastrz = rz;
-
-			const Tile* tile = const_cast<Map*>(this)->getTile(rx, ry, rz);
-			if(tile)
-			{
-				if(tile->hasProperty(BLOCKPROJECTILE))
-					return false;
-			}
-		}
-
-		ey += dy;
-		ez += dz;
-
-		if(2*ey >= dx)
-		{
-			y += sy;
-			ey -= dx;
-		}
-
-		if(2*ez >= dx)
-		{
-			z += sz;
-			ez -= dx;
-		}
+		start.z++;
 	}
 	return true;
 }
@@ -675,12 +596,11 @@ bool Map::isSightClear(const Position& fromPos, const Position& toPos, bool floo
 
 const Tile* Map::canWalkTo(const Creature* creature, const Position& pos)
 {
-	switch(creature->getWalkCache(pos))
-	{
-		case 0: return NULL;
-		case 1: return getTile(pos);
-		break;
-	}
+	int32_t walkCache = creature->getWalkCache(pos);
+	if(walkCache == 0)
+		return NULL;
+	else if(walkCache == 1)
+		return getTile(pos);
 
 	//used for none-cached tiles
 	Tile* tile = getTile(pos);
@@ -706,15 +626,19 @@ bool Map::getPathTo(const Creature* creature, const Position& destPos,
 	if(startPos.z != endPos.z)
 		return false;
 
+	OTSERV_HASH_MAP<uint32_t, AStarNode*> nodeTable;
+
 	AStarNodes nodes;
 	AStarNode* startNode = nodes.createOpenNode();
+
+	nodeTable[(startPos.x * 0xFFFF) + startPos.y] = startNode;
 
 	startNode->x = startPos.x;
 	startNode->y = startPos.y;
 
 	startNode->g = 0;
 	startNode->h = nodes.getEstimatedDistance(startPos.x, startPos.y, endPos.x, endPos.y);
-	startNode->f = startNode->g + startNode->h;
+	startNode->f = startNode->h;
 	startNode->parent = NULL;
 
 	Position pos;
@@ -771,18 +695,22 @@ bool Map::getPathTo(const Creature* creature, const Position& destPos,
 					int32_t cost = nodes.getMapWalkCost(creature, n, tile, pos);
 					int32_t extraCost = nodes.getTileWalkCost(creature, tile);
 					int32_t newg = n->g + cost + extraCost;
+					uint32_t tableIndex = (pos.x * 0xFFFF) + pos.y;
 
 					//Check if the node is already in the closed/open list
 					//If it exists and the nodes already on them has a lower cost (g) then we can ignore this neighbour node
 
-					AStarNode* neighbourNode = nodes.getNodeInList(pos.x, pos.y);
+					AStarNode* neighbourNode;
+					OTSERV_HASH_MAP<uint32_t, AStarNode*>::iterator it = nodeTable.find(tableIndex);
+					if(it != nodeTable.end())
+						neighbourNode = it->second;
+					else
+						neighbourNode = NULL;
+
 					if(neighbourNode)
 					{
 						if(neighbourNode->g <= newg)
-						{
-							//The node on the closed/open list is cheaper than this one
-							continue;
-						}
+							continue; //The node on the closed/open list is cheaper than this one
 
 						nodes.openNode(neighbourNode);
 					}
@@ -796,16 +724,18 @@ bool Map::getPathTo(const Creature* creature, const Position& destPos,
 							listDir.clear();
 							return false;
 						}
+
+						nodeTable[tableIndex] = neighbourNode;
+
+						neighbourNode->x = pos.x;
+						neighbourNode->y = pos.y;
 					}
 
 					//This node is the best node so far with this state
-					neighbourNode->x = pos.x;
-					neighbourNode->y = pos.y;
 					neighbourNode->parent = n;
 					neighbourNode->g = newg;
-					neighbourNode->h = nodes.getEstimatedDistance(neighbourNode->x, neighbourNode->y,
-						endPos.x, endPos.y);
-					neighbourNode->f = neighbourNode->g + neighbourNode->h;
+					neighbourNode->h = nodes.getEstimatedDistance(pos.x, pos.y, endPos.x, endPos.y);
+					neighbourNode->f = newg + neighbourNode->h;
 				}
 			}
 
@@ -859,8 +789,12 @@ bool Map::getPathMatching(const Creature* creature, std::list<Direction>& dirLis
 	Position startPos = creature->getPosition();
 	Position endPos;
 
+	OTSERV_HASH_MAP<uint32_t, AStarNode*> nodeTable;
+
 	AStarNodes nodes;
 	AStarNode* startNode = nodes.createOpenNode();
+
+	nodeTable[(startPos.x * 0xFFFF) + startPos.y] = startNode;
 
 	startNode->x = startPos.x;
 	startNode->y = startPos.y;
@@ -937,11 +871,19 @@ bool Map::getPathMatching(const Creature* creature, std::list<Direction>& dirLis
 				int32_t cost = nodes.getMapWalkCost(creature, n, tile, pos);
 				int32_t extraCost = nodes.getTileWalkCost(creature, tile);
 				int32_t newf = n->f + cost + extraCost;
+				uint32_t tableIndex = (pos.x * 0xFFFF) + pos.y;
 
 				//Check if the node is already in the closed/open list
 				//If it exists and the nodes already on them has a lower cost (g) then we can ignore this neighbour node
 
-				AStarNode* neighbourNode = nodes.getNodeInList(pos.x, pos.y);
+				AStarNode* neighbourNode;
+
+				OTSERV_HASH_MAP<uint32_t, AStarNode*>::iterator it = nodeTable.find(tableIndex);
+				if(it != nodeTable.end())
+					neighbourNode = it->second;
+				else
+					neighbourNode = NULL;
+
 				if(neighbourNode)
 				{
 					if(neighbourNode->f <= newf)
@@ -967,11 +909,14 @@ bool Map::getPathMatching(const Creature* creature, std::list<Direction>& dirLis
 						dirList.clear();
 						return false;
 					}
+
+					nodeTable[tableIndex] = neighbourNode;
+
+					neighbourNode->x = pos.x;
+					neighbourNode->y = pos.y;
 				}
 
 				//This node is the best node so far with this state
-				neighbourNode->x = pos.x;
-				neighbourNode->y = pos.y;
 				neighbourNode->parent = n;
 				neighbourNode->f = newf;
 			}
@@ -1110,26 +1055,6 @@ uint32_t AStarNodes::countOpenNodes()
 			counter++;
 	}
 	return counter;
-}
-
-bool AStarNodes::isInList(int32_t x, int32_t y)
-{
-	for(uint32_t i = 0; i < curNode; i++)
-	{
-		if(nodes[i].x == x && nodes[i].y == y)
-			return true;
-	}
-	return false;
-}
-
-AStarNode* AStarNodes::getNodeInList(int32_t x, int32_t y)
-{
-	for(uint32_t i = 0; i < curNode; i++)
-	{
-		if(nodes[i].x == x && nodes[i].y == y)
-			return &nodes[i];
-	}
-	return NULL;
 }
 
 int32_t AStarNodes::getMapWalkCost(const Creature* creature, AStarNode* node,
@@ -1286,6 +1211,28 @@ Floor* QTreeLeafNode::createFloor(uint32_t z)
 	return m_array[z];
 }
 
+void QTreeLeafNode::addCreature(Creature* c)
+{
+	creature_list.push_back(c);
+	if(c->getPlayer())
+		player_list.push_back(c);
+}
+
+void QTreeLeafNode::removeCreature(Creature* c)
+{
+	CreatureVector::iterator iter = std::find(creature_list.begin(), creature_list.end(), c);
+	assert(iter != creature_list.end());
+	std::swap(*iter, creature_list.back());
+	creature_list.pop_back();
+	if(c->getPlayer())
+	{
+		iter = std::find(player_list.begin(), player_list.end(), c);
+		assert(iter != player_list.end());
+		std::swap(*iter, player_list.back());
+		player_list.pop_back();
+	}
+}
+
 uint32_t Map::clean()
 {
 	uint64_t start = OTSYS_TIME();
@@ -1293,8 +1240,7 @@ uint32_t Map::clean()
 	if(g_game.getGameState() == GAME_STATE_NORMAL)
 		g_game.setGameState(GAME_STATE_MAINTAIN);
 
-	Tile* tile = NULL;
-	ItemVector::iterator it;
+	Tile* tile;
 	for(int32_t z = 0; z < (int32_t)MAP_MAX_LAYERS; z++)
 	{
 		for(uint32_t y = 1; y <= mapHeight; y++)

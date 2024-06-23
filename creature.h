@@ -94,9 +94,9 @@ class FrozenPathingConditionCall
 {
 	public:
 		FrozenPathingConditionCall(const Position& _targetPos);
-		virtual ~FrozenPathingConditionCall() {}
+		~FrozenPathingConditionCall() {}
 
-		virtual bool operator()(const Position& startPos, const Position& testPos,
+		bool operator()(const Position& startPos, const Position& testPos,
 			const FindPathParams& fpp, int32_t& bestMatchDist) const;
 
 		bool isInRange(const Position& startPos, const Position& testPos,
@@ -116,6 +116,8 @@ class Creature : public AutoID, virtual public Thing
 		Creature();
 
 	public:
+		static double speedA, speedB, speedC;
+
 		virtual ~Creature();
 
 		virtual Creature* getCreature() {return this;}
@@ -191,7 +193,7 @@ class Creature : public AutoID, virtual public Thing
 		}
 
 		void setBaseSpeed(uint32_t newBaseSpeed) {baseSpeed = newBaseSpeed;}
-		int32_t getBaseSpeed() {return baseSpeed;}
+		int32_t getBaseSpeed() const {return baseSpeed;}
 
 		virtual int32_t getHealth() const {return health;}
 		virtual int32_t getMaxHealth() const {return healthMax;}
@@ -261,7 +263,7 @@ class Creature : public AutoID, virtual public Thing
 		virtual uint32_t getConditionSuppressions() const {return 0;}
 		virtual bool isAttackable() const {return true;}
 
-		virtual void changeHealth(int32_t healthChange);
+		virtual void changeHealth(int32_t healthChange, bool sendHealthChange = true);
 		virtual void changeMana(int32_t manaChange);
 
 		virtual void drainHealth(Creature* attacker, CombatType_t combatType, int32_t damage);
@@ -272,7 +274,7 @@ class Creature : public AutoID, virtual public Thing
 
 		virtual void onDeath();
 		virtual uint64_t getGainedExperience(Creature* attacker) const;
-		bool addDamagePoints(Creature* attacker, int32_t damagePoints);
+		void addDamagePoints(Creature* attacker, int32_t damagePoints);
 		void addHealPoints(Creature* caster, int32_t healthPoints);
 		bool hasBeenAttacked(uint32_t attackerId);
 
@@ -310,7 +312,6 @@ class Creature : public AutoID, virtual public Thing
 			const ItemType& oldType, const Item* newItem, const ItemType& newType);
 		virtual void onRemoveTileItem(const Tile* tile, const Position& pos, const ItemType& iType,
 			const Item* item);
-		virtual void onUpdateTile(const Tile* tile, const Position& pos);
 
 		virtual void onCreatureAppear(const Creature* creature, bool isLogin);
 		virtual void onCreatureDisappear(const Creature* creature, uint32_t stackpos, bool isLogout);
@@ -320,13 +321,10 @@ class Creature : public AutoID, virtual public Thing
 		virtual void onAttackedCreatureDisappear(bool isLogout) {}
 		virtual void onFollowCreatureDisappear(bool isLogout) {}
 
-		virtual void onCreatureTurn(const Creature* creature, uint32_t stackPos) {}
 		virtual void onCreatureSay(const Creature* creature, SpeakClasses type, const std::string& text,
 			Position* pos = NULL) {}
 
-		virtual void onCreatureChangeOutfit(const Creature* creature, const Outfit_t& outfit) {}
 		virtual void onCreatureConvinced(const Creature* convincer, const Creature* creature) {}
-		virtual void onCreatureChangeVisible(const Creature* creature, bool visible);
 		virtual void onPlacedCreature() {}
 		virtual void onRemovedCreature() {}
 
@@ -343,12 +341,14 @@ class Creature : public AutoID, virtual public Thing
 		virtual void setParent(Cylinder* cylinder)
 		{
 			_tile = dynamic_cast<Tile*>(cylinder);
+			_position = _tile->getTilePosition();
 			Thing::setParent(cylinder);
 		}
 
-		virtual const Position& getPosition() const {return _tile->getTilePosition();}
-		virtual Tile* getTile() {return _tile;}
-		virtual const Tile* getTile() const {return _tile;}
+		const Position& getPosition() const {return _position;}
+
+		Tile* getTile() {return _tile;}
+		const Tile* getTile() const {return _tile;}
 		int32_t getWalkCache(const Position& pos) const;
 
 		const Position& getLastPosition() {return lastPosition;}
@@ -366,6 +366,7 @@ class Creature : public AutoID, virtual public Thing
 		virtual bool useCacheMap() const {return false;}
 
 		Tile* _tile;
+		Position _position;
 		uint32_t id;
 		bool isInternalRemoved;
 		bool isMapLoaded;
@@ -454,7 +455,7 @@ class Creature : public AutoID, virtual public Thing
 		virtual uint16_t getLookCorpse() const { return 0; }
 		virtual void getPathSearchParams(const Creature* creature, FindPathParams& fpp) const;
 		virtual void death() {}
-		virtual void dropCorpse();
+		virtual bool dropCorpse();
 		virtual Item* getCorpse();
 
 		friend class Game;

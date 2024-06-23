@@ -54,6 +54,7 @@ ItemType::ItemType()
 	rotable = false;
 	rotateTo = 0;
 	hasHeight = false;
+	walkStack = true;
 
 	floorChangeDown = false;
 	floorChangeNorth = false;
@@ -145,7 +146,7 @@ ItemType::~ItemType()
 
 Items::Items() // : items(35000)
 {
-	this->items = new Array<ItemType*>(20100);
+	this->items = new Array<ItemType*>(20500);
 }
 
 Items::~Items()
@@ -175,7 +176,7 @@ bool Items::reload()
 	return true;
 }
 
-int32_t Items::loadFromOtb(std::string file)
+int32_t Items::loadFromOtb(const std::string& file)
 {
 	FileLoader f;
 	if(!f.openFile(file.c_str(), "OTBI", false, true))
@@ -219,7 +220,7 @@ int32_t Items::loadFromOtb(std::string file)
 		std::cout << "Old version detected, a newer version of items.otb is required." << std::endl;
 		return ERROR_INVALID_FORMAT;
 	}
-	else if(Items::dwMinorVersion < CLIENT_VERSION_961)
+	else if(Items::dwMinorVersion != CLIENT_VERSION_986)
 	{
 		std::cout << "A newer version of items.otb is required." << std::endl;
 		return ERROR_INVALID_FORMAT;
@@ -284,6 +285,7 @@ int32_t Items::loadFromOtb(std::string file)
 		iType->canReadText = hasBitSet(FLAG_READABLE, flags);
 		iType->lookThrough = hasBitSet(FLAG_LOOKTHROUGH, flags);
 		iType->isAnimation = hasBitSet(FLAG_ANIMATION, flags);
+		// iType->walkStack = !hasBitSet(FLAG_FULLTILE, flags);
 
 		attribute_t attrib;
 		datasize_t datalen = 0;
@@ -295,6 +297,7 @@ int32_t Items::loadFromOtb(std::string file)
 				delete iType;
 				return ERROR_INVALID_FORMAT;
 			}
+
 			switch(attrib)
 			{
 				case ITEM_ATTR_SERVERID:
@@ -306,12 +309,13 @@ int32_t Items::loadFromOtb(std::string file)
 					if(!props.GET_USHORT(serverid))
 						return ERROR_INVALID_FORMAT;
 
-					if(serverid > 20000 && serverid < 20100)
-						serverid = serverid - 20000;
+					if(serverid > 30000 && serverid < 30100)
+						serverid = serverid - 30000;
 
 					iType->id = serverid;
 					break;
 				}
+
 				case ITEM_ATTR_CLIENTID:
 				{
 					if(datalen != sizeof(uint16_t))
@@ -324,6 +328,7 @@ int32_t Items::loadFromOtb(std::string file)
 					iType->clientId = clientid;
 					break;
 				}
+
 				case ITEM_ATTR_SPEED:
 				{
 					if(datalen != sizeof(uint16_t))
@@ -336,6 +341,7 @@ int32_t Items::loadFromOtb(std::string file)
 					iType->speed = speed;
 					break;
 				}
+
 				case ITEM_ATTR_LIGHT2:
 				{
 					if(datalen != sizeof(lightBlock2))
@@ -349,6 +355,7 @@ int32_t Items::loadFromOtb(std::string file)
 					iType->lightColor = lb2->lightColor;
 					break;
 				}
+
 				case ITEM_ATTR_TOPORDER:
 				{
 					if(datalen != sizeof(uint8_t))
@@ -361,6 +368,7 @@ int32_t Items::loadFromOtb(std::string file)
 					iType->alwaysOnTopOrder = v;
 					break;
 				}
+
 				case ITEM_ATTR_WAREID:
 				{
 					if(!props.SKIP_N(datalen))
@@ -369,17 +377,32 @@ int32_t Items::loadFromOtb(std::string file)
 					iType->ware = true;
 					break;
 				}
+
+				/*
+				case ITEM_ATTR_NAME:
+				{
+					std::string name;
+					if(!props.GET_STRING(name, datalen))
+						return ERROR_INVALID_FORMAT;
+
+					iType->marketName = name;
+					break;
+				}
+				*/
+
 				default:
 				{
 					//skip unknown attributes
 					if(!props.SKIP_N(datalen))
 						return ERROR_INVALID_FORMAT;
+
 					break;
 				}
 			}
 		}
 
-		reverseItemMap[iType->clientId] = iType->id;
+		if(reverseItemMap.find(iType->clientId) == reverseItemMap.end())
+			reverseItemMap[iType->clientId] = iType->id;
 
 		// store the found item
 		items->addElement(iType, iType->id);
@@ -496,9 +519,9 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 	int32_t intValue;
 	std::string strValue;
 
-	if(id > 20000 && id < 20100)
+	if(id > 30000 && id < 30100)
 	{
-		id -= 20000;
+		id -= 30000;
 		ItemType* iType = new ItemType();
 		iType->id = id;
 
@@ -807,7 +830,6 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 				if(readXMLString(itemAttributesNode, "value", strValue))
 				{
 					it.ammoType = getAmmoType(strValue);
-
 					if(it.ammoType == AMMO_NONE)
 						std::cout << "Warning: [Items::loadFromXml] " << "Unknown ammoType " << strValue << std::endl;
 				}
@@ -922,32 +944,36 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 				{
-					it.getAbilities()->regeneration = true;
-					it.getAbilities()->healthGain = intValue;
+					Abilities* abilities = it.getAbilities();
+					abilities->regeneration = true;
+					abilities->healthGain = intValue;
 				}
 			}
 			else if(tmpStrValue == "healthticks")
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 				{
-					it.getAbilities()->regeneration = true;
-					it.getAbilities()->healthTicks = intValue;
+					Abilities* abilities = it.getAbilities();
+					abilities->regeneration = true;
+					abilities->healthTicks = intValue;
 				}
 			}
 			else if(tmpStrValue == "managain")
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 				{
-					it.getAbilities()->regeneration = true;
-					it.getAbilities()->manaGain = intValue;
+					Abilities* abilities = it.getAbilities();
+					abilities->regeneration = true;
+					abilities->manaGain = intValue;
 				}
 			}
 			else if(tmpStrValue == "manaticks")
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 				{
-					it.getAbilities()->regeneration = true;
-					it.getAbilities()->manaTicks = intValue;
+					Abilities* abilities = it.getAbilities();
+					abilities->regeneration = true;
+					abilities->manaTicks = intValue;
 				}
 			}
 			else if(tmpStrValue == "manashield")
@@ -1034,30 +1060,33 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 				{
+					Abilities* abilities = it.getAbilities();
 					for(uint32_t i = COMBAT_FIRST; i <= COMBAT_COUNT; i++)
-						it.getAbilities()->absorbPercent[i] += intValue;
+						abilities->absorbPercent[i] += intValue;
 				}
 			}
 			else if(tmpStrValue == "absorbpercentelements")
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 				{
-					it.getAbilities()->absorbPercent[combatTypeToIndex(COMBAT_ENERGYDAMAGE)] += intValue;
-					it.getAbilities()->absorbPercent[combatTypeToIndex(COMBAT_FIREDAMAGE)] += intValue;
-					it.getAbilities()->absorbPercent[combatTypeToIndex(COMBAT_EARTHDAMAGE)] += intValue;
-					it.getAbilities()->absorbPercent[combatTypeToIndex(COMBAT_ICEDAMAGE)] += intValue;
+					Abilities* abilities = it.getAbilities();
+					abilities->absorbPercent[combatTypeToIndex(COMBAT_ENERGYDAMAGE)] += intValue;
+					abilities->absorbPercent[combatTypeToIndex(COMBAT_FIREDAMAGE)] += intValue;
+					abilities->absorbPercent[combatTypeToIndex(COMBAT_EARTHDAMAGE)] += intValue;
+					abilities->absorbPercent[combatTypeToIndex(COMBAT_ICEDAMAGE)] += intValue;
 				}
 			}
 			else if(tmpStrValue == "absorbpercentmagic")
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
 				{
-					it.getAbilities()->absorbPercent[combatTypeToIndex(COMBAT_ENERGYDAMAGE)] += intValue;
-					it.getAbilities()->absorbPercent[combatTypeToIndex(COMBAT_FIREDAMAGE)] += intValue;
-					it.getAbilities()->absorbPercent[combatTypeToIndex(COMBAT_EARTHDAMAGE)] += intValue;
-					it.getAbilities()->absorbPercent[combatTypeToIndex(COMBAT_ICEDAMAGE)] += intValue;
-					it.getAbilities()->absorbPercent[combatTypeToIndex(COMBAT_HOLYDAMAGE)] += intValue;
-					it.getAbilities()->absorbPercent[combatTypeToIndex(COMBAT_DEATHDAMAGE)] += intValue;
+					Abilities* abilities = it.getAbilities();
+					abilities->absorbPercent[combatTypeToIndex(COMBAT_ENERGYDAMAGE)] += intValue;
+					abilities->absorbPercent[combatTypeToIndex(COMBAT_FIREDAMAGE)] += intValue;
+					abilities->absorbPercent[combatTypeToIndex(COMBAT_EARTHDAMAGE)] += intValue;
+					abilities->absorbPercent[combatTypeToIndex(COMBAT_ICEDAMAGE)] += intValue;
+					abilities->absorbPercent[combatTypeToIndex(COMBAT_HOLYDAMAGE)] += intValue;
+					abilities->absorbPercent[combatTypeToIndex(COMBAT_DEATHDAMAGE)] += intValue;
 				}
 			}
 			else if(tmpStrValue == "absorbpercentenergy")
@@ -1260,7 +1289,7 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 						}
 
 						if(conditionDamage->getTotalDamage() > 0)
-							conditionDamage->setParam(CONDITIONPARAM_FORCEUPDATE, true);
+							conditionDamage->setParam(CONDITIONPARAM_FORCEUPDATE, 1);
 					}
 				}
 			}
@@ -1341,6 +1370,26 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 					it.getAbilities()->elementType = COMBAT_ENERGYDAMAGE;
 				}
 			}
+			else if(tmpStrValue == "walkstack")
+			{
+				if(readXMLInteger(itemAttributesNode, "value", intValue))
+					it.walkStack = (intValue != 0);
+			}
+			else if(tmpStrValue == "alwaysontop")
+			{
+				if(readXMLString(itemAttributesNode, "value", strValue))
+					it.alwaysOnTop = booleanString(strValue);
+			}
+			else if(tmpStrValue == "toporder")
+			{
+				if(readXMLInteger(itemAttributesNode, "value", intValue))
+					it.alwaysOnTopOrder = intValue;
+			}
+			else if(tmpStrValue == "allowdistread")
+			{
+				if(readXMLString(itemAttributesNode, "value", strValue))
+					it.allowDistRead = booleanString(strValue);
+			}
 			else
 				std::cout << "Warning: [Items::loadFromXml] Unknown key value " << strValue << std::endl;
 		}
@@ -1374,14 +1423,12 @@ const ItemType& Items::getItemType(int32_t id) const
 
 const ItemType& Items::getItemIdByClientId(int32_t spriteId) const
 {
-	uint32_t i = 100;
-	ItemType* iType = items->getElement(i);
-	while(iType)
+	ReverseItemMap::const_iterator it = reverseItemMap.find(spriteId);
+	if(it != reverseItemMap.end())
 	{
-		if(iType->clientId == spriteId)
+		ItemType* iType = items->getElement(it->second);
+		if(iType)
 			return *iType;
-
-		iType = items->getElement(++i);
 	}
 
 	static ItemType dummyItemType; // use this for invalid ids

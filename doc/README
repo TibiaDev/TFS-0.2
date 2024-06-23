@@ -3,7 +3,7 @@
 		The Forgotten Server
 
 	Version
-		0.2.14
+		0.2.15
 
 	Codenamed
 		"Mystic Spirit"
@@ -29,13 +29,13 @@
 			Data Directory Manager
 			Founder
 
+		Dalkon
+			C++ Programmer
+
 		Kornholijo
 			C++ Programmer
 
 		Elf
-			C++ Programmer
-
-		Dalkon
 			C++ Programmer
 ]
 
@@ -71,15 +71,15 @@
 	Linux: Debian/Ubuntu
 		Downloading required packages
 			Launch a terminal, and paste in this command:
-				apt-get install build-essential subversion libboost-dev libxml2-dev liblua5.1-0-dev libgmp3-dev libmysql++-dev libsqlite3-dev libboost-thread-dev libboost-regex-dev libboost-system-dev
+				apt-get install build-essential subversion libboost-dev libxml2-dev liblua5.1-0-dev libgmp3-dev libmysqlclient-dev libsqlite3-dev libboost-thread-dev libboost-regex-dev libboost-system-dev
 
 		Downloading the source code
 			Launch a terminal, and paste in this command:
-				svn co svn://svn.otland.net/public/forgottenserver/tags/0.2.14
+				svn co svn://svn.otland.net/public/forgottenserver/tags/0.2.15
 
 		Compiling
 			Launch a terminal, and type this command:
-				cd 0.2.14/ && make
+				cd 0.2.15/ && make
 
 	Windows
 		Code::Blocks
@@ -100,7 +100,7 @@
 			this command:
 				./forgottenserver
 
-		SqLite
+		SQLite
 			Launch a terminal, and paste in this command:
 				./forgottenserver
 
@@ -109,7 +109,7 @@
 			Read MYSQL_HELP and then move the exe file to the directory
 			where you have config.lua and data directory and execute it.
 
-		SqLite
+		SQLite
 			Move the exe file to the directory where you have config.lua
 			and data directory and execute it.
 ]

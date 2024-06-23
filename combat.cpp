@@ -95,7 +95,7 @@ bool Combat::getMinMaxValues(Creature* creature, Creature* target, int32_t& min,
 						max = (int32_t)(weapon->getWeaponDamage(player, target, tool, true) * maxa + maxb);
 						if(params.useCharges && tool->hasCharges())
 						{
-							int32_t newCharge = std::max((int32_t)0, ((int32_t)tool->getCharges()) - 1);
+							int32_t newCharge = std::max<int32_t>(0, tool->getCharges() - 1);
 							g_game.transformItem(tool, tool->getID(), newCharge);
 						}
 					}
@@ -781,8 +781,7 @@ void Combat::CombatFunc(Creature* caster, const Position& pos,
 			maxY = diff;
 	}
 
-	g_game.getSpectators(list, pos, false, true, maxX + Map::maxViewportX, maxX + Map::maxViewportX,
-		maxY + Map::maxViewportY, maxY + Map::maxViewportY);
+	g_game.getSpectators(list, pos, true, true, maxX + Map::maxViewportX, maxX + Map::maxViewportX, maxY + Map::maxViewportY, maxY + Map::maxViewportY);
 
 	for(std::list<Tile*>::iterator it = tileList.begin(); it != tileList.end(); ++it)
 	{
@@ -956,14 +955,17 @@ void Combat::doCombatDefault(Creature* caster, Creature* target, const CombatPar
 {
 	if(!params.isAggressive || (caster != target && Combat::canDoCombat(caster, target) == RET_NOERROR))
 	{
-		const SpectatorVec& list = g_game.getSpectators(target->getTile()->getPosition());
+		SpectatorVec list;
+		g_game.getSpectators(list, target->getPosition(), true, true);
+
 		CombatNullFunc(caster, target, params, NULL);
 		combatTileEffects(list, caster, target->getTile(), params);
+
 		if(params.targetCallback)
 			params.targetCallback->onTargetCombat(caster, target);
 
-		if(params.impactEffect != NM_ME_NONE)
-			g_game.addMagicEffect(target->getPosition(), params.impactEffect);
+		//if(params.impactEffect != NM_ME_NONE)
+		//	g_game.addMagicEffect(target->getPosition(), params.impactEffect);
 
 		if(caster && params.distanceEffect != NM_ME_NONE)
 			addDistanceEffect(caster, caster->getPosition(), target->getPosition(), params.distanceEffect);
@@ -1012,7 +1014,7 @@ void ValueCallback::getMinMaxValues(Player* player, int32_t& min, int32_t& max, 
 					attackValue = tool->getAttack();
 					if(useCharges && tool->hasCharges())
 					{
-						int32_t newCharge = std::max(0, tool->getCharges() - 1);
+						int32_t newCharge = std::max<int32_t>(0, tool->getCharges() - 1);
 						g_game.transformItem(tool, tool->getID(), newCharge);
 					}
 				}
@@ -1265,7 +1267,7 @@ void AreaCombat::copyArea(const MatrixArea* input, MatrixArea* output, MatrixOpe
 				angle = 0;
 				break;
 		}
-		double angleRad = 3.1416 * angle / 180.0;
+		double angleRad = M_PI * angle / 180.0;
 
 		double a = std::cos(angleRad);
 		double b = -std::sin(angleRad);

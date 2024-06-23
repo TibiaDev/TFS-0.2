@@ -27,6 +27,7 @@
 
 #include <iostream>
 #include <list>
+#include <deque>
 #include <vector>
 
 class Creature;
@@ -147,7 +148,7 @@ class ItemAttributes
 		void resetDate() {removeAttribute(ATTR_ITEM_WRITTENDATE);}
 		time_t getDate() const {return (time_t)getIntAttr(ATTR_ITEM_WRITTENDATE);}
 
-		void setWriter(std::string _writer) {setStrAttr(ATTR_ITEM_WRITTENBY, _writer);}
+		void setWriter(const std::string& _writer) {setStrAttr(ATTR_ITEM_WRITTENBY, _writer);}
 		void resetWriter() {removeAttribute(ATTR_ITEM_WRITTENBY);}
 		const std::string& getWriter() const {return getStrAttr(ATTR_ITEM_WRITTENBY);}
 
@@ -174,7 +175,7 @@ class ItemAttributes
 		uint32_t getDuration() const {return getIntAttr(ATTR_ITEM_DURATION);}
 
 		void setDecaying(ItemDecayState_t decayState) {setIntAttr(ATTR_ITEM_DECAYING, decayState);}
-		uint32_t getDecaying() const {return getIntAttr(ATTR_ITEM_DECAYING);}
+		ItemDecayState_t getDecaying() const {return (ItemDecayState_t)getIntAttr(ATTR_ITEM_DECAYING);}
 
 	protected:
 		enum itemAttrTypes
@@ -212,7 +213,7 @@ class ItemAttributes
 					next = NULL;
 				}
 
-				Attribute(const Attribute &i)
+				Attribute(const Attribute& i)
 				{
 					type = i.type;
 					if(ItemAttributes::validateIntAttrType(type))
@@ -344,6 +345,7 @@ class Item : virtual public Thing, public ItemAttributes
 		bool isDoor() const {return items[id].isDoor();}
 		bool isBed() const {return items[id].isBed();}
 		bool hasCharges() const {return getCharges() > 0;}
+		bool hasWalkStack() const {return items[id].walkStack;}
 
 		bool floorChangeDown() const {return items[id].floorChangeDown;}
 		bool floorChangeNorth() const {return items[id].floorChangeNorth;}
@@ -400,7 +402,8 @@ class Item : virtual public Thing, public ItemAttributes
 		//Don't add variables here, use the ItemAttribute class.
 };
 
-typedef std::list<Item *> ItemList;
+typedef std::list<Item*> ItemList;
+typedef std::deque<Item*> ItemDeque;
 
 inline uint32_t Item::countByType(const Item* i, int32_t subType)
 {

@@ -301,7 +301,11 @@ ReturnValue Actions::internalUseItem(Player* player, const Position& pos,
 		if(!bed->canUse(player))
 			return RET_CANNOTUSETHISOBJECT;
 
-		bed->sleep(player);
+		if(bed->trySleep(player))
+		{
+			player->setBedItem(bed);
+			g_game.sendOfflineTrainingDialog(player);
+		}
 		return RET_NOERROR;
 	}
 
@@ -309,21 +313,19 @@ ReturnValue Actions::internalUseItem(Player* player, const Position& pos,
 	{
 		Container* openContainer = NULL;
 		//depot container
-		if(Depot* depot = container->getDepot())
+		if(DepotLocker* depot = container->getDepotLocker())
 		{
-			Depot* myDepot = player->getDepot(depot->getDepotId(), true);
-			myDepot->setParent(depot->getParent());
-			openContainer = myDepot;
+			DepotLocker* myDepotLocker = player->getDepotLocker(depot->getDepotId());
+			myDepotLocker->setParent(depot->getParent());
+			openContainer = myDepotLocker;
 			player->setDepotChange(true);
+			player->setLastDepotId(depot->getDepotId());
 		}
 		else
 			openContainer = container;
 
-		if(container->getCorpseOwner() != 0)
-		{
-			if(!player->canOpenCorpse(container->getCorpseOwner()))
-				return RET_YOUARENOTTHEOWNER;
-		}
+		if(container->getCorpseOwner() != 0 && !player->canOpenCorpse(container->getCorpseOwner()))
+			return RET_YOUARENOTTHEOWNER;
 
 		//open/close container
 		int32_t oldcid = player->getContainerID(openContainer);
@@ -337,7 +339,6 @@ ReturnValue Actions::internalUseItem(Player* player, const Position& pos,
 			player->addContainer(index, openContainer);
 			player->onSendContainer(openContainer);
 		}
-
 		return RET_NOERROR;
 	}
 
@@ -364,6 +365,7 @@ bool Actions::useItem(Player* player, const Position& pos, uint8_t index, Item* 
 		return false;
 
 	player->setNextActionTask(NULL);
+	player->setNextAction(OTSYS_TIME() + g_config.getNumber(ConfigManager::ACTIONS_DELAY_INTERVAL));
 	player->stopWalk();
 
 	if(isHotkey)
@@ -375,8 +377,6 @@ bool Actions::useItem(Player* player, const Position& pos, uint8_t index, Item* 
 		player->sendCancelMessage(ret);
 		return false;
 	}
-
-	player->setNextAction(OTSYS_TIME() + g_config.getNumber(ConfigManager::ACTIONS_DELAY_INTERVAL));
 	return true;
 }
 
@@ -387,6 +387,7 @@ bool Actions::useItemEx(Player* player, const Position& fromPos, const Position&
 		return false;
 
 	player->setNextActionTask(NULL);
+	player->setNextAction(OTSYS_TIME() + g_config.getNumber(ConfigManager::EX_ACTIONS_DELAY_INTERVAL));
 	player->stopWalk();
 
 	Action* action = getAction(item);
@@ -417,8 +418,6 @@ bool Actions::useItemEx(Player* player, const Position& fromPos, const Position&
 
 		return false;
 	}
-
-	player->setNextAction(OTSYS_TIME() + g_config.getNumber(ConfigManager::EX_ACTIONS_DELAY_INTERVAL));
 	return true;
 }
 
@@ -486,8 +485,6 @@ bool Action::loadFunction(const std::string& functionName)
 		function = increaseItemId;
 	else if(tmpFunctionName == "decreaseitemid")
 		function = decreaseItemId;
-	else if(tmpFunctionName == "highscorebook")
-		function = highscoreBook;
 	else if(tmpFunctionName == "market")
 		function = enterMarket;
 	else
@@ -497,17 +494,6 @@ bool Action::loadFunction(const std::string& functionName)
 	}
 
 	m_scripted = false;
-	return true;
-}
-
-bool Action::highscoreBook(Player* player, Item* item, const PositionEx& posFrom, const PositionEx& posTo, bool extendedUse, uint32_t creatureId)
-{
-	if(item->getActionId() < 150 || item->getActionId() > 158)
-		return false;
-
-	std::string highscoreString = g_game.getHighscoreString(item->getActionId() - 150);
-	item->setText(highscoreString);
-	player->sendTextWindow(item, highscoreString.size(), false);
 	return true;
 }
 
@@ -533,20 +519,10 @@ bool Action::enterMarket(Player* player, Item* item, const PositionEx& posFrom, 
 		return false;
 	}
 
-	Depot* depot = NULL;
-	if(Thing* thing = item->getParent())
-	{
-		if(Item* parentItem = thing->getItem())
-		{
-			if(Container* parentContainer = parentItem->getContainer())
-				depot = parentContainer->getDepot();
-		}
-	}
-
-	if(depot == NULL)
+	if(player->getLastDepotId() == -1)
 		return false;
 
-	player->sendMarketEnter(depot->getDepotId());
+	player->sendMarketEnter(player->getLastDepotId());
 	return true;
 }
 

@@ -1,7 +1,7 @@
 //////////////////////////////////////////////////////////////////////
 // OpenTibia - an opensource roleplaying game
 //////////////////////////////////////////////////////////////////////
-// Logger class - captures everything that happens on the server
+//
 //////////////////////////////////////////////////////////////////////
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -17,56 +17,40 @@
 // along with this program; if not, write to the Free Software Foundation,
 // Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //////////////////////////////////////////////////////////////////////
-
 #include "otpch.h"
 
-#include <ctime>
-
-#include "logger.h"
-#include <iostream>
+#include "inbox.h"
 #include "tools.h"
 
-Logger::Logger()
+Inbox::Inbox(uint16_t _type) :
+	Container(_type)
 {
-	m_file = fopen("data/logs/otadmin.log", "a");
-	if(!m_file)
-		m_file = stderr;
+	maxSize = 30;
 }
 
-Logger::~Logger()
+Inbox::~Inbox()
 {
-	if(m_file)
-		fclose(m_file);
+	//
 }
 
-void Logger::logMessage(const char* channel, eLogType type, int32_t level, const std::string& message, const char* func)
+ReturnValue Inbox::__queryAdd(int32_t index, const Thing* thing, uint32_t count,
+	uint32_t flags, Creature* actor/* = NULL*/) const
 {
-	fprintf(m_file, "%s", formatDate(time(NULL)).c_str());
+	bool skipLimit = hasBitSet(FLAG_NOLIMIT, flags);
+	if(!skipLimit)
+		return RET_CONTAINERNOTENOUGHROOM;
 
-	if(channel)
-		fprintf(m_file, " [%s] ", channel);
+	return Container::__queryAdd(index, thing, count, flags, actor);
+}
 
-	if(strcmp(func, "") != 0)
-		fprintf(m_file, " %s ", func);
+void Inbox::postAddNotification(Thing* thing, const Cylinder* oldParent, int32_t index, cylinderlink_t link /*= LINK_OWNER*/)
+{
+	if(getParent() != NULL)
+		getParent()->postAddNotification(thing, oldParent, index, LINK_PARENT);
+}
 
-	std::string type_str;
-	switch(type)
-	{
-		case LOGTYPE_EVENT:
-			type_str = "event";
-			break;
-		case LOGTYPE_WARNING:
-			type_str = "warning";
-			break;
-		case LOGTYPE_ERROR:
-			type_str = "error";
-			break;
-		default:
-			type_str = "unknown";
-			break;
-	}
-
-	fprintf(m_file, " %s:", type_str.c_str());
-	fprintf(m_file, " %s\n", message.c_str());
-	fflush(m_file);
+void Inbox::postRemoveNotification(Thing* thing, const Cylinder* newParent, int32_t index, bool isCompleteRemoval, cylinderlink_t link /*= LINK_OWNER*/)
+{
+	if(getParent() != NULL)
+		getParent()->postRemoveNotification(thing, newParent, index, isCompleteRemoval, LINK_PARENT);
 }

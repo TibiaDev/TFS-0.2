@@ -35,6 +35,7 @@
 #include "scheduler.h"
 #include "npc.h"
 #include "iologindata.h"
+#include "modalwindow.h"
 
 class ServiceManager;
 class Creature;
@@ -84,7 +85,6 @@ enum LightState_t
 #define STATE_TIME 1000
 
 typedef std::map<int32_t, int32_t> StageList;
-typedef std::vector< std::pair<std::string, unsigned int> > Highscore;
 typedef std::vector<std::string> StatusList;
 
 /**
@@ -103,11 +103,6 @@ class Game
 		void forceAddCondition(uint32_t creatureId, Condition* condition);
 		void forceRemoveCondition(uint32_t creatureId, ConditionType_t type);
 
-		Highscore getHighscore(uint16_t skill);
-		void timedHighscoreUpdate();
-		bool reloadHighscores();
-		std::string getHighscoreString(uint16_t skill);
-
 		void autoSave();
 		void prepareServerSave();
 		void serverSave();
@@ -117,7 +112,7 @@ class Game
 		  * \param filename Mapfile to load
 		  * \returns int32_t 0 built-in spawns, 1 needs xml spawns, 2 needs sql spawns, -1 if got error
 		  */
-		int32_t loadMap(std::string filename);
+		int32_t loadMap(const std::string& filename);
 
 		/**
 		  * Get the map size - info purpose only
@@ -141,7 +136,7 @@ class Game
 
 		std::string getTradeErrorDescription(ReturnValue ret, Item* item);
 
-		bool violationWindow(Player* player, std::string targetPlayerName, int32_t reason, int32_t action, std::string banComment, bool IPBanishment);
+		bool violationWindow(Player* player, std::string targetPlayerName, int32_t reason, int32_t action, const std::string& banComment, bool IPBanishment);
 
 		/**
 		  * Get a single tile of the map.
@@ -261,11 +256,11 @@ class Game
 
 		void getWorldLightInfo(LightInfo& lightInfo) const;
 
-		void getSpectators(SpectatorVec& list, const Position& centerPos, bool checkforduplicate = false, bool multifloor = false,
+		void getSpectators(SpectatorVec& list, const Position& centerPos, bool multifloor = false, bool onlyPlayers = false,
 			int32_t minRangeX = 0, int32_t maxRangeX = 0,
 			int32_t minRangeY = 0, int32_t maxRangeY = 0)
 		{
-			map->getSpectators(list, centerPos, checkforduplicate, multifloor, minRangeX, maxRangeX, minRangeY, maxRangeY);
+			map->getSpectators(list, centerPos, multifloor, onlyPlayers, minRangeX, maxRangeX, minRangeY, maxRangeY);
 		}
 
 		const SpectatorVec& getSpectators(const Position& centerPos) {return map->getSpectators(centerPos);}
@@ -281,6 +276,9 @@ class Game
 
 		ReturnValue internalMoveItem(Cylinder* fromCylinder, Cylinder* toCylinder, int32_t index,
 			Item* item, uint32_t count, Item** _moveItem, uint32_t flags = 0, Creature* actor = NULL);
+
+		ReturnValue internalMoveTradeItem(Cylinder* fromCylinder, Cylinder* toCylinder, int32_t index,
+			Item* item, Item* tradeItem, uint32_t count, Item** _moveItem, uint32_t flags = 0, Creature* actor = NULL);
 
 		ReturnValue internalAddItem(Cylinder* toCylinder, Item* item, int32_t index = INDEX_WHEREEVER,
 			uint32_t flags = 0, bool test = false);
@@ -309,15 +307,16 @@ class Game
 		  * \param count is the amount to remove
 		  * \param subType is the extra type an item can have such as charges/fluidtype, default is -1
 			* meaning it's not used
+		  * \param onlySubContainers if true it will remove only items from containers in cylinder, default is false
 		  * \returns true if the removal was successful
 		  */
-		bool removeItemOfType(Cylinder* cylinder, uint16_t itemId, int32_t count, int32_t subType = -1);
+		bool removeItemOfType(Cylinder* cylinder, uint16_t itemId, int32_t count, int32_t subType = -1, bool onlySubContainers = false);
 
 		/**
 		  * Get the amount of money in a a cylinder
 		  * \returns the amount of money found
 		  */
-		uint32_t getMoney(const Cylinder* cylinder);
+		uint64_t getMoney(const Cylinder* cylinder);
 
 		/**
 		  * Remove/Add item(s) with a monetary value
@@ -326,7 +325,7 @@ class Game
 		  * \param flags optional flags to modifiy the default behaviour
 		  * \returns true if the removal was successful
 		  */
-		bool removeMoney(Cylinder* cylinder, int32_t money, uint32_t flags = 0);
+		bool removeMoney(Cylinder* cylinder, uint64_t money, uint32_t flags = 0);
 
 		/**
 		  * Add item(s) with monetary value
@@ -334,7 +333,7 @@ class Game
 		  * \param money the amount to give
 		  * \param flags optional flags to modify default behavior
 		  */
-		void addMoney(Cylinder* cylinder, int32_t money, uint32_t flags = 0);
+		void addMoney(Cylinder* cylinder, uint64_t money, uint32_t flags = 0);
 
 		/**
 		  * Transform one item to another type/count
@@ -371,7 +370,7 @@ class Game
 		bool internalCreatureSay(Creature* creature, SpeakClasses type, const std::string& text,
 			bool ghostMode, SpectatorVec* listPtr = NULL, Position* pos = NULL);
 
-		Position getClosestFreeTile(Player* player, Creature* teleportedCreature, Position toPos, bool toCreature);
+		Position getClosestFreeTile(Player* player, Creature* teleportedCreature, const Position& toPos, bool toCreature);
 
 		int32_t getMotdNum();
 		void loadMotd();
@@ -380,8 +379,11 @@ class Game
 
 		void sendGuildMotd(uint32_t playerId, uint32_t guildId);
 		void kickPlayer(uint32_t playerId, bool displayEffect);
-		bool playerReportBug(uint32_t playerId, std::string bug);
-		bool playerDebugAssert(uint32_t playerId, std::string assertLine, std::string date, std::string description, std::string comment);
+		void kickPlayerByName(const std::string& name);
+		bool playerReportBug(uint32_t playerId, const std::string& bug);
+		bool playerDebugAssert(uint32_t playerId, const std::string& assertLine, const std::string& date, const std::string& description, const std::string& comment);
+		bool playerAnswerModalWindow(uint32_t playerId, uint32_t modalWindowId, uint8_t button, uint8_t choice);
+		bool playerCancelWalk(uint32_t playerId);
 
 		bool internalStartTrade(Player* player, Player* partner, Item* tradeItem);
 		bool internalCloseTrade(Player* player);
@@ -412,7 +414,7 @@ class Game
 			uint16_t fromSpriteId, const Position& toPos, uint8_t toStackPos, uint16_t toSpriteId, bool isHotkey);
 		bool playerUseItem(uint32_t playerId, const Position& pos, uint8_t stackPos,
 			uint8_t index, uint16_t spriteId, bool isHotkey);
-		bool playerUseBattleWindow(uint32_t playerId, const Position& fromPos,
+		bool playerUseWithCreature(uint32_t playerId, const Position& fromPos,
 			uint8_t fromStackPos, uint32_t creatureId, uint16_t spriteId, bool isHotkey);
 		bool playerCloseContainer(uint32_t playerId, uint8_t cid);
 		bool playerMoveUpContainer(uint32_t playerId, uint8_t cid);
@@ -428,7 +430,7 @@ class Game
 		bool playerPurchaseItem(uint32_t playerId, uint16_t spriteId, uint8_t count, uint8_t amount,
 			bool ignoreCap = false, bool inBackpacks = false);
 		bool playerSellItem(uint32_t playerId, uint16_t spriteId, uint8_t count,
-			uint8_t amount);
+			uint8_t amount, bool ignoreEquipped = false);
 		bool playerCloseShop(uint32_t playerId);
 		bool playerLookInShop(uint32_t playerId, uint16_t spriteId, uint8_t count);
 		bool playerCloseTrade(uint32_t playerId);
@@ -440,6 +442,7 @@ class Game
 		bool playerLookInBattleList(uint32_t playerId, uint32_t creatureId);
 		bool playerRequestAddVip(uint32_t playerId, const std::string& name);
 		bool playerRequestRemoveVip(uint32_t playerId, uint32_t guid);
+		bool playerRequestEditVip(uint32_t playerId, uint32_t guid, const std::string& description, uint32_t icon, bool notify);
 		bool playerTurn(uint32_t playerId, Direction dir);
 		bool playerRequestOutfit(uint32_t playerId);
 		bool playerShowQuestLog(uint32_t playerId);
@@ -488,6 +491,7 @@ class Game
 		void internalCreatureChangeVisible(Creature* creature, bool visible);
 		void changeLight(const Creature* creature);
 		void updateCreatureSkull(Player* player);
+		void updateCreatureWalkthrough(Creature* creature);
 
 		void sendPublicSquare(Player* sender, SquareColor_t color);
 
@@ -525,7 +529,7 @@ class Game
 		int64_t getStateTime() const {return stateTime;}
 		void setStateTime(int64_t _stateTime) {stateTime = _stateTime;}
 
-		void addCommandTag(std::string tag);
+		void addCommandTag(const std::string& tag);
 		void resetCommandTag();
 
 		void startDecay(Item* item);
@@ -538,10 +542,12 @@ class Game
 		void setServerSaveMessage(int16_t key, bool value) {serverSaveMessage[key] = value;}
 		bool getServerSaveMessage(int16_t key) const {return serverSaveMessage[key];}
 
+		void sendOfflineTrainingDialog(Player* player);
+
 		bool loadStatuslist();
 
-		bool isInBlacklist(std::string ip) const { for (StatusList::const_iterator it = blacklist.begin(); it != blacklist.end(); ++it) { if (*it == ip) return true; } return false; }
-		bool isInWhitelist(std::string ip) const { for (StatusList::const_iterator it = whitelist.begin(); it != whitelist.end(); ++it) { if (*it == ip) return true; } return false; }
+		bool isInBlacklist(const std::string& ip) const { for (StatusList::const_iterator it = blacklist.begin(), end = blacklist.end(); it != end; ++it) { if (*it == ip) return true; } return false; }
+		bool isInWhitelist(const std::string& ip) const { for (StatusList::const_iterator it = whitelist.begin(), end = whitelist.end(); it != end; ++it) { if (*it == ip) return true; } return false; }
 
 	protected:
 		bool playerSayCommand(Player* player, SpeakClasses type, const std::string& text);
@@ -551,9 +557,6 @@ class Game
 		bool playerSpeakTo(Player* player, SpeakClasses type, const std::string& receiver, const std::string& text);
 		bool playerTalkToChannel(Player* player, SpeakClasses type, const std::string& text, uint16_t channelId);
 		bool playerSpeakToNpc(Player* player, const std::string& text);
-
-		Highscore highscoreStorage[9];
-		time_t lastHSUpdate;
 
 		bool serverSaveMessage[3];
 		int64_t stateTime;
@@ -597,7 +600,6 @@ class Game
 		int32_t lightHour;
 		int32_t lightHourDelta;
 
-		uint32_t maxPlayers;
 		uint32_t inFightTicks;
 
 		GameState_t gameState;
@@ -615,6 +617,8 @@ class Game
 		bool stagesEnabled;
 		uint32_t lastStageLevel;
 		bool useLastStageLevel;
+
+		ModalWindow* offlineTrainingWindow;
 
 		std::vector<std::string> commandTags;
 

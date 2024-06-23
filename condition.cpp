@@ -173,10 +173,10 @@ bool Condition::executeCondition(Creature* creature, int32_t interval)
 	if(ticks == -1)
 		return true;
 
-	int32_t newTicks = std::max(((int32_t)0), ((int32_t)getTicks() - interval));
+	int32_t newTicks = std::max<int32_t>(0, getTicks() - interval);
 	//Not using set ticks here since it would reset endTime
 	ticks = newTicks;
-	return (getEndTime() >= OTSYS_TIME());
+	return getEndTime() >= OTSYS_TIME();
 }
 
 Condition* Condition::createCondition(ConditionId_t _id, ConditionType_t _type, int32_t _ticks, int32_t param/* = 0*/, bool _buff/* = false*/, uint32_t _subId/* = 0*/)
@@ -866,22 +866,17 @@ bool ConditionRegeneration::executeCondition(Creature* creature, int32_t interva
 					ss << ucfirst(player->getNameDescription()) << " was healed for " << realHealthGain << " hitpoint" << (realHealthGain != 1 ? "s." : ".");
 					std::string message = ss.str();
 
-					Player* tmpPlayer = NULL;
+					std::ostringstream tmpSs;
+					tmpSs << "You were healed for " << realHealthGain << " hitpoint" << (realHealthGain != 1 ? "s." : ".");
+					player->sendHealMessage(MSG_HEALED, tmpSs.str(), player->getPosition(), realHealthGain, TEXTCOLOR_MAYABLUE);
+
 					SpectatorVec list;
-					g_game.getSpectators(list, player->getPosition());
+					g_game.getSpectators(list, player->getPosition(), false, true);
 					for(SpectatorVec::const_iterator it = list.begin(), end = list.end(); it != end; ++it)
 					{
-						if((tmpPlayer = (*it)->getPlayer()))
-						{
-							if(tmpPlayer == player)
-							{
-								std::ostringstream tmpSs;
-								tmpSs << "You were healed for " << realHealthGain << " hitpoint" << (realHealthGain != 1 ? "s." : ".");
-								tmpPlayer->sendHealMessage(MSG_HEALED, tmpSs.str(), player->getPosition(), realHealthGain, TEXTCOLOR_MAYABLUE);
-							}
-							else
-								tmpPlayer->sendHealMessage(MSG_HEALED_OTHERS, message, player->getPosition(), realHealthGain, TEXTCOLOR_MAYABLUE);
-						}
+						Player* tmpPlayer = (*it)->getPlayer();
+						if(tmpPlayer != player)
+							tmpPlayer->sendHealMessage(MSG_HEALED_OTHERS, message, player->getPosition(), realHealthGain, TEXTCOLOR_MAYABLUE);
 					}
 				}
 			}
@@ -1104,7 +1099,7 @@ bool ConditionDamage::unserializeProp(ConditionAttr_t attr, PropStream& propStre
 		if(!propStream.GET_VALUE(value))
 			return false;
 
-		owner = value;
+		// owner = value;
 		return true;
 	}
 	else if(attr == CONDITIONATTR_INTERVALDATA)
@@ -1132,8 +1127,8 @@ bool ConditionDamage::serialize(PropWriteStream& propWriteStream)
 	propWriteStream.ADD_UCHAR(CONDITIONATTR_PERIODDAMAGE);
 	propWriteStream.ADD_VALUE(periodDamage);
 
-	propWriteStream.ADD_UCHAR(CONDITIONATTR_OWNER);
-	propWriteStream.ADD_VALUE(owner);
+	// propWriteStream.ADD_UCHAR(CONDITIONATTR_OWNER);
+	// propWriteStream.ADD_VALUE(owner);
 
 	for(DamageList::const_iterator it = damageList.begin(); it != damageList.end(); ++it)
 	{
@@ -1207,7 +1202,7 @@ bool ConditionDamage::init()
 			if(startDamage > maxDamage)
 				startDamage = maxDamage;
 			else if(startDamage == 0)
-				startDamage = std::max((int32_t)1, (int32_t)std::ceil(((float)amount / 20.0)));
+				startDamage = std::max<int32_t>(1, std::ceil(amount / 20.0));
 
 			std::list<int32_t> list;
 			ConditionDamage::generateDamageList(amount, startDamage, list);
