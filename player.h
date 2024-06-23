@@ -100,6 +100,23 @@ enum tradestate_t
 	TRADE_TRANSFER
 };
 
+struct AccountManager
+{
+	uint32_t realAccount, newVocation;
+	int8_t talkState;
+	bool managingAccount;
+	PlayerSex_t newSex;
+	std::string newAccountName, accountManagerInput, namelockedPlayerName;
+
+	AccountManager()
+	{
+		managingAccount = false;
+		namelockedPlayerName = "";
+		talkState = 0;
+		newVocation = VOCATION_NONE;
+	}
+};
+
 typedef std::pair<uint32_t, Container*> containervector_pair;
 typedef std::vector<containervector_pair> ContainerVector;
 typedef std::map<uint32_t, Depot*> DepotMap;
@@ -132,7 +149,7 @@ class Player : public Creature, public Cylinder
 		virtual const std::string& getNameDescription() const {return name;}
 		virtual std::string getDescription(int32_t lookDistance) const;
 
-		virtual const CreatureType_t getType() const {return CREATURETYPE_PLAYER;}
+		virtual CreatureType_t getType() const {return CREATURETYPE_PLAYER;}
 
 		uint8_t getCurrentMount() const;
 		void setCurrentMount(uint8_t mountId);
@@ -164,6 +181,9 @@ class Player : public Creature, public Cylinder
 			return ((50ULL * level * level * level) - (150ULL * level * level) + (400ULL * level))/3ULL;
 		}
 
+		uint64_t getBankBalance() const {return bankBalance;}
+		void setBankBalance(uint64_t balance) {bankBalance = balance;}
+
 		uint32_t getGuildId() const {return guildId;}
 		void setGuildId(uint32_t newGuildId) {guildId = newGuildId;}
 
@@ -174,6 +194,8 @@ class Player : public Creature, public Cylinder
 
 		bool hasRequestedOutfit() const {return requestedOutfit;}
 		void hasRequestedOutfit(bool newValue) {requestedOutfit = newValue;}
+
+		const DepotMap& getDepots() const { return depots; }
 
 		Vocation* getVocation() const {return vocation;}
 
@@ -201,8 +223,6 @@ class Player : public Creature, public Cylinder
 		void setGuildRank(const std::string& rank) {guildRank = rank;}
 		const std::string& getGuildNick() const {return guildNick;}
 		void setGuildNick(const std::string& nick) {guildNick = nick;}
-
-		const std::string& getNamelockedPlayer() const {return namelockedPlayer;}
 
 		bool isInvitedToGuild(uint32_t guild_id) const;
 		void leaveGuild();
@@ -237,11 +257,15 @@ class Player : public Creature, public Cylinder
 		void setGroupId(int32_t newId);
 		int32_t getGroupId() const {return groupId;}
 
+		void setMarketDepotId(int16_t newId) { marketDepotId = newId; }
+		int16_t getMarketDepotId() const { return marketDepotId; }
+
 		void resetIdleTime() {idleTime = 0;}
 		bool getNoMove() const {return mayNotMove;}
 
-		bool isAccountManagerEx() const {return accountManagerEx;}
-		bool isAccountManager() const {return accountManager;}
+		bool isAccountManager() const {return accountManager != NULL;}
+		void setAccountManager() {accountManager = new AccountManager();}
+		AccountManager* getAccountManager() const {return accountManager;}
 
 		bool isInGhostMode() const {return ghostMode;}
 		void switchGhostMode() {ghostMode = !ghostMode;}
@@ -255,7 +279,7 @@ class Player : public Creature, public Cylinder
 		bool isPremium() const;
 
 		void setVocation(uint32_t vocId);
-		uint32_t getVocationId() const {return vocation_id;}
+		uint32_t getVocationId() const {return vocationId;}
 
 		PlayerSex_t getSex() const {return sex;}
 		void setSex(PlayerSex_t);
@@ -464,6 +488,7 @@ class Player : public Creature, public Cylinder
 		bool canWear(uint32_t _looktype, uint32_t _addons);
 		void addOutfit(uint32_t _looktype, uint32_t _addons);
 		bool remOutfit(uint32_t _looktype, uint32_t _addons);
+		uint32_t getOutfitAddons(uint32_t looktype);
 		bool canLogout();
 
 		//tile
@@ -594,7 +619,7 @@ class Player : public Creature, public Cylinder
 		void sendIcons() const;
 		void sendMagicEffect(const Position& pos, uint8_t type) const
 			{if(client) client->sendMagicEffect(pos, type);}
-		void sendPing(uint32_t interval);
+		void sendPing();
 		void sendStats();
 		void sendSkills() const
 			{if(client) client->sendSkills();}
@@ -614,6 +639,22 @@ class Player : public Creature, public Cylinder
 			{if(client) client->sendSaleItemList(shopItemList);}
 		void sendCloseShop() const
 			{if(client) client->sendCloseShop();}
+		void sendMarketEnter(uint32_t depotId) const
+			{if(client) client->sendMarketEnter(depotId);}
+		void sendMarketLeave()
+			{marketDepotId = -1; if(client) client->sendMarketLeave();}
+		void sendMarketBrowseItem(uint16_t itemId, const MarketOfferList& buyOffers, const MarketOfferList& sellOffers) const
+			{if(client) client->sendMarketBrowseItem(itemId, buyOffers, sellOffers);}
+		void sendMarketBrowseOwnOffers(const MarketOfferList& buyOffers, const MarketOfferList& sellOffers) const
+			{if(client) client->sendMarketBrowseOwnOffers(buyOffers, sellOffers);}
+		void sendMarketBrowseOwnHistory(const HistoryMarketOfferList& buyOffers, const HistoryMarketOfferList& sellOffers) const
+			{if(client) client->sendMarketBrowseOwnHistory(buyOffers, sellOffers);}
+		void sendMarketDetail(uint16_t itemId) const
+			{if(client) client->sendMarketDetail(itemId);}
+		void sendMarketAcceptOffer(MarketOfferEx offer) const
+			{if(client) client->sendMarketAcceptOffer(offer);}
+		void sendMarketCancelOffer(MarketOfferEx offer) const
+			{if(client) client->sendMarketCancelOffer(offer);}
 		void sendTradeItemRequest(const Player* player, const Item* item, bool ack) const
 			{if(client) client->sendTradeItemRequest(player, item, ack);}
 		void sendTradeClose() const
@@ -634,8 +675,12 @@ class Player : public Creature, public Cylinder
 			{if(client) client->sendTutorial(tutorialId);}
 		void sendAddMarker(const Position& pos, uint8_t markType, const std::string& desc)
 			{if (client) client->sendAddMarker(pos, markType, desc);}
+		void sendQuestLog()
+			{if (client) client->sendQuestLog(); }
+		void sendQuestLine(const Quest* quest)
+			{if (client) client->sendQuestLine(quest); }
 
-		void receivePing() {if(npings > 0) npings--;}
+		void receivePing() {lastPong = OTSYS_TIME();}
 
 		virtual void onThink(uint32_t interval);
 		virtual void onAttacking(uint32_t interval);
@@ -714,7 +759,6 @@ class Player : public Creature, public Cylinder
 		virtual void __internalAddThing(Thing* thing);
 		virtual void __internalAddThing(uint32_t index, Thing* thing);
 
-	protected:
 		ProtocolGame* client;
 
 		Party* party;
@@ -733,7 +777,7 @@ class Player : public Creature, public Cylinder
 		uint32_t conditionSuppressions;
 		uint32_t condition;
 		uint64_t manaSpent;
-		int32_t vocation_id;
+		int32_t vocationId;
 		Vocation* vocation;
 		PlayerSex_t sex;
 		int32_t soul, soulMax;
@@ -753,12 +797,9 @@ class Player : public Creature, public Cylinder
 		bool ghostMode;
 		bool depotChange;
 
-		bool talkState[13], accountManager, accountManagerEx;
-		int32_t newVocation;
-		PlayerSex_t _newSex;
-		uint32_t realAccount, newAccount;
-		char newAccountNumber[10];
-		std::string newPassword, newCharacterName, removeChar, accountNumberAttempt, recoveryKeyAttempt, namelockedPlayer, recoveryKey;
+		AccountManager* accountManager;
+
+		int16_t marketDepotId;
 
 		bool mayNotMove;
 		bool requestedOutfit;
@@ -766,8 +807,9 @@ class Player : public Creature, public Cylinder
 		double inventoryWeight;
 		double capacity;
 
-		uint32_t internalPing;
-		uint32_t npings;
+		int64_t lastPing;
+		int64_t lastPong;
+
 		int64_t nextAction;
 
 		bool pzLocked;
@@ -827,6 +869,8 @@ class Player : public Creature, public Cylinder
 
 		uint32_t town;
 
+		uint64_t bankBalance;
+
 		//guild variables
 		uint32_t guildId;
 		std::string guildName;
@@ -864,18 +908,18 @@ class Player : public Creature, public Cylinder
 		void updateBaseSpeed()
 		{
 			if(!hasFlag(PlayerFlag_SetMaxSpeed))
-				baseSpeed = 220 + (2* (level - 1));
+				baseSpeed = vocation->getBaseSpeed() + (2* (level - 1));
 			else
 				baseSpeed = PLAYER_MAX_SPEED;
 		}
 
-		bool isPromoted();
+		bool isPromoted() const;
 
 		uint32_t getAttackSpeed() const {return vocation->getAttackSpeed();}
 
 		static uint32_t getPercentLevel(uint64_t count, uint64_t nextLevelCount);
-		double getLostPercent();
-		virtual uint64_t getLostExperience() {return skillLoss ? uint64_t(experience * getLostPercent()) : 0;}
+		double getLostPercent() const;
+		virtual uint64_t getLostExperience() const {return skillLoss ? uint64_t(experience * getLostPercent()) : 0;}
 		virtual void dropLoot(Container* corpse);
 		virtual uint32_t getDamageImmunities() const { return damageImmunities; }
 		virtual uint32_t getConditionImmunities() const { return conditionImmunities; }

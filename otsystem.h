@@ -37,14 +37,17 @@ typedef std::vector< std::pair<uint32_t, uint32_t> > IPList;
 #include <stdlib.h>
 #include <sys/timeb.h>
 #include <process.h>
+
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+
+#include <WinSock2.h>
 
 #define OTSYS_CREATE_THREAD(a, b) _beginthread(a, 0, b)
 
 #define OTSYS_THREAD_LOCKVAR		CRITICAL_SECTION
 
 #define OTSYS_THREAD_LOCKVARINIT(a)	InitializeCriticalSection(&a);
-#define OTSYS_THREAD_LOCKVARRELEASE(a)	DeleteCriticalSection(&a);
 #define OTSYS_THREAD_LOCK(a, b)		EnterCriticalSection(&a);
 #define OTSYS_THREAD_UNLOCK(a, b)	LeaveCriticalSection(&a);
 #define OTSYS_THREAD_UNLOCK_PTR(a, b)	LeaveCriticalSection(a);
@@ -127,8 +130,6 @@ inline void OTSYS_THREAD_LOCKVARINIT(OTSYS_THREAD_LOCKVAR& l)
 	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE_NP);
 	pthread_mutex_init(&l, &attr);
 }
-
-#define OTSYS_THREAD_LOCKVARRELEASE(a)  //todo: working macro
 
 #define OTSYS_THREAD_LOCK(a, b)          pthread_mutex_lock(&a);
 #define OTSYS_THREAD_UNLOCK(a, b)        pthread_mutex_unlock(&a);

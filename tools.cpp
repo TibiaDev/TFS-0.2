@@ -30,6 +30,7 @@
 
 #include <sstream>
 #include <iomanip>
+#include <cmath>
 
 #if defined __GNUC__ && __GNUC__ > 3
 #include <ctype.h>
@@ -95,7 +96,7 @@ bool passwordTest(const std::string &plain, std::string &hash)
 	return false;
 }
 
-void replaceString(std::string& str, const std::string sought, const std::string replacement)
+void replaceString(std::string& str, const std::string& sought, const std::string& replacement)
 {
 	size_t pos = 0;
 	size_t start = 0;
@@ -153,20 +154,6 @@ bool readXMLInteger(xmlNodePtr node, const char* tag, int32_t& value)
 	}
 	return false;
 }
-
-#if (defined __WINDOWS__ || defined WIN32) && !defined __GNUC__
-bool readXMLInteger(xmlNodePtr node, const char* tag, int32_t& value)
-{
-	char* nodeValue = (char*)xmlGetProp(node, (xmlChar*)tag);
-	if(nodeValue)
-	{
-		value = atoi(nodeValue);
-		xmlFreeOTSERV(nodeValue);
-		return true;
-	}
-	return false;
-}
-#endif
 
 bool readXMLInteger64(xmlNodePtr node, const char* tag, uint64_t& value)
 {
@@ -389,11 +376,20 @@ bool isPasswordCharacter(char character)
 bool isValidPassword(std::string text)
 {
 	toLowerCaseString(text);
-
-	uint32_t textLength = text.length();
-	for(uint32_t size = 0; size < textLength; size++)
+	for(uint32_t i = 0, size = text.length(); i < size; ++i)
 	{
-		if(!isLowercaseLetter(text[size]) && !isNumber(text[size]) && !isPasswordCharacter(text[size]))
+		if(!isLowercaseLetter(text[i]) && !isNumber(text[i]) && !isPasswordCharacter(text[i]))
+			return false;
+	}
+	return true;
+}
+
+bool isValidAccountName(std::string text)
+{
+	toLowerCaseString(text);
+	for(uint32_t i = 0, size = text.length(); i < size; ++i)
+	{
+		if(!isLowercaseLetter(text[i]) && !isNumber(text[i]))
 			return false;
 	}
 	return true;
@@ -401,10 +397,9 @@ bool isValidPassword(std::string text)
 
 bool isNumbers(std::string text)
 {
-	uint32_t textLength = text.length();
-	for(uint32_t size = 0; size < textLength; size++)
+	for(uint32_t i = 0, size = text.length(); i < size; ++i)
 	{
-		if(!isNumber(text[size]))
+		if(!isNumber(text[i]))
 			return false;
 	}
 	return true;
@@ -412,7 +407,6 @@ bool isNumbers(std::string text)
 
 bool isValidName(std::string text, bool forceUppercaseOnFirstLetter/* = true*/)
 {
-	uint32_t textLength = text.length();
 	uint32_t lenBeforeSpace = 1;
 	uint32_t lenBeforeSingleQuote = 1;
 	uint32_t lenBeforeDash = 1;
@@ -427,33 +421,33 @@ bool isValidName(std::string text, bool forceUppercaseOnFirstLetter/* = true*/)
 	else if(!isLowercaseLetter(text[0]) && !isUppercaseLetter(text[0]))
 		return false;
 
-	for(uint32_t size = 1; size < textLength; size++)
+	for(uint32_t i = 1, size = text.length(); i < size; ++i)
 	{
-		if(text[size] != 32)
+		if(text[i] != 32)
 		{
 			lenBeforeSpace++;
 
-			if(text[size] != 39)
+			if(text[i] != 39)
 				lenBeforeSingleQuote++;
 			else
 			{
-				if(lenBeforeSingleQuote <= 1 || size == textLength - 1 || text[size + 1] == 32)
+				if(lenBeforeSingleQuote <= 1 || i == size - 1 || text[i + 1] == 32)
 					return false;
 
 				lenBeforeSingleQuote = 0;
 			}
 
-			if(text[size] != 45)
+			if(text[i] != 45)
 				lenBeforeDash++;
 			else
 			{
-				if(lenBeforeDash <= 1 || size == textLength - 1 || text[size + 1] == 32)
+				if(lenBeforeDash <= 1 || i == size - 1 || text[i + 1] == 32)
 					return false;
 
 				lenBeforeDash = 0;
 			}
 
-			if(text[size] == lastChar)
+			if(text[i] == lastChar)
 			{
 				repeatedCharacter++;
 				if(repeatedCharacter > 2)
@@ -462,11 +456,11 @@ bool isValidName(std::string text, bool forceUppercaseOnFirstLetter/* = true*/)
 			else
 				repeatedCharacter = 0;
 
-			lastChar = text[size];
+			lastChar = text[i];
 		}
 		else
 		{
-			if(lenBeforeSpace <= 1 || size == textLength - 1 || text[size + 1] == 32)
+			if(lenBeforeSpace <= 1 || i == size - 1 || text[i + 1] == 32)
 				return false;
 
 			lenBeforeSpace = 0;
@@ -474,8 +468,8 @@ bool isValidName(std::string text, bool forceUppercaseOnFirstLetter/* = true*/)
 			lenBeforeDash = 0;
 		}
 
-		if(isLowercaseLetter(text[size]) || text[size] == 32 || text[size] == 39 || text[size] == 45
-			|| (isUppercaseLetter(text[size]) && text[size - 1] == 32))
+		if(isLowercaseLetter(text[i]) || text[i] == 32 || text[i] == 39 || text[i] == 45
+			|| (isUppercaseLetter(text[i]) && text[i - 1] == 32))
 		{
 			continue;
 		}
@@ -485,7 +479,7 @@ bool isValidName(std::string text, bool forceUppercaseOnFirstLetter/* = true*/)
 	return true;
 }
 
-bool checkText(std::string text, std::string str)
+bool checkText(std::string text, const std::string& str)
 {
 	trimString(text);
 	return asLowerCaseString(text) == str;
@@ -509,7 +503,7 @@ std::string generateRecoveryKey(int32_t fieldCount, int32_t fieldLenght)
 		{
 			madeNumber = false;
 			madeCharacter = false;
-			doNumber = (bool)random_range(0, 1);
+			doNumber = random_range(0, 1) == 0;
 			if(doNumber)
 			{
 				number = random_range(2, 9);
@@ -576,7 +570,7 @@ std::string parseParams(tokenizer::iterator &it, tokenizer::iterator end)
 std::string convertIPToString(uint32_t ip)
 {
 	char buffer[17];
-	sprintf(buffer, "%d.%d.%d.%d", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24));
+	sprintf(buffer, "%u.%u.%u.%u", ip & 0xFF, (ip >> 8) & 0xFF, (ip >> 16) & 0xFF, (ip >> 24));
 	return buffer;
 }
 
@@ -810,7 +804,13 @@ MagicEffectNames magicEffectNames[] =
 	{"bats",		NM_ME_BATS},
 	{"smoke",		NM_ME_SMOKE},
 	{"insects",		NM_ME_INSECTS},
-	{"dragonhead",		NM_ME_DRAGONHEAD}
+	{"dragonhead",		NM_ME_DRAGONHEAD},
+	{"orcshaman",		NM_ME_ORCSHAMAN},
+	{"orcshamanfire",	NM_ME_ORCSHAMAN_FIRE},
+	{"thunder",		NM_ME_THUNDER},
+	{"ferumbras",		NM_ME_FERUMBRAS},
+	{"confettihorizontal",	NM_ME_CONFETTI_HORIZONTAL},
+	{"confettivertical",	NM_ME_CONFETTI_VERTICAL}
 };
 
 ShootTypeNames shootTypeNames[] =
@@ -856,7 +856,10 @@ ShootTypeNames shootTypeNames[] =
 	{"smallearth",		NM_SHOOT_SMALLEARTH},
 	{"eartharrow",		NM_SHOOT_EARTHARROW},
 	{"explosion",		NM_SHOOT_EXPLOSION},
-	{"cake",		NM_SHOOT_CAKE}
+	{"cake",		NM_SHOOT_CAKE},
+	{"tarsalarrow",		NM_SHOOT_TARSALARROW},
+	{"vortexbolt",		NM_SHOOT_VORTEXBOLT},
+	{"football",		NM_SHOOT_FOOTBALL}
 };
 
 CombatTypeNames combatTypeNames[] =
@@ -995,10 +998,10 @@ std::string getSkillName(uint16_t skillid)
 		case SKILL_FISH:
 			return "fishing";
 
-		case MAGLEVEL:
+		case SKILL__MAGLEVEL:
 			return "magic level";
 
-		case LEVEL:
+		case SKILL__LEVEL:
 			return "level";
 
 		default:
@@ -1131,7 +1134,11 @@ bool fileExists(const char* filename)
 
 bool dirExists(const std::string& dirName)
 {
+#ifdef _MSC_VER
+	return _access(dirName.c_str(), 0) == 0;
+#else
 	return access(dirName.c_str(), 0) == 0;
+#endif
 }
 
 bool createDir(const std::string& dirName)
@@ -1196,4 +1203,50 @@ std::string ucfirst(std::string str)
 		}
 	}
 	return str;
+}
+
+bool booleanString(std::string str)
+{
+	toLowerCaseString(str);
+	return (str == "yes" || str == "true" || str == "y" || atoi(str.c_str()) > 0);
+}
+
+std::string getWeaponName(WeaponType_t weaponType)
+{
+	switch(weaponType)
+	{
+		case WEAPON_SWORD:
+			return "sword";
+		case WEAPON_CLUB:
+			return "club";
+		case WEAPON_AXE:
+			return "axe";
+		case WEAPON_DIST:
+			return "distance";
+		case WEAPON_SHIELD:
+			return "shield";
+		case WEAPON_WAND:
+			return "wand";
+		case WEAPON_AMMO:
+			return "ammunition";
+		default:
+			break;
+	}
+	return "";
+}
+
+uint32_t combatTypeToIndex(CombatType_t v)
+{
+	if(v == COMBAT_FIRST)
+		return 0;
+
+	return (uint32_t)(log((double)v) / log((double)2)) + 1;
+}
+
+CombatType_t indexToCombatType(uint32_t v)
+{
+	if(v == 0)
+		return COMBAT_FIRST;
+
+	return (CombatType_t)(1 << (v - 1));
 }

@@ -75,6 +75,9 @@ bool Vocations::loadFromXml()
 					if(readXMLString(p, "name", str))
 						voc->name = str;
 
+					if(readXMLInteger(p, "clientid", intVal))
+						voc->clientId = intVal;
+
 					if(readXMLString(p, "description", str))
 						voc->description = str;
 
@@ -104,6 +107,9 @@ bool Vocations::loadFromXml()
 
 					if(readXMLInteger(p, "attackspeed", intVal))
 						voc->attackSpeed = intVal;
+						
+					if(readXMLInteger(p, "basespeed", intVal))
+						voc->baseSpeed = intVal;
 
 					if(readXMLInteger(p, "soulmax", intVal))
 						voc->soulMax = intVal;
@@ -162,16 +168,15 @@ bool Vocations::loadFromXml()
 	return true;
 }
 
-Vocation* Vocations::getVocation(uint32_t vocId)
+Vocation* Vocations::getVocation(uint32_t id)
 {
-	VocationsMap::iterator it = vocationsMap.find(vocId);
-	if(it != vocationsMap.end())
-		return it->second;
-	else
+	VocationsMap::iterator it = vocationsMap.find(id);
+	if(it == vocationsMap.end())
 	{
-		std::cout << "Warning: [Vocations::getVocation] Vocation " << vocId << " not found." << std::endl;
+		std::cout << "Warning: [Vocations::getVocation] Vocation " << id << " not found." << std::endl;
 		return &def_voc;
 	}
+	return it->second;
 }
 
 int32_t Vocations::getVocationId(const std::string& name)
@@ -207,12 +212,14 @@ Vocation::Vocation()
 	gainSoulTicks = 120;
 	soulMax = 100;
 
+	clientId = 0;
 	fromVocation = 0;
 
 	gainCap = 5;
 	gainMana = 5;
 	gainHP = 5;
 	attackSpeed = 1500;
+	baseSpeed = 220;
 	manaMultiplier = 4.0;
 	meleeDamageMultipler = 1.0;
 	distDamageMultipler = 1.0;
@@ -239,8 +246,8 @@ uint32_t Vocation::getReqSkillTries(int32_t skill, int32_t level)
 	if(skill < SKILL_FIRST || skill > SKILL_LAST)
 		return 0;
 
-	cacheMap& skillMap = cacheSkill[skill];
-	cacheMap::iterator it = skillMap.find(level);
+	skillCacheMap& skillMap = cacheSkill[skill];
+	skillCacheMap::iterator it = skillMap.find(level);
 	if(it != cacheSkill[skill].end())
 		return it->second;
 
@@ -251,11 +258,11 @@ uint32_t Vocation::getReqSkillTries(int32_t skill, int32_t level)
 
 uint64_t Vocation::getReqMana(uint32_t magLevel)
 {
-	cacheMap::iterator it = cacheMana.find(magLevel);
+	manaCacheMap::iterator it = cacheMana.find(magLevel);
 	if(it != cacheMana.end())
 		return it->second;
 
-	uint64_t reqMana = (uint64_t)(400 * pow(manaMultiplier, magLevel - 1));
+	uint64_t reqMana = (uint64_t)(400 * pow(manaMultiplier, (int) magLevel - 1));
 	if(reqMana % 20 < 10)
 		reqMana = reqMana - (reqMana % 20);
 	else

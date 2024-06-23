@@ -32,6 +32,12 @@ class Depot : public Container
 		virtual Depot* getDepot() {return this;}
 		virtual const Depot* getDepot() const {return this;}
 
+		void setInbox(Container* container) { inbox = container; }
+		Container* getInbox() const { return inbox; }
+
+		void setChest(Container* container) { chest = container; }
+		Container* getChest() const { return chest; }
+
 		//serialization
 		virtual Attr_ReadValue readAttr(AttrTypes_t attr, PropStream& propStream);
 
@@ -52,9 +58,14 @@ class Depot : public Container
 		//overrides
 		virtual bool canRemove() const {return false;}
 
+		void moveChestToFront();
+
 	private:
 		uint32_t maxDepotLimit;
 		uint32_t depotId;
+
+		Container* chest;
+		Container* inbox;
 };
 
 #endif

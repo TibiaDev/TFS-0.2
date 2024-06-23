@@ -110,7 +110,7 @@ CREATE TABLE `players`
 ) ENGINE = InnoDB;
 
 INSERT INTO `players` VALUES (1, 'Account Manager', 1, 1, 1, 0, 150, 150, 0, 0, 0, 0, 0, 110, 0, 0, 0, 0, 0, 0, 0, 50, 50, 7, '', 400, 0, 0, 0, 0, 0, 0, 0, '', 0, 0, 0, 10, 10, 10, 0, 0);
-	
+
 CREATE TABLE `bans`
 (
 	`type` INT NOT NULL COMMENT 'this field defines if its ip, accountban or namelock',

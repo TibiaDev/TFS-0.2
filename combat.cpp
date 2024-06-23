@@ -296,10 +296,11 @@ ReturnValue Combat::canDoCombat(const Creature* caster, const Tile* tile, bool i
 
 	if(caster)
 	{
-		if(caster->getPosition().z < tile->getPosition().z)
+		const Position& casterPosition = caster->getPosition();
+		const Position& tilePosition = tile->getPosition();
+		if(casterPosition.z < tilePosition.z)
 			return RET_FIRSTGODOWNSTAIRS;
-
-		if(caster->getPosition().z > tile->getPosition().z)
+		else if(casterPosition.z > tilePosition.z)
 			return RET_FIRSTGOUPSTAIRS;
 
 		if(const Player* player = caster->getPlayer())
@@ -336,7 +337,7 @@ bool Combat::isProtected(const Player* attacker, const Player* target)
 	if(attacker->getVocationId() == 0 || target->getVocationId() == 0)
 		return true;
 
-	if(attacker->isAccountManagerEx() || target->isAccountManagerEx())
+	if(attacker->isAccountManager() || target->isAccountManager())
 		return true;
 
 	return false;
@@ -360,9 +361,10 @@ ReturnValue Combat::canDoCombat(const Creature* attacker, const Creature* target
 					return RET_YOUMAYNOTATTACKTHISPLAYER;
 
 				//nopvp-zone
-				if(targetPlayer->getTile()->hasFlag(TILESTATE_NOPVPZONE))
+				const Tile* targetPlayerTile = targetPlayer->getTile();
+				if(targetPlayerTile->hasFlag(TILESTATE_NOPVPZONE))
 					return RET_ACTIONNOTPERMITTEDINANOPVPZONE;
-				else if(attackerPlayer->getTile()->hasFlag(TILESTATE_NOPVPZONE) && !targetPlayer->getTile()->hasFlag(TILESTATE_NOPVPZONE) && !targetPlayer->getTile()->hasFlag(TILESTATE_PROTECTIONZONE))
+				else if(attackerPlayer->getTile()->hasFlag(TILESTATE_NOPVPZONE) && !targetPlayerTile->hasFlag(TILESTATE_NOPVPZONE) && !targetPlayerTile->hasFlag(TILESTATE_PROTECTIONZONE))
 					return RET_ACTIONNOTPERMITTEDINANOPVPZONE;
 			}
 
@@ -631,12 +633,11 @@ bool Combat::CombatConditionFunc(Creature* caster, Creature* target, const Comba
 
 bool Combat::CombatDispelFunc(Creature* caster, Creature* target, const CombatParams& params, void* data)
 {
-	if(target->hasCondition(params.dispelType))
-	{
-		target->removeCondition(caster, params.dispelType);
-		return true;
-	}
-	return false;
+	if(!target->hasCondition(params.dispelType))
+		return false;
+
+	target->removeCondition(caster, params.dispelType);
+	return true;
 }
 
 bool Combat::CombatNullFunc(Creature* caster, Creature* target, const CombatParams& params, void* data)
@@ -660,18 +661,52 @@ void Combat::combatTileEffects(const SpectatorVec& list, Creature* caster, Tile*
 				_caster = caster->getMaster()->getPlayer();
 		}
 
+		switch(itemId)
+		{
+			case ITEM_FIREFIELD_PERSISTENT_FULL:
+				itemId = ITEM_FIREFIELD_PVP_FULL;
+				break;
+
+			case ITEM_FIREFIELD_PERSISTENT_MEDIUM:
+				itemId = ITEM_FIREFIELD_PVP_MEDIUM;
+				break;
+
+			case ITEM_FIREFIELD_PERSISTENT_SMALL:
+				itemId = ITEM_FIREFIELD_PVP_SMALL;
+				break;
+
+			case ITEM_ENERGYFIELD_PERSISTENT:
+				itemId = ITEM_ENERGYFIELD_PVP;
+				break;
+
+			case ITEM_POISONFIELD_PERSISTENT:
+				itemId = ITEM_POISONFIELD_PVP;
+				break;
+
+			case ITEM_MAGICWALL_PERSISTENT:
+				itemId = ITEM_MAGICWALL;
+				break;
+
+			case ITEM_WILDGROWTH_PERSISTENT:
+				itemId = ITEM_WILDGROWTH;
+				break;
+
+			default:
+				break;
+		}
+
 		if(_caster)
 		{
 			if(g_game.getWorldType() == WORLD_TYPE_NO_PVP || tile->hasFlag(TILESTATE_NOPVPZONE))
 			{
-				if(itemId == ITEM_FIREFIELD_PVP)
+				if(itemId == ITEM_FIREFIELD_PVP_FULL)
 					itemId = ITEM_FIREFIELD_NOPVP;
 				else if(itemId == ITEM_POISONFIELD_PVP)
 					itemId = ITEM_POISONFIELD_NOPVP;
 				else if(itemId == ITEM_ENERGYFIELD_PVP)
 					itemId = ITEM_ENERGYFIELD_NOPVP;
 			}
-			else if(itemId == ITEM_FIREFIELD_PVP || itemId == ITEM_POISONFIELD_PVP || itemId == ITEM_ENERGYFIELD_PVP)
+			else if(itemId == ITEM_FIREFIELD_PVP_FULL || itemId == ITEM_POISONFIELD_PVP || itemId == ITEM_ENERGYFIELD_PVP)
 				_caster->addInFightTicks(true);
 		}
 
@@ -704,7 +739,7 @@ void Combat::addDistanceEffect(Creature* caster, const Position& fromPos, const 
 	uint8_t effect)
 {
 	uint8_t distanceEffect = effect;
-	if(distanceEffect == NM_SHOOT_WEAPONTYPE)
+	if(caster && distanceEffect == NM_SHOOT_WEAPONTYPE)
 	{
 		switch(caster->getWeaponType())
 		{
@@ -715,7 +750,7 @@ void Combat::addDistanceEffect(Creature* caster, const Position& fromPos, const 
 		}
 	}
 
-	if(caster && distanceEffect != NM_ME_NONE)
+	if(distanceEffect != NM_ME_NONE)
 		g_game.addDistanceEffect(fromPos, toPos, distanceEffect);
 }
 
@@ -737,11 +772,12 @@ void Combat::CombatFunc(Creature* caster, const Position& pos,
 	//calculate the max viewable range
 	for(std::list<Tile*>::iterator it = tileList.begin(); it != tileList.end(); ++it)
 	{
-		diff = std::abs((*it)->getPosition().x - pos.x);
+		const Position& tilePos = (*it)->getPosition();
+		diff = std::abs(tilePos.x - pos.x);
 		if(diff > maxX)
 			maxX = diff;
 
-		diff = std::abs((*it)->getPosition().y - pos.y);
+		diff = std::abs(tilePos.y - pos.y);
 		if(diff > maxY)
 			maxY = diff;
 	}
@@ -755,11 +791,9 @@ void Combat::CombatFunc(Creature* caster, const Position& pos,
 		bool bContinue = true;
 		if(canDoCombat(caster, iter_tile, params.isAggressive) == RET_NOERROR)
 		{
-			if(iter_tile->getCreatures())
+			if(CreatureVector* creatures = iter_tile->getCreatures())
 			{
-				for(CreatureVector::iterator cit = iter_tile->getCreatures()->begin(),
-					cend = iter_tile->getCreatures()->end();
-					bContinue && cit != cend; ++cit)
+				for(CreatureVector::iterator cit = creatures->begin(), cend = creatures->end(); bContinue && cit != cend; ++cit)
 				{
 					if(params.targetCasterOrTopMost)
 					{
@@ -950,7 +984,7 @@ void ValueCallback::getMinMaxValues(Player* player, int32_t& min, int32_t& max, 
 	//"onGetPlayerMinMaxValues"(...)
 	if(m_scriptInterface->reserveScriptEnv())
 	{
-		ScriptEnviroment* env = m_scriptInterface->getScriptEnv();
+		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 		lua_State* L = m_scriptInterface->getLuaState();
 
 		if(!env->setCallbackId(m_scriptId, m_scriptInterface))
@@ -1035,7 +1069,7 @@ void TileCallback::onTileCombat(Creature* creature, Tile* tile) const
 	//"onTileCombat"(cid, pos)
 	if(m_scriptInterface->reserveScriptEnv())
 	{
-		ScriptEnviroment* env = m_scriptInterface->getScriptEnv();
+		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 		lua_State* L = m_scriptInterface->getLuaState();
 
 		if(!env->setCallbackId(m_scriptId, m_scriptInterface))
@@ -1068,7 +1102,7 @@ void TargetCallback::onTargetCombat(Creature* creature, Creature* target) const
 	//"onTargetCombat"(cid, target)
 	if(m_scriptInterface->reserveScriptEnv())
 	{
-		ScriptEnviroment* env = m_scriptInterface->getScriptEnv();
+		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 		lua_State* L = m_scriptInterface->getLuaState();
 
 		if(!env->setCallbackId(m_scriptId, m_scriptInterface))
@@ -1240,10 +1274,10 @@ void AreaCombat::copyArea(const MatrixArea* input, MatrixArea* output, MatrixOpe
 		}
 		double angleRad = 3.1416 * angle / 180.0;
 
-		float a = std::cos(angleRad);
-		float b = -std::sin(angleRad);
-		float c = std::sin(angleRad);
-		float d = std::cos(angleRad);
+		double a = std::cos(angleRad);
+		double b = -std::sin(angleRad);
+		double c = std::sin(angleRad);
+		double d = std::cos(angleRad);
 
 		for(int32_t x = 0; x < (long)input->getCols(); ++x)
 		{

@@ -21,6 +21,7 @@
 
 #include "definitions.h"
 #include "configmanager.h"
+#include "tools.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -43,7 +44,7 @@ bool ConfigManager::loadFile(const std::string& _filename)
 
 	if(luaL_dofile(L, _filename.c_str()))
 	{
-		std::clog << "[Error - ConfigManager::loadFile] With file = " << _filename << ", " << lua_tostring(L, -1) << std::endl;
+		std::cout << "[Error - ConfigManager::loadFile] With file = " << _filename << ", " << lua_tostring(L, -1) << std::endl;
 		lua_close(L);
 		return false;
 	}
@@ -51,9 +52,11 @@ bool ConfigManager::loadFile(const std::string& _filename)
 	//parse config
 	if(!m_isLoaded) //info that must be loaded one time (unless we reset the modules involved)
 	{
-		m_confBoolean[SERVERSAVE_ENABLED] = (getGlobalString(L, "serverSaveEnabled", "yes") == "yes");
-		m_confBoolean[SAVE_GLOBAL_STORAGE] = (getGlobalString(L, "saveGlobalStorage", "no") == "yes");
-		m_confBoolean[INGAME_GUILD_SYSTEM] = (getGlobalString(L, "ingameGuildSystem", "yes") == "yes");
+		m_confBoolean[SERVERSAVE_ENABLED] = booleanString(getGlobalString(L, "serverSaveEnabled", "yes"));
+		m_confBoolean[SAVE_GLOBAL_STORAGE] = booleanString(getGlobalString(L, "saveGlobalStorage", "no"));
+		m_confBoolean[INGAME_GUILD_SYSTEM] = booleanString(getGlobalString(L, "ingameGuildSystem", "yes"));
+		m_confBoolean[BIND_ONLY_GLOBAL_ADDRESS] = booleanString(getGlobalString(L, "bindOnlyGlobalAddress", "no"));
+		m_confBoolean[OPTIMIZE_DATABASE] = booleanString(getGlobalString(L, "startupDatabaseOptimization", "yes"));
 
 		m_confString[CONFIG_FILE] = _filename;
 		m_confString[IP] = getGlobalString(L, "ip", "127.0.0.1");
@@ -66,6 +69,9 @@ bool ConfigManager::loadFile(const std::string& _filename)
 		m_confString[MYSQL_DB] = getGlobalString(L, "mysqlDatabase", "theforgottenserver");
 		m_confString[SQLITE_DB] = getGlobalString(L, "sqliteDatabase");
 		m_confString[PASSWORDTYPE] = getGlobalString(L, "passwordType", "plain");
+		#ifdef MULTI_SQL_DRIVERS
+		m_confString[SQL_TYPE] = getGlobalString(L, "sqlType", "sqlite");
+		#endif
 
 		m_confInteger[SQL_PORT] = getGlobalNumber(L, "mysqlPort", 3306);
 		m_confInteger[PASSWORD_TYPE] = PASSWORD_TYPE_PLAIN;
@@ -75,38 +81,34 @@ bool ConfigManager::loadFile(const std::string& _filename)
 		m_confInteger[LOGIN_PORT] = getGlobalNumber(L, "loginProtocolPort", 7171);
 		m_confInteger[STATUS_PORT] = getGlobalNumber(L, "statusProtocolPort", 7171);
 
-		#if defined __USE_MYSQL__ && defined __USE_SQLITE__
-		m_confString[SQL_TYPE] = getGlobalString(L, "sqlType", "sqlite");
-		m_confInteger[SQLTYPE] = SQL_TYPE_NONE;
-		#endif
-
-		m_confBoolean[BIND_ONLY_GLOBAL_ADDRESS] = (getGlobalString(L, "bindOnlyGlobalAddress", "no") == "yes");
+		m_confInteger[MARKET_OFFER_DURATION] = getGlobalNumber(L, "marketOfferDuration",  30 * 24 * 60 * 60);
 	}
 
-	m_confBoolean[FREE_MEMORY_AT_SHUTDOWN] = (getGlobalString(L, "freeMemoryAtShutdown", "yes") == "yes");
-	m_confBoolean[ACCOUNT_MANAGER] = (getGlobalString(L, "accountManager", "yes") == "yes");
-	m_confBoolean[ON_OR_OFF_CHARLIST] = (getGlobalString(L, "displayOnOrOffAtCharlist", "no") == "yes");
-	m_confBoolean[ALLOW_CHANGEOUTFIT] = (getGlobalString(L, "allowChangeOutfit", "yes") == "yes");
-	m_confBoolean[ONE_PLAYER_ON_ACCOUNT] = (getGlobalString(L, "onePlayerOnlinePerAccount", "yes") == "yes");
-	m_confBoolean[CANNOT_ATTACK_SAME_LOOKFEET] = (getGlobalString(L, "noDamageToSameLookfeet", "no") == "yes");
-	m_confBoolean[AIMBOT_HOTKEY_ENABLED] = (getGlobalString(L, "hotkeyAimbotEnabled", "yes") == "yes");
-	m_confBoolean[START_CHOOSEVOC] = (getGlobalString(L, "newPlayerChooseVoc", "no") == "yes");
-	m_confBoolean[SHOW_GAMEMASTERS_ONLINE] = (getGlobalString(L, "displayGamemastersWithOnlineCommand", "no") == "yes");
-	m_confBoolean[REMOVE_AMMO] = (getGlobalString(L, "removeAmmoWhenUsingDistanceWeapon", "yes") == "yes");
-	m_confBoolean[REMOVE_RUNE_CHARGES] = (getGlobalString(L, "removeChargesFromRunes", "yes") == "yes");
-	m_confBoolean[REMOVE_WEAPON_CHARGES] = (getGlobalString(L, "removeChargesFromWeapons", "yes") == "yes");
-	m_confBoolean[RANDOMIZE_TILES] = (getGlobalString(L, "randomizeTiles", "yes") == "yes");
-	m_confBoolean[EXPERIENCE_FROM_PLAYERS] = (getGlobalString(L, "experienceByKillingPlayers", "no") == "yes");
-	m_confBoolean[SHUTDOWN_AT_SERVERSAVE] = (getGlobalString(L, "shutdownAtServerSave", "no") == "yes");
-	m_confBoolean[CLEAN_MAP_AT_SERVERSAVE] = (getGlobalString(L, "cleanMapAtServerSave", "yes") == "yes");
-	m_confBoolean[FREE_PREMIUM] = (getGlobalString(L, "freePremium", "no") == "yes");
-	m_confBoolean[ADMIN_LOGS_ENABLED] = (getGlobalString(L, "adminLogsEnabled", "no") == "yes");
-	m_confBoolean[BROADCAST_BANISHMENTS] = (getGlobalString(L, "broadcastBanishments", "yes") == "yes");
-	m_confBoolean[GENERATE_ACCOUNT_NUMBER] = (getGlobalString(L, "generateAccountNumber", "yes") == "yes");
-	m_confBoolean[REPLACE_KICK_ON_LOGIN] = (getGlobalString(L, "replaceKickOnLogin", "yes") == "yes");
-	m_confBoolean[OLD_CONDITION_ACCURACY] = (getGlobalString(L, "oldConditionAccuracy", "no") == "yes");
-	m_confBoolean[ANIMATION_TEXT_ON_HEAL] = (getGlobalString(L, "animationTextOnHeal", "yes") == "yes");
-	m_confBoolean[ALLOW_CLONES] = getGlobalNumber(L, "allowClones", 0);
+	m_confBoolean[FREE_MEMORY_AT_SHUTDOWN] = booleanString(getGlobalString(L, "freeMemoryAtShutdown", "no"));
+	m_confBoolean[ACCOUNT_MANAGER] = booleanString(getGlobalString(L, "accountManager", "yes"));
+	m_confBoolean[ON_OR_OFF_CHARLIST] = booleanString(getGlobalString(L, "displayOnOrOffAtCharlist", "no"));
+	m_confBoolean[ALLOW_CHANGEOUTFIT] = booleanString(getGlobalString(L, "allowChangeOutfit", "yes"));
+	m_confBoolean[ONE_PLAYER_ON_ACCOUNT] = booleanString(getGlobalString(L, "onePlayerOnlinePerAccount", "yes"));
+	m_confBoolean[CANNOT_ATTACK_SAME_LOOKFEET] = booleanString(getGlobalString(L, "noDamageToSameLookfeet", "no"));
+	m_confBoolean[AIMBOT_HOTKEY_ENABLED] = booleanString(getGlobalString(L, "hotkeyAimbotEnabled", "yes"));
+	m_confBoolean[START_CHOOSEVOC] = booleanString(getGlobalString(L, "newPlayerChooseVoc", "no"));
+	m_confBoolean[SHOW_GAMEMASTERS_ONLINE] = booleanString(getGlobalString(L, "displayGamemastersWithOnlineCommand", "no"));
+	m_confBoolean[REMOVE_AMMO] = booleanString(getGlobalString(L, "removeAmmoWhenUsingDistanceWeapon", "yes"));
+	m_confBoolean[REMOVE_RUNE_CHARGES] = booleanString(getGlobalString(L, "removeChargesFromRunes", "yes"));
+	m_confBoolean[REMOVE_WEAPON_CHARGES] = booleanString(getGlobalString(L, "removeChargesFromWeapons", "yes"));
+	m_confBoolean[RANDOMIZE_TILES] = booleanString(getGlobalString(L, "randomizeTiles", "yes"));
+	m_confBoolean[EXPERIENCE_FROM_PLAYERS] = booleanString(getGlobalString(L, "experienceByKillingPlayers", "no"));
+	m_confBoolean[SHUTDOWN_AT_SERVERSAVE] = booleanString(getGlobalString(L, "shutdownAtServerSave", "no"));
+	m_confBoolean[CLEAN_MAP_AT_SERVERSAVE] = booleanString(getGlobalString(L, "cleanMapAtServerSave", "yes"));
+	m_confBoolean[FREE_PREMIUM] = booleanString(getGlobalString(L, "freePremium", "no"));
+	m_confBoolean[ADMIN_LOGS_ENABLED] = booleanString(getGlobalString(L, "adminLogsEnabled", "no"));
+	m_confBoolean[BROADCAST_BANISHMENTS] = booleanString(getGlobalString(L, "broadcastBanishments", "yes"));
+	m_confBoolean[GENERATE_ACCOUNT_NUMBER] = booleanString(getGlobalString(L, "generateAccountNumber", "yes"));
+	m_confBoolean[REPLACE_KICK_ON_LOGIN] = booleanString(getGlobalString(L, "replaceKickOnLogin", "yes"));
+	m_confBoolean[OLD_CONDITION_ACCURACY] = booleanString(getGlobalString(L, "oldConditionAccuracy", "no"));
+	m_confBoolean[ALLOW_CLONES] = booleanString(getGlobalString(L, "allowClones", "no"));
+	m_confBoolean[MARKET_ENABLED] = booleanString(getGlobalString(L, "marketEnabled", "yes"));
+	m_confBoolean[MARKET_PREMIUM] = booleanString(getGlobalString(L, "premiumToCreateMarketOffer", "yes"));
 
 	m_confString[DEFAULT_PRIORITY] = getGlobalString(L, "defaultPriority", "high");
 	m_confString[MAP_STORAGE_TYPE] = getGlobalString(L, "mapStorageType", "relational");
@@ -157,8 +159,12 @@ bool ConfigManager::loadFile(const std::string& _filename)
 	m_confInteger[AUTO_SAVE_EACH_MINUTES] = getGlobalNumber(L, "autoSaveEachMinutes", 0);
 	m_confInteger[STAIRHOP_DELAY] = getGlobalNumber(L, "stairJumpExhaustion", 2000);
 	m_confInteger[LEVEL_TO_CREATE_GUILD] = getGlobalNumber(L, "levelToCreateGuild", 8);
+	m_confInteger[MIN_GUILD_NAME] = getGlobalNumber(L, "minGuildNameLength", 4);
+	m_confInteger[MAX_GUILD_NAME] = getGlobalNumber(L, "maxGuildNameLength", 20);
+	m_confInteger[CHECK_EXPIRED_MARKET_OFFERS_EACH_MINUTES] = getGlobalNumber(L, "checkExpiredMarketOffersEachMinutes", 60);
+	m_confInteger[MAX_MARKET_OFFERS_AT_A_TIME_PER_PLAYER] = getGlobalNumber(L, "maxMarketOffersAtATimePerPlayer", 100);
+	
 	m_isLoaded = true;
-
 	lua_close(L);
 	return true;
 }

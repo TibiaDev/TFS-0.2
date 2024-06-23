@@ -21,7 +21,7 @@
 #ifndef __FORGOTTENSERVER_GUI_H__
 #define __FORGOTTENSERVER_GUI_H__
 
-#ifndef __CONSOLE__
+#ifndef _CONSOLE
 #include "playerbox.h"
 #include "resources.h"
 
@@ -30,6 +30,12 @@ class GUI
 	public:
 		void initTrayMenu();
 		void initFont();
+
+		static GUI* getInstance()
+		{
+			static GUI instance;
+			return &instance;
+		}
 
 		bool m_connections, m_minimized;
 		HWND m_mainWindow, m_statusBar, m_logWindow;

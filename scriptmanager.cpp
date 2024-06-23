@@ -33,9 +33,8 @@
 #include "creatureevent.h"
 #include "globalevent.h"
 
-#ifndef __CONSOLE__
+#ifndef _CONSOLE
 #include "gui.h"
-extern GUI gui;
 #endif
 
 Actions* g_actions = NULL;

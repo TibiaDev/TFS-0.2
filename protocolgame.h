@@ -42,6 +42,7 @@ class House;
 class Container;
 class Tile;
 class Connection;
+class Quest;
 
 class ProtocolGame : public Protocol
 {
@@ -143,6 +144,13 @@ class ProtocolGame : public Protocol
 		void parseAcceptTrade(NetworkMessage& msg);
 		void parseCloseTrade();
 
+		//market methods
+		void parseMarketLeave();
+		void parseMarketBrowse(NetworkMessage& msg);
+		void parseMarketCreateOffer(NetworkMessage& msg);
+		void parseMarketCancelOffer(NetworkMessage& msg);
+		void parseMarketAcceptOffer(NetworkMessage& msg);
+
 		//VIP methods
 		void parseAddVip(NetworkMessage& msg);
 		void parseRemoveVip(NetworkMessage& msg);
@@ -179,6 +187,9 @@ class ProtocolGame : public Protocol
 		void sendCreatureTurn(const Creature* creature, uint32_t stackpos);
 		void sendCreatureSay(const Creature* creature, SpeakClasses type, const std::string& text, Position* pos = NULL);
 
+		void sendQuestLog();
+		void sendQuestLine(const Quest* quest);
+
 		void sendCancel(const std::string& message);
 		void sendCancelWalk();
 		void sendChangeSpeed(const Creature* creature, uint32_t speed);
@@ -199,6 +210,14 @@ class ProtocolGame : public Protocol
 		void sendShop(Npc* npc, const ShopInfoList& itemList);
 		void sendCloseShop();
 		void sendSaleItemList(const std::list<ShopInfo>& shop);
+		void sendMarketEnter(uint32_t depotId);
+		void sendMarketLeave();
+		void sendMarketBrowseItem(uint16_t itemId, const MarketOfferList& buyOffers, const MarketOfferList& sellOffers);
+		void sendMarketAcceptOffer(MarketOfferEx offer);
+		void sendMarketBrowseOwnOffers(const MarketOfferList& buyOffers, const MarketOfferList& sellOffers);
+		void sendMarketCancelOffer(MarketOfferEx offer);
+		void sendMarketBrowseOwnHistory(const HistoryMarketOfferList& buyOffers, const HistoryMarketOfferList& sellOffers);
+		void sendMarketDetail(uint16_t itemId);
 		void sendTradeItemRequest(const Player* player, const Item* item, bool ack);
 		void sendCloseTrade();
 
@@ -301,7 +320,7 @@ class ProtocolGame : public Protocol
 		void RemoveInventoryItem(NetworkMessage_ptr msg, slots_t slot);
 
 		//shop
-		void AddShopItem(NetworkMessage_ptr msg, const ShopInfo item);
+		void AddShopItem(NetworkMessage_ptr msg, const ShopInfo& item);
 
 		friend class Player;
 
@@ -312,8 +331,6 @@ class ProtocolGame : public Protocol
 		void addGameTaskInternal(const FunctionType&);
 
 		Player* player;
-
-		int64_t m_nextPing;
 
 		uint32_t eventConnect;
 

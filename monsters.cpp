@@ -57,9 +57,9 @@ void MonsterType::reset()
 	targetDistance = 1;
 	runAwayHealth = 0;
 	pushable = true;
-	base_speed = 200;
+	baseSpeed = 200;
 	health = 100;
-	health_max = 100;
+	healthMax = 100;
 
 	outfit.lookHead = 0;
 	outfit.lookBody = 0;
@@ -132,12 +132,12 @@ uint32_t Monsters::getLootRandom()
 
 void MonsterType::createLoot(Container* corpse)
 {
-	for(LootItems::const_iterator it = lootItems.begin(); it != lootItems.end() && (corpse->capacity() - corpse->size()) > 0; it++)
+	for(LootItems::const_iterator it = lootItems.begin(), end = lootItems.end(); it != end && corpse->capacity() != corpse->size(); ++it)
 	{
 		std::list<Item*> itemList = createLootItem(*it);
 		if(!itemList.empty())
 		{
-			for(std::list<Item*>::iterator iit = itemList.begin(); iit != itemList.end(); ++iit)
+			for(std::list<Item*>::iterator iit = itemList.begin(), iend = itemList.end(); iit != iend; ++iit)
 			{
 				Item* tmpItem = *iit;
 
@@ -192,6 +192,9 @@ std::list<Item*> MonsterType::createLootItem(const LootBlock& lootBlock)
 	{
 		uint16_t n = (uint16_t)std::min(itemCount, (int32_t)100);
 		tmpItem = Item::CreateItem(lootBlock.id, n);
+		if(!tmpItem)
+			break;
+
 		itemCount -= n;
 
 		if(lootBlock.subType != -1)
@@ -205,22 +208,22 @@ std::list<Item*> MonsterType::createLootItem(const LootBlock& lootBlock)
 
 		itemList.push_back(tmpItem);
 	}
-
 	return itemList;
 }
 
 bool MonsterType::createLootContainer(Container* parent, const LootBlock& lootblock)
 {
-	LootItems::const_iterator it = lootblock.childLoot.begin();
-	if(it == lootblock.childLoot.end())
+	LootItems::const_iterator it = lootblock.childLoot.begin(),
+		end = lootblock.childLoot.end();
+	if(it == end)
 		return true;
 
-	for(; it != lootblock.childLoot.end() && parent->size() < parent->capacity(); it++)
+	for(; it != end && parent->size() < parent->capacity(); ++it)
 	{
 		std::list<Item*> itemList = createLootItem(*it);
 		if(!itemList.empty())
 		{
-			for(std::list<Item*>::iterator iit = itemList.begin(); iit != itemList.end(); ++iit)
+			for(std::list<Item*>::iterator iit = itemList.begin(), iend = itemList.end(); iit != iend; ++iit)
 			{
 				Item* tmpItem = *iit;
 				if(Container* container = tmpItem->getContainer())
@@ -638,18 +641,17 @@ bool Monsters::deserializeSpell(xmlNodePtr node, spellBlock_t& sb, const std::st
 			combat->setCondition(condition);
 		}
 		else if(tmpName == "firefield")
-			combat->setParam(COMBATPARAM_CREATEITEM, 1487);
+			combat->setParam(COMBATPARAM_CREATEITEM, ITEM_FIREFIELD_PVP_FULL);
 		else if(tmpName == "poisonfield")
-			combat->setParam(COMBATPARAM_CREATEITEM, 1490);
+			combat->setParam(COMBATPARAM_CREATEITEM, ITEM_POISONFIELD_PVP);
 		else if(tmpName == "energyfield")
-			combat->setParam(COMBATPARAM_CREATEITEM, 1491);
-		else if(tmpName == "firecondition" ||
-				tmpName == "poisoncondition" ||
-				tmpName == "energycondition" ||
-				tmpName == "drowncondition" ||
-				tmpName == "freezecondition" ||
-				tmpName == "cursecondition" ||
-				tmpName == "dazzlecondition")
+			combat->setParam(COMBATPARAM_CREATEITEM, ITEM_ENERGYFIELD_PVP);
+		else if(tmpName == "firecondition" || tmpName == "energycondition" ||
+			tmpName == "earthcondition" || tmpName == "poisoncondition" ||
+			tmpName == "icecondition" || tmpName == "freezecondition" ||
+			tmpName == "deathcondition" || tmpName == "cursecondition" ||
+			tmpName == "holycondition" || tmpName == "dazzlecondition" ||
+			tmpName == "drowncondition")
 		{
 			ConditionType_t conditionType = CONDITION_NONE;
 			uint32_t tickInterval = 2000;
@@ -659,7 +661,7 @@ bool Monsters::deserializeSpell(xmlNodePtr node, spellBlock_t& sb, const std::st
 				conditionType = CONDITION_FIRE;
 				tickInterval = 10000;
 			}
-			else if(tmpName == "poisoncondition")
+			else if(tmpName == "poisoncondition" || tmpName == "earthcondition")
 			{
 				conditionType = CONDITION_POISON;
 				tickInterval = 5000;
@@ -674,17 +676,17 @@ bool Monsters::deserializeSpell(xmlNodePtr node, spellBlock_t& sb, const std::st
 				conditionType = CONDITION_DROWN;
 				tickInterval = 5000;
 			}
-			else if(tmpName == "freezecondition")
+			else if(tmpName == "freezecondition" || tmpName == "icecondition")
 			{
 				conditionType = CONDITION_FREEZING;
 				tickInterval = 10000;
 			}
-			else if(tmpName == "cursecondition")
+			else if(tmpName == "cursecondition" || tmpName == "deathcondition")
 			{
 				conditionType = CONDITION_CURSED;
 				tickInterval = 4000;
 			}
-			else if(tmpName == "dazzlecondition")
+			else if(tmpName == "dazzlecondition" || tmpName == "holycondition")
 			{
 				conditionType = CONDITION_DAZZLED;
 				tickInterval = 10000;
@@ -710,6 +712,10 @@ bool Monsters::deserializeSpell(xmlNodePtr node, spellBlock_t& sb, const std::st
 		else if(tmpName == "strength")
 		{
 			//
+		}
+		else if(tmpName == "effect")
+		{
+		 	//
 		}
 		else
 		{
@@ -839,7 +845,7 @@ bool Monsters::loadMonster(const std::string& file, const std::string& monster_n
 			mType->experience = intValue;
 
 		if(readXMLInteger(root, "speed", intValue))
-			mType->base_speed = intValue;
+			mType->baseSpeed = intValue;
 
 		if(readXMLInteger(root, "manacost", intValue))
 			mType->manaCost = intValue;
@@ -863,7 +869,7 @@ bool Monsters::loadMonster(const std::string& file, const std::string& monster_n
 				}
 
 				if(readXMLInteger(p, "max", intValue))
-					mType->health_max = intValue;
+					mType->healthMax = intValue;
 				else
 				{
 					SHOW_XML_ERROR("Missing health.max");
@@ -1096,7 +1102,7 @@ bool Monsters::loadMonster(const std::string& file, const std::string& monster_n
 								mType->conditionImmunities |= CONDITION_OUTFIT;
 							else if(tmpStrValue == "drunk")
 								mType->conditionImmunities |= CONDITION_DRUNK;
-							else if(tmpStrValue == "invisible")
+							else if(tmpStrValue == "invisible" || tmpStrValue == "invisibility")
 								mType->conditionImmunities |= CONDITION_INVISIBLE;
 							else
 								SHOW_XML_WARNING("Unknown immunity name " << strValue);
@@ -1190,13 +1196,14 @@ bool Monsters::loadMonster(const std::string& file, const std::string& monster_n
 							if(intValue != 0)
 								mType->conditionImmunities |= CONDITION_DRUNK;
 						}
-						else if(readXMLInteger(tmpNode, "invisible", intValue))
+						else if(readXMLInteger(tmpNode, "invisible", intValue) ||
+							readXMLInteger(tmpNode, "invisibility", intValue))
 						{
 							if(intValue != 0)
 								mType->conditionImmunities |= CONDITION_INVISIBLE;
 						}
 						else
-							SHOW_XML_WARNING("Unknown immunity " << strValue);
+							SHOW_XML_WARNING("Unknown immunity");
 					}
 					tmpNode = tmpNode->next;
 				}
@@ -1472,6 +1479,6 @@ uint32_t Monsters::getIdByName(const std::string& name)
 
 Monsters::~Monsters()
 {
-	for(MonsterMap::iterator it = monsters.begin(); it != monsters.end(); it++)
+	for(MonsterMap::iterator it = monsters.begin(), end = monsters.end(); it != end; ++it)
 		delete it->second;
 }

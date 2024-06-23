@@ -18,9 +18,11 @@
 // Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //////////////////////////////////////////////////////////////////////
 
+#include "otpch.h"
+
 #include "definitions.h"
 
-#ifndef __CONSOLE__
+#ifndef _CONSOLE
 #include "inputbox.h"
 
 HFONT CInputBox::m_hFont = NULL;

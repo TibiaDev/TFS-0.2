@@ -478,7 +478,7 @@ class Npc : public Creature
 		virtual Npc* getNpc() {return this;}
 		virtual const Npc* getNpc() const {return this;}
 
-		virtual bool isPushable() const { return false;}
+		virtual bool isPushable() const { return true;}
 
 		virtual uint32_t idRange(){ return 0x80000000;}
 		static AutoList<Npc> listNpc;
@@ -495,7 +495,7 @@ class Npc : public Creature
 		virtual const std::string& getName() const {return name;}
 		virtual const std::string& getNameDescription() const {return name;}
 
-		virtual const CreatureType_t getType() const {return CREATURETYPE_NPC;}
+		virtual CreatureType_t getType() const {return CREATURETYPE_NPC;}
 
 		void doSay(const std::string& text);
 		void doSayToPlayer(Player* player, const std::string& text);
@@ -532,7 +532,7 @@ class Npc : public Creature
 		virtual void onUpdateTile(const Tile* tile, const Position& pos);
 
 		virtual void onCreatureAppear(const Creature* creature, bool isLogin);
-		virtual void onCreatureDisappear(const Creature* creature, bool isLogout);
+		virtual void onCreatureDisappear(const Creature* creature, uint32_t stackpos, bool isLogout);
 		virtual void onCreatureMove(const Creature* creature, const Tile* newTile, const Position& newPos,
 			const Tile* oldTile, const Position& oldPos, bool teleport);
 

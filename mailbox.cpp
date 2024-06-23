@@ -122,12 +122,13 @@ bool Mailbox::sendItem(Item* item)
 	if(!IOLoginData::getInstance()->getGuidByName(guid, receiver))
 		return false;
 
-	if(Player* player = g_game.getPlayerByName(receiver))
+	Player* player = g_game.getPlayerByName(receiver);
+	if(player)
 	{
 		Depot* depot = player->getDepot(dp, true);
 		if(depot)
 		{
-			if(g_game.internalMoveItem(item->getParent(), depot, INDEX_WHEREEVER,
+			if(g_game.internalMoveItem(item->getParent(), depot->getInbox(), INDEX_WHEREEVER,
 				item, item->getItemCount(), NULL, FLAG_NOLIMIT) == RET_NOERROR)
 			{
 				g_game.transformItem(item, item->getID() + 1);
@@ -137,9 +138,9 @@ bool Mailbox::sendItem(Item* item)
 			}
 		}
 	}
-	else if(IOLoginData::getInstance()->playerExists(receiver))
+	else
 	{
-		Player* player = new Player(receiver, NULL);
+		player = new Player(receiver, NULL);
 		if(!IOLoginData::getInstance()->loadPlayer(player, receiver))
 		{
 			#ifdef __DEBUG_MAILBOX__
@@ -162,7 +163,7 @@ bool Mailbox::sendItem(Item* item)
 		Depot* depot = player->getDepot(dp, true);
 		if(depot)
 		{
-			if(g_game.internalMoveItem(item->getParent(), depot, INDEX_WHEREEVER,
+			if(g_game.internalMoveItem(item->getParent(), depot->getInbox(), INDEX_WHEREEVER,
 				item, item->getItemCount(), NULL, FLAG_NOLIMIT) == RET_NOERROR)
 			{
 				g_game.transformItem(item, item->getID() + 1);
@@ -187,7 +188,7 @@ bool Mailbox::getReceiver(Item* item, std::string& name, uint32_t& dp)
 		Container* parcel = item->getContainer();
 		if(parcel)
 		{
-			for(ItemList::const_iterator cit = parcel->getItems(); cit != parcel->getEnd(); cit++)
+			for(ItemList::const_iterator cit = parcel->getItems(), end = parcel->getEnd(); cit != end; ++cit)
 			{
 				if((*cit)->getID() == ITEM_LABEL)
 				{

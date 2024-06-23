@@ -18,8 +18,10 @@
 // Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //////////////////////////////////////////////////////////////////////
 
-#ifndef __CONSOLE__
-#ifdef _WIN32
+#include "otpch.h"
+
+#ifndef _CONSOLE
+#ifdef WIN32
 #include "gui.h"
 
 void GUI::initTrayMenu()

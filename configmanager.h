@@ -63,9 +63,11 @@ class ConfigManager
 			OLD_CONDITION_ACCURACY,
 			BROADCAST_BANISHMENTS,
 			FREE_MEMORY_AT_SHUTDOWN,
-			ANIMATION_TEXT_ON_HEAL,
 			ALLOW_CLONES,
 			BIND_ONLY_GLOBAL_ADDRESS,
+			OPTIMIZE_DATABASE,
+			MARKET_ENABLED,
+			MARKET_PREMIUM,
 			LAST_BOOLEAN_CONFIG /* this must be the last one */
 		};
 
@@ -91,7 +93,7 @@ class ConfigManager
 			MYSQL_DB,
 			DEFAULT_PRIORITY,
 			SQLITE_DB,
-			#if defined __USE_MYSQL__ && defined __USE_SQLITE__
+			#ifdef MULTI_SQL_DRIVERS
 			SQL_TYPE,
 			#endif
 			PASSWORDTYPE,
@@ -137,9 +139,6 @@ class ConfigManager
 			PROTECTION_LEVEL,
 			DEATH_LOSE_PERCENT,
 			PASSWORD_TYPE,
-			#if defined __USE_MYSQL__ && defined __USE_SQLITE__
-			SQLTYPE,
-			#endif
 			STATUSQUERY_TIMEOUT,
 			FRAG_TIME,
 			WHITE_SKULL_TIME,
@@ -150,6 +149,11 @@ class ConfigManager
 			STATUS_PORT,
 			STAIRHOP_DELAY,
 			LEVEL_TO_CREATE_GUILD,
+			MIN_GUILD_NAME,
+			MAX_GUILD_NAME,
+			MARKET_OFFER_DURATION,
+			CHECK_EXPIRED_MARKET_OFFERS_EACH_MINUTES,
+			MAX_MARKET_OFFERS_AT_A_TIME_PER_PLAYER,
 			LAST_INTEGER_CONFIG /* this must be the last one */
 		};
 
@@ -172,4 +176,4 @@ class ConfigManager
 		bool m_confBoolean[LAST_BOOLEAN_CONFIG];
 };
 
-#endif /* _CONFIG_MANAGER_H */
+#endif

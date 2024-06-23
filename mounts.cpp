@@ -18,15 +18,18 @@
 // Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 //////////////////////////////////////////////////////////////////////
 
+#include "otpch.h"
+
 #include "mounts.h"
 #include "tools.h"
 
-Mount::Mount(uint8_t _id, uint16_t _clientId, std::string _name, int32_t _speed)
+Mount::Mount(uint8_t _id, uint16_t _clientId, std::string _name, int32_t _speed, bool _premium)
 {
 	id = _id;
 	clientId = _clientId;
 	name = _name;
 	speed = _speed;
+	premium = _premium;
 }
 
 bool Mount::isTamed(Player* player) const
@@ -37,19 +40,22 @@ bool Mount::isTamed(Player* player) const
 	if(player->isAccessPlayer())
 		return true;
 
+	if(premium && !player->isPremium())
+		return false;
+
 	uint8_t tmpId = id - 1;
 
 	int32_t value = 0;
 	if(!player->getStorageValue(PSTRG_MOUNTS_RANGE_START + (tmpId / 31), value))
 		return false;
 
-	int32_t tmp = (int32_t)pow(2, tmpId % 31);
+	int32_t tmp = (int32_t)pow(2.0f, tmpId % 31);
 	return (tmp & value) == tmp;
 }
 
 Mounts::~Mounts()
 {
-	for(MountsList::iterator it = mounts.begin(); it != mounts.end(); it++)
+	for(MountsList::iterator it = mounts.begin(), end = mounts.end(); it != end; ++it)
 		delete (*it);
 
 	mounts.clear();
@@ -57,7 +63,7 @@ Mounts::~Mounts()
 
 bool Mounts::reload()
 {
-	for(MountsList::iterator it = mounts.begin(); it != mounts.end(); it++)
+	for(MountsList::iterator it = mounts.begin(), end = mounts.end(); it != end; ++it)
 		delete (*it);
 
 	mounts.clear();
@@ -89,6 +95,7 @@ bool Mounts::loadFromXml()
 			int16_t clientid = 0;
 			std::string name = "";
 			int32_t speed = 0;
+			bool premium = true;
 			if(readXMLInteger(p, "id", intValue))
 				id = intValue;
 
@@ -101,7 +108,10 @@ bool Mounts::loadFromXml()
 			if(readXMLInteger(p, "speed", intValue))
 				speed = intValue;
 
-			mounts.push_back(new Mount(id, clientid, name, speed));
+			if(readXMLString(p, "premium", strValue))
+				premium = booleanString(strValue);
+
+			mounts.push_back(new Mount(id, clientid, name, speed, premium));
 		}
 		p = p->next;
 	}
@@ -111,7 +121,7 @@ bool Mounts::loadFromXml()
 
 Mount* Mounts::getMountByID(uint8_t id)
 {
-	for(MountsList::iterator it = mounts.begin(); it != mounts.end(); it++)
+	for(MountsList::iterator it = mounts.begin(), end = mounts.end(); it != end; ++it)
 	{
 		if((*it)->getID() == id)
 			return (*it);
@@ -121,27 +131,10 @@ Mount* Mounts::getMountByID(uint8_t id)
 
 Mount* Mounts::getMountByClientID(uint16_t clientId)
 {
-	for(MountsList::iterator it = mounts.begin(); it != mounts.end(); it++)
+	for(MountsList::iterator it = mounts.begin(), end = mounts.end(); it != end; ++it)
 	{
 		if((*it)->getClientID() == clientId)
 			return (*it);
 	}
 	return NULL;
-}
-
-void Mounts::sendMountsList(Player* player, NetworkMessage_ptr msg)
-{
-	MountsList tmp_list;
-	for(MountsList::const_iterator it = mounts.begin(); it != mounts.end(); it++)
-	{
-		if((*it)->isTamed(player))
-			tmp_list.push_back(*it);
-	}
-
-	msg->AddByte(tmp_list.size());
-	for(MountsList::const_iterator it = tmp_list.begin(); it != tmp_list.end(); it++)
-	{
-		msg->AddU16((*it)->getClientID());
-		msg->AddString((*it)->getName());
-	}
 }

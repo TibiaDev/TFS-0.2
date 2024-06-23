@@ -69,8 +69,8 @@ Creature()
 	currentOutfit = mType->outfit;
 
 	health = mType->health;
-	healthMax = mType->health_max;
-	baseSpeed = mType->base_speed;
+	healthMax = mType->healthMax;
+	baseSpeed = mType->baseSpeed;
 	internalLight.level = mType->lightLevel;
 	internalLight.color = mType->lightColor;
 
@@ -297,17 +297,19 @@ bool Monster::isFriend(const Creature* creature)
 		const Player* tmpPlayer = NULL;
 		if(creature->getPlayer())
 			tmpPlayer = creature->getPlayer();
-		else if(creature->getMaster() && creature->getMaster()->getPlayer())
-			tmpPlayer = creature->getMaster()->getPlayer();
+		else
+		{
+			const Creature* creatureMaster = creature->getMaster();
+			if(creatureMaster && creatureMaster->getPlayer())
+				tmpPlayer = creatureMaster->getPlayer();
+		}
 
 		if(tmpPlayer && (tmpPlayer == getMaster() || masterPlayer->isPartner(tmpPlayer)))
 			return true;
 	}
-	else
-	{
-		if(creature->getMonster() && !creature->isSummon())
-			return true;
-	}
+	else if(creature->getMonster() && !creature->isSummon())
+		return true;
+
 	return false;
 }
 
@@ -398,10 +400,11 @@ bool Monster::searchTarget(TargetSearchType_t searchType /*= TARGETSEARCH_DEFAUL
 			int32_t minRange = -1;
 			for(std::list<Creature*>::iterator it = resultList.begin(); it != resultList.end(); ++it)
 			{
-				if(minRange == -1 || std::max(std::abs(myPos.x - (*it)->getPosition().x), std::abs(myPos.y - (*it)->getPosition().y)) < minRange)
+				const Position& pos = (*it)->getPosition();
+				if(minRange == -1 || std::max(std::abs(myPos.x - pos.x), std::abs(myPos.y - pos.y)) < minRange)
 				{
 					target = *it;
-					minRange = std::max(std::abs(myPos.x - (*it)->getPosition().x), std::abs(myPos.y - (*it)->getPosition().y));
+					minRange = std::max(std::abs(myPos.x - pos.x), std::abs(myPos.y - pos.y));
 				}
 			}
 
@@ -652,7 +655,6 @@ void Monster::doAttacking(uint32_t interval)
 		return;
 
 	bool updateLook = true;
-	bool outOfRange = true;
 
 	resetTicks = interval != 0;
 	attackTicks += interval;
@@ -687,9 +689,7 @@ void Monster::doAttacking(uint32_t interval)
 			}
 		}
 
-		if(inRange)
-			outOfRange = false;
-		else if(it->isMelee)
+		if(!inRange && it->isMelee)
 		{
 			//melee swing out of reach
 			extraMeleeAttack = true;
@@ -843,7 +843,10 @@ void Monster::onThinkDefense(uint32_t interval)
 					if(!g_game.placeCreature(summon, summonPos))
 						removeSummon(summon);
 					else
+					{
 						g_game.addMagicEffect(getPosition(), NM_ME_MAGIC_ENERGY);
+						g_game.addMagicEffect(summon->getPosition(), NM_ME_TELEPORT);
+					}
 				}
 			}
 		}
@@ -1160,8 +1163,6 @@ bool Monster::getDanceStep(const Position& creaturePos, Direction& dir,
 	return false;
 }
 
-
-
 bool Monster::isInSpawnRange(const Position& toPos)
 {
 	if(masterRadius == -1)
@@ -1222,8 +1223,12 @@ Item* Monster::getCorpse()
 			uint32_t corpseOwner = 0;
 			if(mostDamageCreature->getPlayer())
 				corpseOwner = mostDamageCreature->getID();
-			else if(mostDamageCreature->getMaster() && mostDamageCreature->getMaster()->getPlayer())
-				corpseOwner = mostDamageCreature->getMaster()->getID();
+			else
+			{
+				const Creature* mostDamageCreatureMaster = mostDamageCreature->getMaster();
+				if(mostDamageCreatureMaster && mostDamageCreatureMaster->getPlayer())
+					corpseOwner = mostDamageCreatureMaster->getID();
+			}
 
 			if(corpseOwner != 0)
 				corpse->setCorpseOwner(corpseOwner);

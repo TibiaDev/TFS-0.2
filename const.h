@@ -23,84 +23,88 @@
 
 #include "definitions.h"
 
-#define NETWORKMESSAGE_MAXSIZE 15340
+#define NETWORKMESSAGE_MAXSIZE 16384
 
 enum MagicEffectClasses
 {
-	NM_ME_FIRST		= 0x00,
-	NM_ME_DRAW_BLOOD	= NM_ME_FIRST,
-	NM_ME_LOSE_ENERGY	= 0x01,
-	NM_ME_POFF		= 0x02,
-	NM_ME_BLOCKHIT		= 0x03,
-	NM_ME_EXPLOSION_AREA	= 0x04,
-	NM_ME_EXPLOSION_DAMAGE	= 0x05,
-	NM_ME_FIRE_AREA		= 0x06,
-	NM_ME_YELLOW_RINGS	= 0x07,
-	NM_ME_POISON_RINGS	= 0x08,
-	NM_ME_HIT_AREA		= 0x09,
-	NM_ME_TELEPORT		= 0x0A, //10
-	NM_ME_ENERGY_DAMAGE	= 0x0B, //11
-	NM_ME_MAGIC_ENERGY	= 0x0C, //12
-	NM_ME_MAGIC_BLOOD	= 0x0D, //13
-	NM_ME_MAGIC_POISON	= 0x0E, //14
-	NM_ME_HITBY_FIRE	= 0x0F, //15
-	NM_ME_POISON		= 0x10, //16
-	NM_ME_MORT_AREA		= 0x11, //17
-	NM_ME_SOUND_GREEN	= 0x12, //18
-	NM_ME_SOUND_RED		= 0x13, //19
-	NM_ME_POISON_AREA	= 0x14, //20
-	NM_ME_SOUND_YELLOW	= 0x15, //21
-	NM_ME_SOUND_PURPLE	= 0x16, //22
-	NM_ME_SOUND_BLUE	= 0x17, //23
-	NM_ME_SOUND_WHITE	= 0x18, //24
-	NM_ME_BUBBLES		= 0x19, //25
-	NM_ME_CRAPS		= 0x1A, //26
-	NM_ME_GIFT_WRAPS	= 0x1B, //27
-	NM_ME_FIREWORK_YELLOW	= 0x1C, //28
-	NM_ME_FIREWORK_RED	= 0x1D, //29
-	NM_ME_FIREWORK_BLUE	= 0x1E, //30
-	NM_ME_STUN		= 0x1F, //31
-	NM_ME_SLEEP		= 0x20, //32
-	NM_ME_WATERCREATURE	= 0x21, //33
-	NM_ME_GROUNDSHAKER	= 0x22, //34
-	NM_ME_HEARTS		= 0x23, //35
-	NM_ME_FIREATTACK	= 0x24, //36
-	NM_ME_ENERGY_AREA	= 0x25, //37
-	NM_ME_SMALLCLOUDS	= 0x26, //38
-	NM_ME_HOLYDAMAGE	= 0x27, //39
-	NM_ME_BIGCLOUDS		= 0x28, //40
-	NM_ME_ICEAREA		= 0x29, //41
-	NM_ME_ICETORNADO	= 0x2A, //42
-	NM_ME_ICEATTACK		= 0x2B, //43
-	NM_ME_STONES		= 0x2C, //44
-	NM_ME_SMALLPLANTS	= 0x2D, //45
-	NM_ME_CARNIPHILA	= 0x2E, //46
-	NM_ME_PURPLEENERGY	= 0x2F, //47
-	NM_ME_YELLOWENERGY	= 0x30, //48
-	NM_ME_HOLYAREA		= 0x31, //49
-	NM_ME_BIGPLANTS		= 0x32, //50
-	NM_ME_CAKE		= 0x33, //51
-	NM_ME_GIANTICE		= 0x34, //52
-	NM_ME_WATERSPLASH	= 0x35, //53
-	NM_ME_PLANTATTACK	= 0x36, //54
-	NM_ME_TUTORIALARROW	= 0x37, //55
-	NM_ME_TUTORIALSQUARE	= 0x38, //56
-	NM_ME_MIRRORHORIZONTAL	= 0x39, //57
-	NM_ME_MIRRORVERTICAL	= 0x3A, //58
-	NM_ME_SKULLHORIZONTAL	= 0x3B, //59
-	NM_ME_SKULLVERTICAL	= 0x3C, //60
-	NM_ME_ASSASSIN		= 0x3D, //61
-	NM_ME_STEPSHORIZONTAL	= 0x3E, //62
-	NM_ME_BLOODYSTEPS	= 0x3F, //63
-	NM_ME_STEPSVERTICAL	= 0x40, //64
-	NM_ME_YALAHARIGHOST	= 0x41, //65
-	NM_ME_BATS		= 0x42, //66
-	NM_ME_SMOKE		= 0x43, //67
-	NM_ME_INSECTS		= 0x44, //68
-	NM_ME_DRAGONHEAD	= 0x45, //69
-	NM_ME_ORCSHAMAN		= 0x46, //70
-	NM_ME_ORCSHAMAN_FIRE	= 0x47, //71
-	NM_ME_LAST		= NM_ME_ORCSHAMAN_FIRE,
+	NM_ME_FIRST			= 0x00,
+	NM_ME_DRAW_BLOOD		= NM_ME_FIRST,
+	NM_ME_LOSE_ENERGY		= 0x01,
+	NM_ME_POFF			= 0x02,
+	NM_ME_BLOCKHIT			= 0x03,
+	NM_ME_EXPLOSION_AREA		= 0x04,
+	NM_ME_EXPLOSION_DAMAGE		= 0x05,
+	NM_ME_FIRE_AREA			= 0x06,
+	NM_ME_YELLOW_RINGS		= 0x07,
+	NM_ME_POISON_RINGS		= 0x08,
+	NM_ME_HIT_AREA			= 0x09,
+	NM_ME_TELEPORT			= 0x0A, //10
+	NM_ME_ENERGY_DAMAGE		= 0x0B, //11
+	NM_ME_MAGIC_ENERGY		= 0x0C, //12
+	NM_ME_MAGIC_BLOOD		= 0x0D, //13
+	NM_ME_MAGIC_POISON		= 0x0E, //14
+	NM_ME_HITBY_FIRE		= 0x0F, //15
+	NM_ME_POISON			= 0x10, //16
+	NM_ME_MORT_AREA			= 0x11, //17
+	NM_ME_SOUND_GREEN		= 0x12, //18
+	NM_ME_SOUND_RED			= 0x13, //19
+	NM_ME_POISON_AREA		= 0x14, //20
+	NM_ME_SOUND_YELLOW		= 0x15, //21
+	NM_ME_SOUND_PURPLE		= 0x16, //22
+	NM_ME_SOUND_BLUE		= 0x17, //23
+	NM_ME_SOUND_WHITE		= 0x18, //24
+	NM_ME_BUBBLES			= 0x19, //25
+	NM_ME_CRAPS			= 0x1A, //26
+	NM_ME_GIFT_WRAPS		= 0x1B, //27
+	NM_ME_FIREWORK_YELLOW		= 0x1C, //28
+	NM_ME_FIREWORK_RED		= 0x1D, //29
+	NM_ME_FIREWORK_BLUE		= 0x1E, //30
+	NM_ME_STUN			= 0x1F, //31
+	NM_ME_SLEEP			= 0x20, //32
+	NM_ME_WATERCREATURE		= 0x21, //33
+	NM_ME_GROUNDSHAKER		= 0x22, //34
+	NM_ME_HEARTS			= 0x23, //35
+	NM_ME_FIREATTACK		= 0x24, //36
+	NM_ME_ENERGY_AREA		= 0x25, //37
+	NM_ME_SMALLCLOUDS		= 0x26, //38
+	NM_ME_HOLYDAMAGE		= 0x27, //39
+	NM_ME_BIGCLOUDS			= 0x28, //40
+	NM_ME_ICEAREA			= 0x29, //41
+	NM_ME_ICETORNADO		= 0x2A, //42
+	NM_ME_ICEATTACK			= 0x2B, //43
+	NM_ME_STONES			= 0x2C, //44
+	NM_ME_SMALLPLANTS		= 0x2D, //45
+	NM_ME_CARNIPHILA		= 0x2E, //46
+	NM_ME_PURPLEENERGY		= 0x2F, //47
+	NM_ME_YELLOWENERGY		= 0x30, //48
+	NM_ME_HOLYAREA			= 0x31, //49
+	NM_ME_BIGPLANTS			= 0x32, //50
+	NM_ME_CAKE			= 0x33, //51
+	NM_ME_GIANTICE			= 0x34, //52
+	NM_ME_WATERSPLASH		= 0x35, //53
+	NM_ME_PLANTATTACK		= 0x36, //54
+	NM_ME_TUTORIALARROW		= 0x37, //55
+	NM_ME_TUTORIALSQUARE		= 0x38, //56
+	NM_ME_MIRRORHORIZONTAL		= 0x39, //57
+	NM_ME_MIRRORVERTICAL		= 0x3A, //58
+	NM_ME_SKULLHORIZONTAL		= 0x3B, //59
+	NM_ME_SKULLVERTICAL		= 0x3C, //60
+	NM_ME_ASSASSIN			= 0x3D, //61
+	NM_ME_STEPSHORIZONTAL		= 0x3E, //62
+	NM_ME_BLOODYSTEPS		= 0x3F, //63
+	NM_ME_STEPSVERTICAL		= 0x40, //64
+	NM_ME_YALAHARIGHOST		= 0x41, //65
+	NM_ME_BATS			= 0x42, //66
+	NM_ME_SMOKE			= 0x43, //67
+	NM_ME_INSECTS			= 0x44, //68
+	NM_ME_DRAGONHEAD		= 0x45, //69
+	NM_ME_ORCSHAMAN			= 0x46, //70
+	NM_ME_ORCSHAMAN_FIRE		= 0x47, //71
+	NM_ME_THUNDER			= 0x48, //72
+	NM_ME_FERUMBRAS			= 0x49, //73
+	NM_ME_CONFETTI_HORIZONTAL	= 0x4A, //74
+	NM_ME_CONFETTI_VERTICAL 	= 0x4B, //75
+	NM_ME_LAST			= NM_ME_CONFETTI_VERTICAL,
 
 	//for internal use, dont send to client
 	NM_ME_NONE             = 0xFF,
@@ -152,7 +156,12 @@ enum ShootType_t
 	NM_SHOOT_EARTHARROW	= 0x27, //39
 	NM_SHOOT_EXPLOSION	= 0x28, //40
 	NM_SHOOT_CAKE		= 0x29, //41
-	NM_SHOOT_LAST		= NM_SHOOT_CAKE,
+	NM_SHOOT_UNK1		= 0x2A, //42 DEBUG!
+	NM_SHOOT_TARSALARROW	= 0x2B, //43
+	NM_SHOOT_VORTEXBOLT	= 0x2C, //44
+	NM_SHOOT_UNK2		= 0x2D, //45 DEBUG!
+	NM_SHOOT_FOOTBALL	= 0x2E, //46
+	NM_SHOOT_LAST		= NM_SHOOT_FOOTBALL,
 
 	//for internal use, dont send to client
 	NM_SHOOT_WEAPONTYPE	= 0xFE, //254
@@ -287,7 +296,7 @@ const uint8_t fluidMap[] =
 enum SquareColor_t
 {
 	SQ_COLOR_NONE = 256,
-	SQ_COLOR_BLACK = 0,
+	SQ_COLOR_BLACK = 0
 };
 
 enum TextColor_t
@@ -296,6 +305,8 @@ enum TextColor_t
 	TEXTCOLOR_GREEN		= 18,
 	TEXTCOLOR_LIGHTGREEN	= 30,
 	TEXTCOLOR_LIGHTBLUE	= 35,
+	TEXTCOLOR_TEAL		= 65,
+	TEXTCOLOR_MAYABLUE	= 95,
 	TEXTCOLOR_DARKRED	= 108,
 	TEXTCOLOR_LIGHTGREY	= 129,
 	TEXTCOLOR_SKYBLUE	= 143,
@@ -377,7 +388,8 @@ enum Skulls_t
 	SKULL_WHITE = 3,
 	SKULL_RED = 4,
 	SKULL_BLACK = 5,
-	SKULL_LAST = SKULL_BLACK
+	SKULL_ORANGE = 6,
+	SKULL_LAST = SKULL_ORANGE
 };
 
 enum PartyShields_t
@@ -405,20 +417,31 @@ enum GuildEmblems_t
 
 enum item_t
 {
-	ITEM_FIREFIELD_PVP	= 1487,
+	ITEM_FIREFIELD_PVP_FULL	= 1487,
+	ITEM_FIREFIELD_PVP_MEDIUM	= 1488,
+	ITEM_FIREFIELD_PVP_SMALL	= 1489,
+	ITEM_FIREFIELD_PERSISTENT_FULL = 1492,
+	ITEM_FIREFIELD_PERSISTENT_MEDIUM = 1493,
+	ITEM_FIREFIELD_PERSISTENT_SMALL = 1494,
 	ITEM_FIREFIELD_NOPVP	= 1500,
 
 	ITEM_POISONFIELD_PVP	= 1490,
+	ITEM_POISONFIELD_PERSISTENT = 1496,
 	ITEM_POISONFIELD_NOPVP	= 1503,
 
 	ITEM_ENERGYFIELD_PVP	= 1491,
+	ITEM_ENERGYFIELD_PERSISTENT = 1495,
 	ITEM_ENERGYFIELD_NOPVP	= 1504,
 
 	ITEM_MAGICWALL		= 1497,
+	ITEM_MAGICWALL_PERSISTENT = 1498,
 	ITEM_MAGICWALL_SAFE	= 11098,
 
 	ITEM_WILDGROWTH		= 1499,
+	ITEM_WILDGROWTH_PERSISTENT = 2721,
 	ITEM_WILDGROWTH_SAFE	= 11099,
+
+	ITEM_BAG		= 1987,
 
 	ITEM_COINS_GOLD		= 2148,
 	ITEM_COINS_PLATINUM	= 2152,
@@ -426,6 +449,8 @@ enum item_t
 
 	ITEM_DEPOT		= 2594,
 	ITEM_LOCKER1		= 2589,
+	ITEM_INBOX		= 14404,
+	ITEM_MARKET		= 14405,
 
 	ITEM_MALE_CORPSE	= 3058,
 	ITEM_FEMALE_CORPSE	= 3065,
@@ -449,7 +474,7 @@ enum item_t
 
 	ITEM_AMULETOFLOSS	= 2173,
 
-	ITEM_DOCUMENT_RO	= 1968, //read-only
+	ITEM_DOCUMENT_RO	= 1968 //read-only
 };
 
 enum PlayerBlessings
@@ -463,44 +488,44 @@ enum PlayerBlessings
 
 enum PlayerFlags
 {
-	PlayerFlag_CannotUseCombat = 0,
-	PlayerFlag_CannotAttackPlayer,
-	PlayerFlag_CannotAttackMonster,
-	PlayerFlag_CannotBeAttacked,
-	PlayerFlag_CanConvinceAll,
-	PlayerFlag_CanSummonAll,
-	PlayerFlag_CanIllusionAll,
-	PlayerFlag_CanSenseInvisibility,
-	PlayerFlag_IgnoredByMonsters,
-	PlayerFlag_NotGainInFight,
-	PlayerFlag_HasInfiniteMana,
-	PlayerFlag_HasInfiniteSoul,
-	PlayerFlag_HasNoExhaustion,
-	PlayerFlag_CannotUseSpells,
-	PlayerFlag_CannotPickupItem,
-	PlayerFlag_CanAlwaysLogin,
-	PlayerFlag_CanBroadcast,
-	PlayerFlag_CanEditHouses,
-	PlayerFlag_CannotBeBanned,
-	PlayerFlag_CannotBePushed,
-	PlayerFlag_HasInfiniteCapacity,
-	PlayerFlag_CanPushAllCreatures,
-	PlayerFlag_CanTalkRedPrivate,
-	PlayerFlag_CanTalkRedChannel,
-	PlayerFlag_TalkOrangeHelpChannel,
-	PlayerFlag_NotGainExperience,
-	PlayerFlag_NotGainMana,
-	PlayerFlag_NotGainHealth,
-	PlayerFlag_NotGainSkill,
-	PlayerFlag_SetMaxSpeed,
-	PlayerFlag_SpecialVIP,
-	PlayerFlag_NotGenerateLoot,
-	PlayerFlag_CanTalkRedChannelAnonymous,
-	PlayerFlag_IgnoreProtectionZone,
-	PlayerFlag_IgnoreSpellCheck,
-	PlayerFlag_IgnoreWeaponCheck,
-	PlayerFlag_CannotBeMuted,
-	PlayerFlag_IsAlwaysPremium,
+	PlayerFlag_CannotUseCombat = 0,         //2^0 = 1
+	PlayerFlag_CannotAttackPlayer,          //2^1 = 2
+	PlayerFlag_CannotAttackMonster,         //2^2 = 4
+	PlayerFlag_CannotBeAttacked,            //2^3 = 8
+	PlayerFlag_CanConvinceAll,              //2^4 = 16
+	PlayerFlag_CanSummonAll,                //2^5 = 32
+	PlayerFlag_CanIllusionAll,              //2^6 = 64
+	PlayerFlag_CanSenseInvisibility,        //2^7 = 128
+	PlayerFlag_IgnoredByMonsters,           //2^8 = 256
+	PlayerFlag_NotGainInFight,              //2^9 = 512
+	PlayerFlag_HasInfiniteMana,             //2^10 = 1024
+	PlayerFlag_HasInfiniteSoul,             //2^11 = 2048
+	PlayerFlag_HasNoExhaustion,             //2^12 = 4096
+	PlayerFlag_CannotUseSpells,             //2^13 = 8192
+	PlayerFlag_CannotPickupItem,            //2^14 = 16384
+	PlayerFlag_CanAlwaysLogin,              //2^15 = 32768
+	PlayerFlag_CanBroadcast,                //2^16 = 65536
+	PlayerFlag_CanEditHouses,               //2^17 = 131072
+	PlayerFlag_CannotBeBanned,              //2^18 = 262144
+	PlayerFlag_CannotBePushed,              //2^19 = 524288
+	PlayerFlag_HasInfiniteCapacity,         //2^20 = 1048576
+	PlayerFlag_CanPushAllCreatures,         //2^21 = 2097152
+	PlayerFlag_CanTalkRedPrivate,           //2^22 = 4194304
+	PlayerFlag_CanTalkRedChannel,           //2^23 = 8388608
+	PlayerFlag_TalkOrangeHelpChannel,       //2^24 = 16777216
+	PlayerFlag_NotGainExperience,           //2^25 = 33554432
+	PlayerFlag_NotGainMana,                 //2^26 = 67108864
+	PlayerFlag_NotGainHealth,               //2^27 = 134217728
+	PlayerFlag_NotGainSkill,                //2^28 = 268435456
+	PlayerFlag_SetMaxSpeed,                 //2^29 = 536870912
+	PlayerFlag_SpecialVIP,                  //2^30 = 1073741824
+	PlayerFlag_NotGenerateLoot,             //2^31 = 2147483648
+	PlayerFlag_CanTalkRedChannelAnonymous,  //2^32 = 4294967296
+	PlayerFlag_IgnoreProtectionZone,        //2^33 = 8589934592
+	PlayerFlag_IgnoreSpellCheck,            //2^34 = 17179869184
+	PlayerFlag_IgnoreWeaponCheck,           //2^35 = 34359738368
+	PlayerFlag_CannotBeMuted,               //2^36 = 68719476736
+	PlayerFlag_IsAlwaysPremium,             //2^37 = 137438953472
 
 	//add new flags here
 	PlayerFlag_LastFlag

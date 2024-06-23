@@ -20,7 +20,7 @@
 
 #ifndef __INPUTBOX_H__
 #define __INPUTBOX_H__
-#ifndef __CONSOLE__
+#ifndef _CONSOLE
 #include <tchar.h>
 #include <windows.h>
 #include <stdlib.h>
@@ -42,12 +42,12 @@ class CInputBox
 
 	static LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
-public:
-	LPTSTR Text;
-	BOOL DoModal(LPCTSTR szCaption, LPCTSTR szPrompt);
+	public:
+		LPTSTR Text;
+		BOOL DoModal(LPCTSTR szCaption, LPCTSTR szPrompt);
 
-	CInputBox(HWND hWndParent);
-	virtual ~CInputBox();
+		CInputBox(HWND hWndParent);
+		virtual ~CInputBox();
 
 };
 

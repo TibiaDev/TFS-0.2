@@ -38,6 +38,7 @@
 #include "game.h"
 
 #include "iologindata.h"
+#include "iomarket.h"
 
 #if !defined(__WINDOWS__)
 #include <signal.h> // for sigemptyset()
@@ -54,7 +55,7 @@
 #include "ban.h"
 #include "rsa.h"
 
-#ifndef __CONSOLE__
+#ifndef _CONSOLE
 #ifdef WIN32
 #include "shellapi.h"
 #include "gui.h"
@@ -83,6 +84,8 @@
 #include "allocator.h"
 #endif
 
+#include "databasemanager.h"
+
 #ifdef BOOST_NO_EXCEPTIONS
 	#include <exception>
 	void boost::throw_exception(std::exception const & e)
@@ -106,11 +109,10 @@ Monsters g_monsters;
 Vocations g_vocations;
 RSA g_RSA;
 
-#ifndef __CONSOLE__
+#ifndef _CONSOLE
 #ifdef _WIN32
 NOTIFYICONDATA NID;
 TextLogger logger;
-GUI gui;
 extern Actions* g_actions;
 extern CreatureEvents* g_creatureEvents;
 extern GlobalEvents* g_globalEvents;
@@ -134,7 +136,7 @@ void startupErrorMessage(std::string errorStr)
 		std::cout << "> ERROR: " << errorStr << std::endl;
 
 	#ifdef WIN32
-	#ifndef __CONSOLE__
+	#ifndef _CONSOLE
 	system("pause");
 	#endif
 	#else
@@ -144,7 +146,7 @@ void startupErrorMessage(std::string errorStr)
 }
 
 void mainLoader(
-#ifdef __CONSOLE__
+#ifdef _CONSOLE
 	int argc, char *argv[],
 #endif
 	ServiceManager* servicer
@@ -159,7 +161,7 @@ void badAllocationHandler()
 	exit(-1);
 }
 
-#ifndef __CONSOLE__
+#ifndef _CONSOLE
 void serverMain(void* param)
 #else
 int main(int argc, char *argv[])
@@ -169,7 +171,7 @@ int main(int argc, char *argv[])
 	std::set_new_handler(badAllocationHandler);
 
 	#ifdef _WIN32
-	#ifndef __CONSOLE__
+	#ifndef _CONSOLE
 	std::cout.rdbuf(&logger);
 	#endif
 	#endif
@@ -203,7 +205,7 @@ int main(int argc, char *argv[])
 	g_scheduler.start();
 
 	g_dispatcher.addTask(createTask(boost::bind(mainLoader,
-#ifdef __CONSOLE__
+#ifdef _CONSOLE
 		argc, argv,
 #endif
 		&servicer)));
@@ -215,34 +217,34 @@ int main(int argc, char *argv[])
 	if(servicer.is_running())
 	{
 		std::cout << ">> " << g_config.getString(ConfigManager::SERVER_NAME) << " Server Online!" << std::endl << std::endl;
-		#ifndef __CONSOLE__
-		SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Status: Online!");
-		gui.m_connections = true;
+		#ifndef _CONSOLE
+		SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Status: Online!");
+		GUI::getInstance()->m_connections = true;
 		#endif
 		servicer.run();
 	}
 	else
 	{
 		std::cout << ">> No services running. The server is NOT online." << std::endl;
-		#ifndef __CONSOLE__
-		SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Status: Offline (no services running)!");
+		#ifndef _CONSOLE
+		SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Status: Offline (no services running)!");
 		#endif
 	}
 
 #ifdef __EXCEPTION_TRACER__
 	mainExceptionHandler.RemoveHandler();
 #endif
-#ifndef __CONSOLE__
+#ifndef _CONSOLE
 	exit(0);
 #else
 	return 0;
 #endif
 }
 
-#ifdef __CONSOLE__
-void mainLoader(int argc, char *argv[], ServiceManager* service_manager)
+#ifdef _CONSOLE
+void mainLoader(int argc, char *argv[], ServiceManager* services)
 #else
-void mainLoader(ServiceManager* service_manager)
+void mainLoader(ServiceManager* services)
 #endif
 {
 	//dispatcher thread
@@ -250,12 +252,24 @@ void mainLoader(ServiceManager* service_manager)
 
 	srand((unsigned int)OTSYS_TIME());
 	#ifdef WIN32
-	#ifdef __CONSOLE__
+	#ifdef _CONSOLE
 	SetConsoleTitle(STATUS_SERVER_NAME);
 	#endif
 	#endif
 	std::cout << STATUS_SERVER_NAME << " - Version " << STATUS_SERVER_VERSION << " (" << STATUS_SERVER_CODENAME << ")." << std::endl;
-	std::cout << "A server developed by Talaturen, Kornholijo, Elf, and Fallen." << std::endl;
+	std::cout << "Compilied on " << __DATE__ << " " << __TIME__ << " for arch ";
+
+	#if defined(__amd64__) || defined(_M_X64)
+	std::cout << "x64" << std::endl;
+	#elif defined(__i386__) || defined(_M_IX86) || defined(_X86_)
+	std::cout << "x86" << std::endl;
+	#else
+	std::cout << "unk" << std::endl;
+	#endif
+
+	std::cout << std::endl;
+
+	std::cout << "A server developed by " << STATUS_SERVER_DEVELOPERS << "." << std::endl;
 	std::cout << "Visit our forum for updates, support, and resources: http://otland.net/." << std::endl;
 
 	#if defined __DEBUG__MOVESYS__ || defined __DEBUG_HOUSES__ || defined __DEBUG_MAILBOX__ || defined __DEBUG_LUASCRIPTS__ || defined __DEBUG_RAID__ || defined __DEBUG_NET__
@@ -281,8 +295,8 @@ void mainLoader(ServiceManager* service_manager)
 	std::cout << std::endl;
 	#endif
 
-	#ifndef __CONSOLE__
-	gui.m_connections = false;
+	#ifndef _CONSOLE
+	GUI::getInstance()->m_connections = false;
 	#endif
 
 	#if !defined(_WIN32) && !defined(__ROOT_PERMISSION__)
@@ -294,8 +308,8 @@ void mainLoader(ServiceManager* service_manager)
 
 	// read global config
 	std::cout << ">> Loading config" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading config");
+	#ifndef _CONSOLE
+	SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading config");
 	#endif
 	#if !defined(WIN32) && !defined(__NO_HOMEDIR_CONF__)
 	std::string configpath;
@@ -305,7 +319,10 @@ void mainLoader(ServiceManager* service_manager)
 	#else
 	if(!g_config.loadFile("config.lua"))
 	#endif
+	{
 		startupErrorMessage("Unable to load config.lua!");
+		return;
+	}
 
 	#ifdef WIN32
 	std::string defaultPriority = asLowerCaseString(g_config.getString(ConfigManager::DEFAULT_PRIORITY));
@@ -317,117 +334,113 @@ void mainLoader(ServiceManager* service_manager)
 		SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
 	#endif
 
-	//load RSA key
-	std::cout << ">> Loading RSA key" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading RSA Key");
-	#endif
+	//set RSA key
 	const char* p("14299623962416399520070177382898895550795403345466153217470516082934737582776038882967213386204600674145392845853859217990626450972452084065728686565928113");
 	const char* q("7630979195970404721891201847792002125535401292779123937207447574596692788513647179235335529307251350570728407373705564708871762033017096809910315212884101");
 	const char* d("46730330223584118622160180015036832148732986808519344675210555262940258739805766860224610646919605860206328024326703361630109888417839241959507572247284807035235569619173792292786907845791904955103601652822519121908367187885509270025388641700821735345222087940578381210879116823013776808975766851829020659073");
 	g_RSA.setKey(p, q, d);
 
-	std::cout << ">> Testing SQL connection... ";
-	#if defined __USE_MYSQL__ && defined __USE_SQLITE__
-	std::string sqlType = asLowerCaseString(g_config.getString(ConfigManager::SQL_TYPE));
-	if(sqlType == "mysql")
-	{
-		g_config.setNumber(ConfigManager::SQLTYPE, SQL_TYPE_MYSQL);
-		std::cout << "MySQL." << std::endl;
-		Database* db = Database::getInstance();
-		if(!db->connect())
-			startupErrorMessage("Failed to connect to database, read doc/MYSQL_HELP for information or try SqLite which doesn't require any connection.");
-	}
-	else if(sqlType == "sqlite")
-	{
-		g_config.setNumber(ConfigManager::SQLTYPE, SQL_TYPE_SQLITE);
-		std::cout << "SQLite." << std::endl;
-		FILE* sqliteFile = fopen(g_config.getString(ConfigManager::SQLITE_DB).c_str(), "r");
-		if(!sqliteFile)
-			startupErrorMessage("Failed to load sqlite file: " + std::string(strerror(errno)) + "\n");
-
-			//startupErrorMessage("Failed to connect to sqlite database file, make sure it exists and is readable.");
-		fclose(sqliteFile);
-	}
-	else
-		startupErrorMessage("Unkwown sqlType, valid sqlTypes are: 'mysql' and 'sqlite'.");
-	#elif defined __USE_MYSQL__
-	std::cout << "MySQL." << std::endl;
+	std::cout << ">> Loading database driver..." << std::flush;
 	Database* db = Database::getInstance();
-	if(!db->connect())
-		startupErrorMessage("Failed to connect to database, read doc/MYSQL_HELP for information or try SqLite which doesn't require any connection.");
-	#elif defined __USE_SQLITE__
-	std::cout << "SQLite." << std::endl;
-	FILE* sqliteFile = fopen(g_config.getString(ConfigManager::SQLITE_DB).c_str(), "r");
-	if(sqliteFile == NULL)
-		startupErrorMessage("Failed to connect to sqlite database file, make sure it exists and is readable.");
-	fclose(sqliteFile);
-	#else
-	startupErrorMessage("Unknown sqlType... terminating!");
-	#endif
+	if(!db->isConnected())
+	{
+		switch(db->getDatabaseEngine())
+		{
+			case DATABASE_ENGINE_MYSQL:
+				startupErrorMessage("Failed to connect to database, read doc/MYSQL_HELP for information or try SQLite which doesn't require any connection.");
+				return;
+
+			case DATABASE_ENGINE_SQLITE:
+				startupErrorMessage("Failed to connect to sqlite database file, make sure it exists and is readable.");
+				return;
+
+			default:
+				startupErrorMessage("Unkwown sqlType in config.lua, valid sqlTypes are: \"mysql\" and \"sqlite\".");
+				return;
+		}
+	}
+	std::cout << " " << db->getClientName() << " " << db->getClientVersion() << std::endl;
+
+	// run database manager
+	std::cout << ">> Running database manager" << std::endl;
+	DatabaseManager* dbManager = DatabaseManager::getInstance();
+	if(!dbManager->isDatabaseSetup())
+	{
+		startupErrorMessage("The database you have specified in config.lua is empty, please import the schema to the database.");
+		return;
+	}
+
+	for(uint32_t version = dbManager->updateDatabase(); version != 0; version = dbManager->updateDatabase())
+		std::cout << "> Database has been updated to version " << version << "." << std::endl;
+
+	dbManager->checkTriggers();
+	dbManager->checkEncryption();
+
+	if(g_config.getBoolean(ConfigManager::OPTIMIZE_DATABASE) && !dbManager->optimizeTables())
+		std::cout << "> No tables were optimized." << std::endl;
 
 	//load bans
 	std::cout << ">> Loading bans" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading bans");
+	#ifndef _CONSOLE
+	SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading bans");
 	#endif
 
 	g_bans.init();
 
 	//load vocations
 	std::cout << ">> Loading vocations" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading vocations");
+	#ifndef _CONSOLE
+	SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading vocations");
 	#endif
 	if(!g_vocations.loadFromXml())
 		startupErrorMessage("Unable to load vocations!");
 
 	//load commands
 	std::cout << ">> Loading commands" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading commands");
+	#ifndef _CONSOLE
+	SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading commands");
 	#endif
 	if(!commands.loadFromXml())
 		startupErrorMessage("Unable to load commands!");
 
 	// load item data
 	std::cout << ">> Loading items" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading items");
+	#ifndef _CONSOLE
+	SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading items");
 	#endif
 	if(Item::items.loadFromOtb("data/items/items.otb"))
 		startupErrorMessage("Unable to load items (OTB)!");
 
 	if(!Item::items.loadFromXml())
 	{
-		#if defined(_WIN32) && !defined(__CONSOLE__)
-		if(MessageBoxA(gui.m_mainWindow, "Unable to load items (XML)! Continue?", "Items (XML)", MB_YESNO) == IDNO)
+		#if defined(_WIN32) && !defined(_CONSOLE)
+		if(MessageBoxA(GUI::getInstance()->m_mainWindow, "Unable to load items (XML)! Continue?", "Items (XML)", MB_YESNO) == IDNO)
 		#endif
 			startupErrorMessage("Unable to load items (XML)!");
 	}
 
 	std::cout << ">> Loading script systems" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading script systems");
+	#ifndef _CONSOLE
+	SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading script systems");
 	#endif
 	if(!ScriptingManager::getInstance()->loadScriptSystems())
 		startupErrorMessage("");
 
 	std::cout << ">> Loading monsters" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading monsters");
+	#ifndef _CONSOLE
+	SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading monsters");
 	#endif
 	if(!g_monsters.loadFromXml())
 	{
-		#ifndef __CONSOLE__
-		if(MessageBoxA(gui.m_mainWindow, "Unable to load monsters! Continue?", "Monsters", MB_YESNO) == IDNO)
+		#ifndef _CONSOLE
+		if(MessageBoxA(GUI::getInstance()->m_mainWindow, "Unable to load monsters! Continue?", "Monsters", MB_YESNO) == IDNO)
 		#endif
 			startupErrorMessage("Unable to load monsters!");
 	}
 
 	std::cout << ">> Loading outfits" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading outfits");
+	#ifndef _CONSOLE
+	SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading outfits");
 	#endif
 	Outfits* outfits = Outfits::getInstance();
 	if(!outfits->loadFromXml())
@@ -435,15 +448,15 @@ void mainLoader(ServiceManager* service_manager)
 
 	g_adminConfig = new AdminProtocolConfig();
 	std::cout << ">> Loading admin protocol config" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading admin protocol config");
+	#ifndef _CONSOLE
+	SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading admin protocol config");
 	#endif
 	if(!g_adminConfig->loadXMLConfig())
 		startupErrorMessage("Unable to load admin protocol config!");
 
 	std::cout << ">> Loading experience stages" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading experience stages");
+	#ifndef _CONSOLE
+	SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading experience stages");
 	#endif
 	if(!g_game.loadExperienceStages())
 		startupErrorMessage("Unable to load experience stages!");
@@ -486,8 +499,8 @@ void mainLoader(ServiceManager* service_manager)
 	status->setMapName(g_config.getString(ConfigManager::MAP_NAME));
 
 	std::cout << ">> Loading map" << std::endl;
-	#ifndef __CONSOLE__
-	SendMessage(gui.m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading map");
+	#ifndef _CONSOLE
+	SendMessage(GUI::getInstance()->m_statusBar, WM_SETTEXT, 0, (LPARAM)">> Loading map");
 	#endif
 	if(!g_game.loadMap(g_config.getString(ConfigManager::MAP_NAME)))
 		startupErrorMessage("");
@@ -496,16 +509,16 @@ void mainLoader(ServiceManager* service_manager)
 	g_game.setGameState(GAME_STATE_INIT);
 
 	// Tibia protocols
-	service_manager->add<ProtocolGame>(g_config.getNumber(ConfigManager::GAME_PORT));
-	service_manager->add<ProtocolLogin>(g_config.getNumber(ConfigManager::LOGIN_PORT));
+	services->add<ProtocolGame>(g_config.getNumber(ConfigManager::GAME_PORT));
+	services->add<ProtocolLogin>(g_config.getNumber(ConfigManager::LOGIN_PORT));
 
 	// OT protocols
-	service_manager->add<ProtocolAdmin>(g_config.getNumber(ConfigManager::ADMIN_PORT));
-	service_manager->add<ProtocolStatus>(g_config.getNumber(ConfigManager::STATUS_PORT));
+	services->add<ProtocolAdmin>(g_config.getNumber(ConfigManager::ADMIN_PORT));
+	services->add<ProtocolStatus>(g_config.getNumber(ConfigManager::STATUS_PORT));
 
 	// Legacy protocols
-	service_manager->add<ProtocolOldLogin>(g_config.getNumber(ConfigManager::LOGIN_PORT));
-	service_manager->add<ProtocolOldGame>(g_config.getNumber(ConfigManager::LOGIN_PORT));
+	services->add<ProtocolOldLogin>(g_config.getNumber(ConfigManager::LOGIN_PORT));
+	services->add<ProtocolOldGame>(g_config.getNumber(ConfigManager::LOGIN_PORT));
 
 	g_game.timedHighscoreUpdate();
 
@@ -562,6 +575,12 @@ void mainLoader(ServiceManager* service_manager)
 
 	g_npcs.reload();
 
+	if(g_config.getBoolean(ConfigManager::MARKET_ENABLED))
+	{
+		g_game.checkExpiredMarketOffers();
+		IOMarket::getInstance()->updateStatistics();
+	}
+
 	std::cout << ">> Loaded all modules, server starting up..." << std::endl;
 
 	std::pair<uint32_t, uint32_t> IpNetMask;
@@ -579,7 +598,7 @@ void mainLoader(ServiceManager* service_manager)
 			while(addr[0] != NULL)
 			{
 				IpNetMask.first = *(uint32_t*)(*addr);
-				IpNetMask.second = 0x0000FFFF;
+				IpNetMask.second = 0xFFFFFFFF;
 				serverIPs.push_back(IpNetMask);
 				addr++;
 			}
@@ -611,12 +630,12 @@ void mainLoader(ServiceManager* service_manager)
 	#endif
 
 	IOLoginData::getInstance()->resetOnlineStatus();
-	g_game.start(service_manager);
+	g_game.start(services);
 	g_game.setGameState(GAME_STATE_NORMAL);
 	OTSYS_THREAD_SIGNAL_SEND(g_loaderSignal);
 }
 
-#ifndef __CONSOLE__
+#ifndef _CONSOLE
 LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	CInputBox iBox(hwnd);
@@ -624,15 +643,15 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 	{
 		case WM_CREATE:
 		{
-			gui.m_logWindow = CreateWindow("edit", NULL, WS_CHILD | WS_VSCROLL | WS_HSCROLL | WS_VISIBLE | ES_MULTILINE | DS_CENTER, 0, 0, 700, 400, hwnd, (HMENU)ID_LOG, NULL, NULL);
-			gui.m_statusBar = CreateWindowEx(0, STATUSCLASSNAME, NULL, WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP, 0, 0, 0, 0, hwnd, (HMENU)ID_STATUS_BAR, GetModuleHandle(NULL), NULL);
+			GUI::getInstance()->m_logWindow = CreateWindow("edit", NULL, WS_CHILD | WS_VSCROLL | WS_HSCROLL | WS_VISIBLE | ES_MULTILINE | DS_CENTER, 0, 0, 700, 400, hwnd, (HMENU)ID_LOG, NULL, NULL);
+			GUI::getInstance()->m_statusBar = CreateWindowEx(0, STATUSCLASSNAME, NULL, WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP, 0, 0, 0, 0, hwnd, (HMENU)ID_STATUS_BAR, GetModuleHandle(NULL), NULL);
 			int32_t statusBarWidthLine[] = {150, -1};
-			gui.m_lineCount = 0;
-			SendMessage(gui.m_statusBar, SB_SETPARTS, sizeof(statusBarWidthLine)/sizeof(int32_t), (LPARAM)statusBarWidthLine);
-			SendMessage(gui.m_statusBar, SB_SETTEXT, 0, (LPARAM)"Not loaded");
-			gui.m_minimized = false;
-			gui.m_pBox.setParent(hwnd);
-			SendMessage(gui.m_logWindow, WM_SETFONT, (WPARAM)gui.m_font, 0);
+			GUI::getInstance()->m_lineCount = 0;
+			SendMessage(GUI::getInstance()->m_statusBar, SB_SETPARTS, sizeof(statusBarWidthLine)/sizeof(int32_t), (LPARAM)statusBarWidthLine);
+			SendMessage(GUI::getInstance()->m_statusBar, SB_SETTEXT, 0, (LPARAM)"Not loaded");
+			GUI::getInstance()->m_minimized = false;
+			GUI::getInstance()->m_pBox.setParent(hwnd);
+			SendMessage(GUI::getInstance()->m_logWindow, WM_SETFONT, (WPARAM)GUI::getInstance()->m_font, 0);
 			NID.hWnd = hwnd;
 			NID.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_ICON));
 			NID.uCallbackMessage = WM_USER+1;
@@ -647,9 +666,9 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 		{
 			if(wParam == SIZE_MINIMIZED)
 			{
-				gui.m_minimized = true;
+				GUI::getInstance()->m_minimized = true;
 				ShowWindow(hwnd, SW_HIDE);
-				ModifyMenu(gui.m_trayMenu, ID_TRAY_HIDE, MF_STRING, ID_TRAY_HIDE, "&Show window");
+				ModifyMenu(GUI::getInstance()->m_trayMenu, ID_TRAY_HIDE, MF_STRING, ID_TRAY_HIDE, "&Show window");
 			}
 			else
 			{
@@ -657,14 +676,14 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 				int32_t iStatusHeight;
 				int32_t iEditHeight;
 				RECT rcClient;
-				gui.m_statusBar = GetDlgItem(hwnd, ID_STATUS_BAR);
-				SendMessage(gui.m_statusBar, WM_SIZE, 0, 0);
-				GetWindowRect(gui.m_statusBar, &rcStatus);
+				GUI::getInstance()->m_statusBar = GetDlgItem(hwnd, ID_STATUS_BAR);
+				SendMessage(GUI::getInstance()->m_statusBar, WM_SIZE, 0, 0);
+				GetWindowRect(GUI::getInstance()->m_statusBar, &rcStatus);
 				iStatusHeight = rcStatus.bottom - rcStatus.top;
 				GetClientRect(hwnd, &rcClient);
 				iEditHeight = rcClient.bottom - iStatusHeight;
-				gui.m_logWindow = GetDlgItem(hwnd, ID_LOG);
-				SetWindowPos(gui.m_logWindow, NULL, 0, rcClient.top, rcClient.right, iEditHeight, SWP_NOZORDER);
+				GUI::getInstance()->m_logWindow = GetDlgItem(hwnd, ID_LOG);
+				SetWindowPos(GUI::getInstance()->m_logWindow, NULL, 0, rcClient.top, rcClient.right, iEditHeight, SWP_NOZORDER);
 			}
 			break;
 		}
@@ -674,30 +693,35 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 			switch(LOWORD(wParam))
 			{
 				case ID_TRAY_HIDE:
-					if(gui.m_minimized)
+				{
+					if(GUI::getInstance()->m_minimized)
 					{
 						ShowWindow(hwnd, SW_SHOW);
 						ShowWindow(hwnd, SW_RESTORE);
-						ModifyMenu(gui.m_trayMenu, ID_TRAY_HIDE, MF_STRING, ID_TRAY_HIDE, "&Hide window");
-						gui.m_minimized = false;
+						ModifyMenu(GUI::getInstance()->m_trayMenu, ID_TRAY_HIDE, MF_STRING, ID_TRAY_HIDE, "&Hide window");
+						GUI::getInstance()->m_minimized = false;
 					}
 					else
 					{
 						ShowWindow(hwnd, SW_HIDE);
-						ModifyMenu(gui.m_trayMenu, ID_TRAY_HIDE, MF_STRING, ID_TRAY_HIDE, "&Show window");
-						gui.m_minimized = true;
+						ModifyMenu(GUI::getInstance()->m_trayMenu, ID_TRAY_HIDE, MF_STRING, ID_TRAY_HIDE, "&Show window");
+						GUI::getInstance()->m_minimized = true;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_BROADCAST:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(iBox.DoModal("Broadcast Message", "What would you like to broadcast?"))
 							g_game.broadcastMessage(iBox.Text, MSG_STATUS_WARNING);
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_ACTIONS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(g_actions->reload())
@@ -706,8 +730,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload actions." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_CREATUREEVENTS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(g_creatureEvents->reload())
@@ -716,8 +742,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload creature events." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_COMMANDS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(commands.reload())
@@ -726,8 +754,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload commands." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_CONFIG:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(g_config.reload())
@@ -736,8 +766,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload config." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_HIGHSCORES:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(g_game.reloadHighscores())
@@ -746,8 +778,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload highscores." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_MONSTERS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(g_monsters.reload())
@@ -756,8 +790,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload monsters." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_MOUNTS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(Mounts::getInstance()->reload())
@@ -766,8 +802,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload mounts." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_MOVEMENTS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(g_moveEvents->reload())
@@ -776,16 +814,20 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload movements." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_NPCS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						g_npcs.reload();
 						std::cout << "Reloaded npcs." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_QUESTS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(Quests::getInstance()->reload())
@@ -794,8 +836,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload quests." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_RAIDS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(Raids::getInstance()->reload() && Raids::getInstance()->startup())
@@ -804,8 +848,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload raids." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_SPELLS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(g_spells->reload() && g_monsters.reload())
@@ -814,8 +860,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload spells." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_TALKACTIONS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(g_talkActions->reload())
@@ -824,8 +872,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload talkactions." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_GLOBALEVENTS:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						if(g_globalEvents->reload())
@@ -834,8 +884,10 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 							std::cout << "Failed to reload globalevents." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_RELOAD_RELOADALL:
+				{
 					if(g_game.getGameState() == GAME_STATE_STARTUP)
 						break;
 
@@ -881,60 +933,74 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 					g_npcs.reload();
 					std::cout << "Reloaded all." << std::endl;
 					break;
+				}
 
 				case ID_MENU_GAME_WORLDTYPE_PVP:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						g_game.setWorldType(WORLD_TYPE_PVP);
 						std::cout << "WorldType set to 'PVP'." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_WORLDTYPE_NOPVP:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						g_game.setWorldType(WORLD_TYPE_NO_PVP);
 						std::cout << "WorldType set to 'Non PVP'." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_WORLDTYPE_PVPENFORCED:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
 						g_game.setWorldType(WORLD_TYPE_PVP_ENFORCED);
 						std::cout << "WorldType set to 'PVP Enforced'." << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_FILE_CLEARLOG:
+				{
 					if(g_game.getGameState() != GAME_STATE_STARTUP)
 					{
-						gui.m_logText = "";
-						gui.m_lineCount = 0;
+						GUI::getInstance()->m_logText = "";
+						GUI::getInstance()->m_lineCount = 0;
 						std::cout << STATUS_SERVER_NAME << " - Version " << STATUS_SERVER_VERSION << " (" << STATUS_SERVER_CODENAME << ")." << std::endl;
-						std::cout << "A server developed by Talaturen, Kornholijo, Elf, and Fallen." << std::endl;
+						std::cout << "A server developed by " << STATUS_SERVER_DEVELOPERS << "." << std::endl;
 						std::cout << "Visit our forum for updates, support and resources: http://otland.net/." << std::endl << std::endl;
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_ACCEPT:
-					if(g_game.getGameState() != GAME_STATE_STARTUP && !gui.m_connections)
+				{
+					if(g_game.getGameState() != GAME_STATE_STARTUP && !GUI::getInstance()->m_connections)
 					{
-						gui.m_connections = true;
+						GUI::getInstance()->m_connections = true;
 						ModifyMenu(GetMenu(hwnd), ID_MENU_GAME_ACCEPT, MF_STRING, ID_MENU_GAME_REJECT, "&Reject Connections");
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_REJECT:
-					if(g_game.getGameState() != GAME_STATE_STARTUP && gui.m_connections)
+				{
+					if(g_game.getGameState() != GAME_STATE_STARTUP && GUI::getInstance()->m_connections)
 					{
-						gui.m_connections = false;
+						GUI::getInstance()->m_connections = false;
 						ModifyMenu(GetMenu(hwnd), ID_MENU_GAME_REJECT, MF_STRING, ID_MENU_GAME_ACCEPT, "&Accept Connections");
 					}
 					break;
+				}
 
 				case ID_TRAY_SHUTDOWN:
 				case ID_MENU_FILE_SHUTDOWN:
+				{
 					if(MessageBoxA(hwnd, "Are you sure you want to shutdown the server?", "Shutdown", MB_YESNO) == IDYES)
 					{
 						g_dispatcher.addTask(
@@ -942,16 +1008,17 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 						Shell_NotifyIcon(NIM_DELETE, &NID);
 					}
 					break;
+				}
 
 				case ID_MENU_GAME_PLAYERS_LIST:
 				{
-					if(g_game.getGameState() != GAME_STATE_STARTUP && gui.m_connections)
+					if(g_game.getGameState() != GAME_STATE_STARTUP && GUI::getInstance()->m_connections)
 					{
 						int32_t playersOnline = g_game.getPlayersOnline();
 						if(playersOnline == 0)
 							MessageBoxA(NULL, "No players online.", "Player List", MB_OK);
 						else
-							gui.m_pBox.popUp("Player List");
+							GUI::getInstance()->m_pBox.popUp("Player List");
 					}
 				}
 				break;
@@ -962,7 +1029,7 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 					{
 						g_dispatcher.addTask(
 							createTask(boost::bind(&Game::saveGameState, &g_game)));
-						MessageBoxA(NULL, "The players online has been saved.", "Save players", MB_OK);
+						MessageBoxA(NULL, "The players online have been saved.", "Save players", MB_OK);
 					}
 				}
 				break;
@@ -990,18 +1057,18 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 				{
 					POINT mp;
 					GetCursorPos(&mp);
-					TrackPopupMenu(GetSubMenu(gui.m_trayMenu, 0), 0, mp.x, mp.y, 0, hwnd, 0);
+					TrackPopupMenu(GetSubMenu(GUI::getInstance()->m_trayMenu, 0), 0, mp.x, mp.y, 0, hwnd, 0);
 				}
 				break;
 
 				case WM_LBUTTONUP: // left click
 				{
-					if(gui.m_minimized)
+					if(GUI::getInstance()->m_minimized)
 					{
 						ShowWindow(hwnd, SW_SHOW);
 						ShowWindow(hwnd, SW_RESTORE);
-						ModifyMenu(gui.m_trayMenu, ID_TRAY_HIDE, MF_STRING, ID_TRAY_HIDE, "&Hide window");
-						gui.m_minimized = false;
+						ModifyMenu(GUI::getInstance()->m_trayMenu, ID_TRAY_HIDE, MF_STRING, ID_TRAY_HIDE, "&Hide window");
+						GUI::getInstance()->m_minimized = false;
 					}
 				}
 				break;
@@ -1019,15 +1086,15 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszA
 {
 	MSG messages;
 	WNDCLASSEX wincl;
-	gui.initTrayMenu();
-	gui.initFont();
+	GUI::getInstance()->initTrayMenu();
+	GUI::getInstance()->initFont();
 	wincl.hInstance = hInstance;
 	wincl.lpszClassName = "forgottenserver_gui";
 	wincl.lpfnWndProc = WindowProcedure;
 	wincl.style = CS_DBLCLKS;
 	wincl.cbSize = sizeof(WNDCLASSEX);
-	wincl.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_ICON));
-	wincl.hIconSm = (HICON)LoadImage(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_ICON), IMAGE_ICON, 16, 16, 0);
+	wincl.hIcon  = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_ICON));
+	wincl.hIconSm  = (HICON)LoadImage(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_ICON), IMAGE_ICON, 16, 16, 0);
 	wincl.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wincl.lpszMenuName = MAKEINTRESOURCE(ID_MENU);
 	wincl.cbClsExtra = 0;
@@ -1035,8 +1102,9 @@ int32_t WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszA
 	wincl.hbrBackground = (HBRUSH)COLOR_BACKGROUND;
 	if(!RegisterClassEx(&wincl))
 		return 0;
-	gui.m_mainWindow = CreateWindowEx(0, "forgottenserver_gui", STATUS_SERVER_NAME, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 707, 453, HWND_DESKTOP, NULL, hInstance, NULL);
-	ShowWindow(gui.m_mainWindow, 1);
+
+	GUI::getInstance()->m_mainWindow = CreateWindowEx(0, "forgottenserver_gui", STATUS_SERVER_NAME, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 707, 453, HWND_DESKTOP, NULL, hInstance, NULL);
+	ShowWindow(GUI::getInstance()->m_mainWindow, 1);
 	while(GetMessage(&messages, NULL, 0, 0))
 	{
 		TranslateMessage(&messages);

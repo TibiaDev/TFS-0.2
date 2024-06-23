@@ -44,6 +44,7 @@
 #define	SLOTP_AMMO 512
 #define	SLOTP_DEPOT 1024
 #define	SLOTP_TWO_HAND 2048
+#define SLOTP_HAND (SLOTP_LEFT | SLOTP_RIGHT)
 
 enum ItemTypes_t
 {
@@ -94,7 +95,7 @@ struct Abilities
 	int32_t skills[SKILL_LAST + 1];
 
 	//damage abilities modifiers
-	int16_t absorbPercent[COMBAT_LAST + 1];
+	int16_t absorbPercent[COMBAT_COUNT + 1];
 
 	//stats modifiers
 	int32_t stats[STAT_LAST + 1];
@@ -142,11 +143,10 @@ class ItemType
 		bool isTrashHolder() const {return (type == ITEM_TYPE_TRASHHOLDER);}
 		bool isBed() const {return (type == ITEM_TYPE_BED);}
 
-		// FIXME
-		bool isLevelDoor() const {return id == 1227 || id == 1229 || id == 1245 || id == 1247 || id == 1259 || id == 1261 || id == 3540 || id == 3549 || id == 5103 || id == 5112 || id == 5121 || id == 5130 || id == 5292 || id == 5294 || id == 6206 || id == 6208 || id == 6263 || id == 6265 || id == 6896 || id == 6905 || id == 7038 || id == 7047 || id == 8555 || id == 8557 || id == 9179 || id == 9181 || id == 9281 || id == 9283 || id == 10282 || id == 10284 || id == 10473 || id == 10482;}
-
 		bool isRune() const {return type == ITEM_TYPE_RUNE;}
 		bool hasSubType() const {return (isFluidContainer() || isSplash() || stackable || charges != 0);}
+
+		Abilities* getAbilities() { if(abilities == NULL) { abilities = new Abilities(); } return abilities; }
 
 		Direction bedPartnerDir;
 		uint16_t transformToOnUse[2];
@@ -170,7 +170,8 @@ class ItemType
 		int32_t defense;
 		int32_t extraDefense;
 		int32_t armor;
-		uint16_t slot_position;
+		uint16_t slotPosition;
+		uint32_t levelDoor;
 		bool isVertical;
 		bool isHorizontal;
 		bool isHangable;
@@ -238,11 +239,12 @@ class ItemType
 		AmmoAction_t ammoAction;
 		FluidTypes_t fluidSource;
 
-		Abilities abilities;
+		Abilities* abilities;
 
 		Condition* condition;
 		CombatType_t combatType;
 		bool replaceable;
+		bool ware;
 };
 
 template<typename A>

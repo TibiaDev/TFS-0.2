@@ -291,13 +291,10 @@ ReturnValue Actions::internalUseItem(Player* player, const Position& pos,
 			if(action->executeUse(player, item, posEx, posEx, false, creatureId))
 				return RET_NOERROR;
 		}
-		else
+		else if(action->function)
 		{
-			if(action->function)
-			{
-				if(action->function(player, item, posEx, posEx, false, creatureId))
-					return RET_NOERROR;
-			}
+			if(action->function(player, item, posEx, posEx, false, creatureId))
+				return RET_NOERROR;
 		}
 	}
 
@@ -450,7 +447,9 @@ void Actions::showUseHotkeyMessage(Player* player, int32_t id, uint32_t count)
 {
 	const ItemType& it = Item::items[id];
 	std::stringstream ss;
-	if(count == 1)
+	if(!it.showCount)
+		ss << "Using one of " << it.name << "...";
+	else if(count == 1)
 		ss << "Using the last " << it.name << "...";
 	else
 		ss << "Using one of " << count << " " << it.pluralName << "...";
@@ -460,7 +459,7 @@ void Actions::showUseHotkeyMessage(Player* player, int32_t id, uint32_t count)
 
 bool Actions::hasAction(const Item* item)
 {
-	return getAction(item);
+	return getAction(item) != NULL;
 }
 
 Action::Action(LuaScriptInterface* _interface) :
@@ -508,6 +507,8 @@ bool Action::loadFunction(const std::string& functionName)
 		function = decreaseItemId;
 	else if(tmpFunctionName == "highscorebook")
 		function = highscoreBook;
+	else if(tmpFunctionName == "market")
+		function = enterMarket;
 	else
 	{
 		std::cout << "[Warning - Action::loadFunction] Function \"" << functionName << "\" does not exist." << std::endl;
@@ -520,48 +521,52 @@ bool Action::loadFunction(const std::string& functionName)
 
 bool Action::highscoreBook(Player* player, Item* item, const PositionEx& posFrom, const PositionEx& posTo, bool extendedUse, uint32_t creatureId)
 {
-	if(player)
-	{
-		if(item)
-		{
-			if(item->getActionId() >= 150 && item->getActionId() <= 158)
-			{
-				std::string highscoreString = g_game.getHighscoreString(item->getActionId() - 150);
-				item->setText(highscoreString);
-				player->sendTextWindow(item, highscoreString.size(), false);
-				return true;
-			}
-		}
-	}
-	return false;
+	if(item->getActionId() < 150 || item->getActionId() > 158)
+		return false;
+
+	std::string highscoreString = g_game.getHighscoreString(item->getActionId() - 150);
+	item->setText(highscoreString);
+	player->sendTextWindow(item, highscoreString.size(), false);
+	return true;
 }
 
 bool Action::increaseItemId(Player* player, Item* item, const PositionEx& posFrom, const PositionEx& posTo, bool extendedUse, uint32_t creatureId)
 {
-	if(player)
-	{
-		if(item)
-		{
-			g_game.transformItem(item, item->getID() + 1);
-			g_game.startDecay(item);
-			return true;
-		}
-	}
-	return false;
+	g_game.transformItem(item, item->getID() + 1);
+	g_game.startDecay(item);
+	return true;
 }
 
 bool Action::decreaseItemId(Player* player, Item* item, const PositionEx& posFrom, const PositionEx& posTo, bool extendedUse, uint32_t creatureId)
 {
-	if(player)
+	g_game.transformItem(item, item->getID() - 1);
+	g_game.startDecay(item);
+	return true;
+}
+
+bool Action::enterMarket(Player* player, Item* item, const PositionEx& posFrom, const PositionEx& posTo, bool extendedUse, uint32_t creatureId)
+{
+	if(!g_config.getBoolean(ConfigManager::MARKET_ENABLED))
 	{
-		if(item)
+		player->sendTextMessage(MSG_INFO_DESCR, "The market is disabled.");
+		return false;
+	}
+
+	Depot* depot = NULL;
+	if(Thing* thing = item->getParent())
+	{
+		if(Item* parentItem = thing->getItem())
 		{
-			g_game.transformItem(item, item->getID() - 1);
-			g_game.startDecay(item);
-			return true;
+			if(Container* parentContainer = parentItem->getContainer())
+				depot = parentContainer->getDepot();
 		}
 	}
-	return false;
+
+	if(depot == NULL)
+		return false;
+
+	player->sendMarketEnter(depot->getDepotId());
+	return true;
 }
 
 std::string Action::getScriptEventName()
@@ -571,12 +576,10 @@ std::string Action::getScriptEventName()
 
 ReturnValue Action::canExecuteAction(const Player* player, const Position& toPos)
 {
-	ReturnValue ret = RET_NOERROR;
 	if(!getAllowFarUse())
-		ret = g_actions->canUse(player, toPos);
-	else
-		ret = g_actions->canUseFar(player, toPos, getCheckLineOfSight());
-	return ret;
+		return g_actions->canUse(player, toPos);
+
+	return g_actions->canUseFar(player, toPos, getCheckLineOfSight());
 }
 
 bool Action::executeUse(Player* player, Item* item, const PositionEx& fromPos, const PositionEx& toPos, bool extendedUse, uint32_t creatureId)
@@ -584,7 +587,7 @@ bool Action::executeUse(Player* player, Item* item, const PositionEx& fromPos, c
 	//onUse(cid, item, fromPosition, itemEx, toPosition)
 	if(m_scriptInterface->reserveScriptEnv())
 	{
-		ScriptEnviroment* env = m_scriptInterface->getScriptEnv();
+		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 
 		#ifdef __DEBUG_LUASCRIPTS__
 		std::stringstream desc;

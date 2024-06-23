@@ -44,7 +44,8 @@ TalkActions::~TalkActions()
 void TalkActions::clear()
 {
 	TalkActionList::iterator it = wordsMap.begin();
-	while(it != wordsMap.end()){
+	while(it != wordsMap.end())
+	{
 		delete it->second;
 		wordsMap.erase(it);
 		it = wordsMap.begin();
@@ -154,7 +155,7 @@ int32_t TalkAction::executeSay(Creature* creature, const std::string& words, con
 	//onSay(cid, words, param)
 	if(m_scriptInterface->reserveScriptEnv())
 	{
-		ScriptEnviroment* env = m_scriptInterface->getScriptEnv();
+		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 
 		#ifdef __DEBUG_LUASCRIPTS__
 		char desc[125];

@@ -80,11 +80,10 @@ class Weapon : public Event
 
 		uint16_t getID() const {return id;}
 		virtual int32_t getWeaponDamage(const Player* player, const Creature* target, const Item* item, bool maxDamage = false) const = 0;
-		virtual int32_t getElementDamage(const Player* player, const Creature* target) const {return 0;}
 
 		uint32_t getReqLevel() const {return level;}
 		int32_t getReqMagLv() const {return magLevel;}
-		bool hasExhaustion() const {return exhaustion;}
+		bool hasExhaustion() const {return exhaustion != 0;}
 		bool isPremium() const {return premium;}
 		bool isWieldedUnproperly() const {return wieldUnproperly;}
 
@@ -131,7 +130,6 @@ class WeaponMelee : public Weapon
 
 		virtual bool useWeapon(Player* player, Item* item, Creature* target) const;
 		virtual int32_t getWeaponDamage(const Player* player, const Creature* target, const Item* item, bool maxDamage = false) const;
-		virtual int32_t getElementDamage(const Player* player, const Item* item) const;
 
 	protected:
 		virtual void onUsedWeapon(Player* player, Item* item, Tile* destTile) const;

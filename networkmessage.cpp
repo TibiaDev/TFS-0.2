@@ -49,7 +49,7 @@ std::string NetworkMessage::GetString(uint16_t stringlen/* = 0*/)
 	if(stringlen == 0)
 		stringlen = GetU16();
 
-	if(stringlen >= (NETWORKMESSAGE_MAXSIZE - m_ReadPos))
+	if(!canRead(stringlen))
 		return std::string();
 
 	char* v = (char*)(m_MsgBuf + m_ReadPos);
@@ -130,7 +130,7 @@ void NetworkMessage::AddItem(const Item* item)
 	AddU16(it.clientId);
 
 	if(it.stackable)
-		AddByte(item->getSubType());
+		AddByte(std::min((uint16_t)255, item->getSubType()));
 	else if(it.isSplash() || it.isFluidContainer())
 	{
 		uint32_t fluidIndex = item->getSubType() % 8;
