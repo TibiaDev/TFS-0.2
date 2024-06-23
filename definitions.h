@@ -21,6 +21,12 @@
 #ifndef __OTSERV_DEFINITIONS_H__
 #define __OTSERV_DEFINITIONS_H__
 
+#ifdef _WIN32
+#ifndef WIN32
+#define WIN32
+#endif
+#endif
+
 #ifndef WIN32
 	#define __CONSOLE__
 #endif
@@ -56,12 +62,6 @@ enum passwordType_t
 	PASSWORD_TYPE_MD5,
 	PASSWORD_TYPE_SHA1
 };
-
-#ifdef _WIN32
-#ifndef WIN32
-#define WIN32
-#endif
-#endif
 
 #if defined __WINDOWS__ || defined WIN32
 
@@ -131,7 +131,8 @@ enum passwordType_t
 		return ::_strnicmp(s1, s2, n);
 	}
 
-	#if VISUALC_VERSION >= 10
+	//#if VISUALC_VERSION >= 10
+	#if defined(_MSC_VER) && _MSC_VER >= 10
 		#include <stdint.h>
 	#else
 		typedef signed long long int64_t;

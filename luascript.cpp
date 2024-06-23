@@ -1010,8 +1010,8 @@ std::string LuaScriptInterface::popString(lua_State* L)
 {
 	lua_pop(L,1);
 	const char* str = lua_tostring(L, 0);
-	if(!str || strlen(str) == 0)
-		return "";
+	if(!str || *str == '\0')
+		return std::string();
 
 	return str;
 }
@@ -1568,6 +1568,9 @@ void LuaScriptInterface::registerFunctions()
 	//getHouseTilesSize(houseid)
 	lua_register(m_luaState, "getHouseTilesSize", LuaScriptInterface::luaGetHouseTilesSize);
 
+	//getHighscoreString(skillId)
+	lua_register(m_luaState, "getHighscoreString", LuaScriptInterface::luaGetHighscoreString);
+
 	//setHouseAccessList(houseid, listid, listtext)
 	lua_register(m_luaState, "setHouseAccessList", LuaScriptInterface::luaSetHouseAccessList);
 
@@ -1762,6 +1765,12 @@ void LuaScriptInterface::registerFunctions()
 
 	//getItemIdByName(name)
 	lua_register(m_luaState, "getItemIdByName", LuaScriptInterface::luaGetItemIdByName);
+
+	//getTownName(townId)
+	lua_register(m_luaState, "getTownName", LuaScriptInterface::luaGetTownName);
+
+	//getTownTemplePosition(townId)
+	lua_register(m_luaState, "getTownTemplePosition", LuaScriptInterface::luaGetTownTemplePosition);
 
 	//isSightClear(fromPos, toPos, floorCheck)
 	lua_register(m_luaState, "isSightClear", LuaScriptInterface::luaIsSightClear);
@@ -1964,12 +1973,12 @@ int32_t LuaScriptInterface::internalGetPlayerInfo(lua_State* L, PlayerInfo_t inf
 				break;
 
 			case PlayerInfoPzLock:
-				value = player->isPzLocked();
-				break;
+				lua_pushboolean(L, player->isPzLocked());
+				return 1;
 
 			case PlayerInfoGhostStatus:
-				value = player->isInGhostMode();
-				break;
+				lua_pushboolean(L, player->isInGhostMode());
+				return 1;
 
 			case PlayerInfoIp:
 				value = (int32_t)player->getIP();
@@ -1981,7 +1990,7 @@ int32_t LuaScriptInterface::internalGetPlayerInfo(lua_State* L, PlayerInfo_t inf
 				value = 0;
 				break;
 		}
-		lua_pushnumber(L,value);
+		lua_pushnumber(L, value);
 		return 1;
 	}
 	else
@@ -2115,7 +2124,7 @@ int32_t LuaScriptInterface::luaGetPlayerFlagValue(lua_State* L)
 	if(player)
 	{
 		if(flagindex < PlayerFlag_LastFlag)
-			lua_pushnumber(L, player->hasFlag((PlayerFlags)flagindex) ? 1 : 0);
+			lua_pushboolean(L, player->hasFlag((PlayerFlags)flagindex));
 		else
 		{
 			reportErrorFunc("No valid flag index.");
@@ -2477,7 +2486,7 @@ int32_t LuaScriptInterface::luaDoTeleportThing(lua_State* L)
 
 	bool pushMovement = false;
 	if(parameters > 2)
-		pushMovement = popNumber(L) == 1;
+		pushMovement = popBoolean(L);
 
 	PositionEx pos;
 	popPosition(L, pos);
@@ -3888,7 +3897,7 @@ int32_t LuaScriptInterface::luaSetPlayerStorageValue(lua_State* L)
 	if(player)
 	{
 		player->addStorageValue(key,value);
-		lua_pushnumber(L, 0);
+		lua_pushboolean(L, true);
 	}
 	else
 	{
@@ -4417,6 +4426,18 @@ int32_t LuaScriptInterface::luaGetHouseTilesSize(lua_State* L)
 		reportErrorFunc(getErrorDesc(LUA_ERROR_HOUSE_NOT_FOUND));
 		lua_pushboolean(L, false);
 	}
+	return 1;
+}
+
+int32_t LuaScriptInterface::luaGetHighscoreString(lua_State* L)
+{
+	//getHighscoreString(skillId)
+	uint16_t skillId = popNumber(L);
+	if(skillId <= SKILL_LAST)
+		lua_pushstring(L, g_game.getHighscoreString(skillId).c_str());
+	else
+		lua_pushboolean(L, false);
+
 	return 1;
 }
 
@@ -6191,7 +6212,7 @@ int32_t LuaScriptInterface::luaSetGlobalStorageValue(lua_State* L)
 
 	ScriptEnviroment* env = getScriptEnv();
 	env->addGlobalStorageValue(key,value);
-	lua_pushnumber(L,0);
+	lua_pushboolean(L, true);
 	return 1;
 }
 
@@ -6965,7 +6986,7 @@ int32_t LuaScriptInterface::luaCanPlayerWearOutfit(lua_State* L)
 	Player* player = env->getPlayerByUID(cid);
 	if(player)
 	{
-		lua_pushnumber(L, (player->canWear(looktype, addon)? true : false));
+		lua_pushboolean(L, player->canWear(looktype, addon));
 		return 1;
 	}
 
@@ -7220,7 +7241,7 @@ int32_t LuaScriptInterface::luaHasProperty(lua_State* L)
 	if(item->getTile() && item->getTile()->ground == item)
 		hasProp = item->getTile()->hasProperty((ITEMPROPERTY)prop);
 
-	lua_pushnumber(L, hasProp ? true : false);
+	lua_pushboolean(L, hasProp);
 	return 1;
 }
 
@@ -7326,6 +7347,30 @@ int32_t LuaScriptInterface::luaGetItemIdByName(lua_State* L)
 	return 1;
 }
 
+int32_t LuaScriptInterface::luaGetTownTemplePosition(lua_State* L)
+{
+	//getTownTemplePosition(townId)
+	uint32_t townId = popNumber(L);
+	if(Town* town = Towns::getInstance().getTown(townId))
+		pushPosition(L, town->getTemplePosition(), 255);
+	else
+		lua_pushboolean(L, false);
+
+	return 1;
+}
+
+int32_t LuaScriptInterface::luaGetTownName(lua_State* L)
+{
+	//getTownName(townId)
+	uint32_t townId = popNumber(L);
+	if(Town* town = Towns::getInstance().getTown(townId))
+		lua_pushstring(L, town->getName().c_str());
+	else
+		lua_pushboolean(L, false);
+
+	return 1;
+}
+
 int32_t LuaScriptInterface::luaIsSightClear(lua_State* L)
 {
 	//isSightClear(fromPos, toPos, floorCheck)
@@ -7334,8 +7379,7 @@ int32_t LuaScriptInterface::luaIsSightClear(lua_State* L)
 	popPosition(L, toPos);
 	popPosition(L, fromPos);
 
-	bool result = g_game.isSightClear(fromPos, toPos, floorCheck);
-	lua_pushnumber(L, (result ? true : false));
+	lua_pushboolean(L, g_game.isSightClear(fromPos, toPos, floorCheck));
 	return 1;
 }
 
