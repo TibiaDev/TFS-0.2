@@ -1113,6 +1113,9 @@ void LuaScriptInterface::registerFunctions()
 	//getPlayerGuildId(cid)
 	lua_register(m_luaState, "getPlayerGuildId", LuaScriptInterface::luaGetPlayerGuildId);
 
+	//getPlayerGuildLevel(cid)
+	lua_register(m_luaState, "getPlayerGuildLevel", LuaScriptInterface::luaGetPlayerGuildLevel);
+
 	//getPlayerGuildName(cid)
 	lua_register(m_luaState, "getPlayerGuildName", LuaScriptInterface::luaGetPlayerGuildName);
 
@@ -1436,6 +1439,9 @@ void LuaScriptInterface::registerFunctions()
 
 	//getContainerCap(uid)
 	lua_register(m_luaState, "getContainerCap", LuaScriptInterface::luaGetContainerCap);
+
+	//getContainerCapById(itemid)
+	lua_register(m_luaState, "getContainerCapById", LuaScriptInterface::luaGetContainerCapById);
 
 	//getContainerItem(uid, slot)
 	lua_register(m_luaState, "getContainerItem", LuaScriptInterface::luaGetContainerItem);
@@ -1808,6 +1814,9 @@ int32_t LuaScriptInterface::internalGetPlayerInfo(lua_State* L, PlayerInfo_t inf
 			case PlayerInfoGuildId:
 				value = player->getGuildId();
 				break;
+			case PlayerInfoGuildLevel:
+				value = player->getGuildLevel();
+				break;
 			case PlayerInfoGuildName:
 				lua_pushstring(L, player->getGuildName().c_str());
 				return 1;
@@ -1882,6 +1891,9 @@ int32_t LuaScriptInterface::luaGetPlayerFreeCap(lua_State* L){
 
 int32_t LuaScriptInterface::luaGetPlayerGuildId(lua_State* L){
 	return internalGetPlayerInfo(L,PlayerInfoGuildId);}
+
+int32_t LuaScriptInterface::luaGetPlayerGuildLevel(lua_State* L){
+	return internalGetPlayerInfo(L,PlayerInfoGuildLevel);}
 
 int32_t LuaScriptInterface::luaGetPlayerGuildName(lua_State* L){
 	return internalGetPlayerInfo(L,PlayerInfoGuildName);}
@@ -6149,6 +6161,22 @@ int32_t LuaScriptInterface::luaGetContainerCap(lua_State* L)
 	return 1;
 }
 
+int32_t LuaScriptInterface::luaGetContainerCapById(lua_State* L)
+{
+	//getContainerCapById(itemid)
+	uint32_t itemId = popNumber(L);
+
+	const ItemType& it = Item::items[itemId];
+	if(it.isContainer())
+		lua_pushnumber(L, it.maxItems);
+	else
+	{
+		reportErrorFunc(getErrorDesc(LUA_ERROR_CONTAINER_NOT_FOUND));
+		lua_pushnumber(L, LUA_ERROR);
+	}
+	return 1;
+}
+
 int32_t LuaScriptInterface::luaGetContainerItem(lua_State* L)
 {
 	//getContainerItem(uid, slot)
@@ -7058,8 +7086,7 @@ int32_t LuaScriptInterface::luaDoPlayerAddBlessing(lua_State* L)
 	{
 		if(!player->hasBlessing(blessing))
 		{
-			blessing = 1 << blessing;
-			player->addBlessing(blessing);
+			player->addBlessing(1 << blessing);
 			lua_pushboolean(L, true);
 		}
 		else

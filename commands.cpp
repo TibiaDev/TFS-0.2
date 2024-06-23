@@ -1275,29 +1275,34 @@ bool Commands::createGuild(Creature* creature, const std::string& cmd, const std
 			{
 				if(param.length() < 21)
 				{
-					uint32_t guildId;
-					if(!IOGuild::getInstance()->getGuildIdByName(guildId, param))
+					if(isValidName(param))
 					{
-						if(player->level > 7)
+						uint32_t guildId;
+						if(!IOGuild::getInstance()->getGuildIdByName(guildId, param))
 						{
-							if(player->isPremium())
+							if(player->level > 7)
 							{
-								char buffer[80];
-								sprintf(buffer, "You have formed the guild: %s!", param.c_str());
-								player->sendTextMessage(MSG_INFO_DESCR, buffer);
-								player->setGuildName(param);
+								if(player->isPremium())
+								{
+									char buffer[80];
+									sprintf(buffer, "You have formed the guild: %s!", param.c_str());
+									player->sendTextMessage(MSG_INFO_DESCR, buffer);
+									player->setGuildName(param);
 
-								IOGuild::getInstance()->createGuild(player);
-								return true;
+									IOGuild::getInstance()->createGuild(player);
+									return true;
+								}
+								else
+									player->sendCancelMessage(RET_YOUNEEDPREMIUMACCOUNT);
 							}
 							else
-								player->sendCancelMessage(RET_YOUNEEDPREMIUMACCOUNT);
+								player->sendCancel("You have to be atleast Level 8 to form a guild.");
 						}
 						else
-							player->sendCancel("You have to be atleast Level 8 to form a guild.");
+							player->sendCancel("There is already a guild with that name.");
 					}
 					else
-						player->sendCancel("There is already a guild with that name.");
+						player->sendCancel("Invalid guild name format.");
 				}
 				else
 					player->sendCancel("That guild name is too long, please select a shorter name.");
@@ -1318,11 +1323,14 @@ bool Commands::unban(Creature* creature, const std::string& cmd, const std::stri
 	{
 		uint32_t accountNumber = atoi(param.c_str());
 		bool removedIPBan = false;
-		if(IOLoginData::getInstance()->playerExists(param))
+		std::string name = param;
+		bool playerExists = false;
+		if(IOLoginData::getInstance()->playerExists(name))
 		{
-			accountNumber = IOLoginData::getInstance()->getAccountNumberByName(param);
+			playerExists = true;
+			accountNumber = IOLoginData::getInstance()->getAccountNumberByName(name);
 
-			uint32_t lastIP = IOLoginData::getInstance()->getLastIPByName(param);
+			uint32_t lastIP = IOLoginData::getInstance()->getLastIPByName(name);
 			if(lastIP != 0)
 				removedIPBan = g_bans.removeIPBan(lastIP);
 		}
@@ -1330,23 +1338,40 @@ bool Commands::unban(Creature* creature, const std::string& cmd, const std::stri
 		if(g_bans.removeAccountBan(accountNumber))
 		{
 			char buffer[70];
-			sprintf(buffer, "%s has been unbanned.", param.c_str());
+			sprintf(buffer, "%s has been unbanned.", name.c_str());
 			player->sendTextMessage(MSG_INFO_DESCR, buffer);
 		}
 		else if(g_bans.removeAccountDeletion(accountNumber))
 		{
 			char buffer[70];
-			sprintf(buffer, "%s has been undeleted.", param.c_str());
+			sprintf(buffer, "%s has been undeleted.", name.c_str());
 			player->sendTextMessage(MSG_INFO_DESCR, buffer);
 		}
 		else if(removedIPBan)
 		{
 			char buffer[80];
-			sprintf(buffer, "IPBan on %s has been lifted.", param.c_str());
+			sprintf(buffer, "IPBan on %s has been lifted.", name.c_str());
 			player->sendTextMessage(MSG_INFO_DESCR, buffer);
 		}
 		else
-			player->sendCancel("That player or account is not banished or deleted.");
+		{
+			bool removedNamelock = false;
+			if(playerExists)
+			{
+				uint32_t guid = 0;
+				if(IOLoginData::getInstance()->getGuidByName(guid, name) &&
+					g_bans.removePlayerNamelock(guid))
+				{
+					char buffer[85];
+					sprintf(buffer, "Namelock on %s has been lifted.", name.c_str());
+					player->sendTextMessage(MSG_INFO_DESCR, buffer);
+					removedNamelock = true;
+				}
+			}
+
+			if(!removedNamelock)
+				player->sendCancel("That player or account is not banished or deleted.");
+		}
 	}
 	return false;
 }
