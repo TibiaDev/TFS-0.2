@@ -3,7 +3,7 @@
 		The Forgotten Server
 
 	Version
-		0.2
+		0.2.2
 
 	Codenamed
 		"Mystic Spirit"
@@ -83,6 +83,11 @@
 			If you're new to Linux you just have to type:
 				./TheForgottenServer
 
+		#9
+			In most Linux MySQL installations, the control user is safe
+			already, but to be sure please have a look at this thread:
+				http://otland.net/f14/warning-everyone-whos-running-xampp-15321/
+
 	Windows
 		Introduction
 			In this guide you will learn how to setup a MySQL server
@@ -94,7 +99,7 @@
 
 		#1
 			Download XAMPP from:
-				http://heanet.dl.sourceforge.net/sourceforge/xampp/xampp-win32-1.6.7-installer.exe
+				http://heanet.dl.sourceforge.net/sourceforge/xampp/xampp-win32-1.6.8-installer.exe
 
 		#2
 			Go to http://localhost/security/xamppsecurity.php and change your root password.
@@ -122,6 +127,15 @@
 			Don't close config.lua yet, if you already did, open it
 			again find the '-- SQL' part and change sqlType to "mysql".
 			You may now save and close config.lua.
+
+		#9
+			VERY IMPORTANT! DON'T SKIP THIS PART!!!
+			Once you are done with that, view this thread to resolve a
+			security hole in your XAMPP installation:
+				http://otland.net/f14/warning-everyone-whos-running-xampp-15321/
+
+			If there is something you don't understand, don't hesitate
+			to reply in the thread and ask for help.
 
 	Trouble
 		Did you find a part confusing, or just failed somewhere?
