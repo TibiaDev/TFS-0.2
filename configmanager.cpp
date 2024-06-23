@@ -76,6 +76,8 @@ bool ConfigManager::loadFile(const std::string& _filename)
 		m_confString[SQL_TYPE] = getGlobalString(L, "sqlType", "sqlite");
 		m_confInteger[SQLTYPE] = SQL_TYPE_NONE;
 		#endif
+
+		m_confBoolean[BIND_ONLY_GLOBAL_ADDRESS] = (getGlobalString(L, "bindOnlyGlobalAddress", "no") == "yes");
 	}
 
 	m_confBoolean[FREE_MEMORY_AT_SHUTDOWN] = (getGlobalString(L, "freeMemoryAtShutdown", "yes") == "yes");
@@ -151,7 +153,6 @@ bool ConfigManager::loadFile(const std::string& _filename)
 	m_confInteger[WHITE_SKULL_TIME] = getGlobalNumber(L, "whiteSkullTime", 15 * 60 * 1000);
 	m_confInteger[AUTO_SAVE_EACH_MINUTES] = getGlobalNumber(L, "autoSaveEachMinutes", 0);
 	m_confInteger[STAIRHOP_DELAY] = getGlobalNumber(L, "stairJumpExhaustion", 2000);
-	m_confInteger[ALTERNATIVE_EXHAUST] = getGlobalNumber(L, "alternativeExhaust", 1000);
 	m_confInteger[LEVEL_TO_CREATE_GUILD] = getGlobalNumber(L, "levelToCreateGuild", 8);
 	m_isLoaded = true;
 

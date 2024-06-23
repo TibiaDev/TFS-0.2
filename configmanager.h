@@ -65,6 +65,7 @@ class ConfigManager
 			FREE_MEMORY_AT_SHUTDOWN,
 			ANIMATION_TEXT_ON_HEAL,
 			ALLOW_CLONES,
+			BIND_ONLY_GLOBAL_ADDRESS,
 			LAST_BOOLEAN_CONFIG /* this must be the last one */
 		};
 
@@ -143,7 +144,6 @@ class ConfigManager
 			FRAG_TIME,
 			WHITE_SKULL_TIME,
 			AUTO_SAVE_EACH_MINUTES,
-			ALTERNATIVE_EXHAUST,
 			ADMIN_PORT,
 			GAME_PORT,
 			LOGIN_PORT,

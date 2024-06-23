@@ -550,10 +550,10 @@ bool Weapon::executeUseWeapon(Player* player, const LuaVariant& var) const
 		lua_pushnumber(L, cid);
 		m_scriptInterface->pushVariant(L, var);
 
-		int32_t result = m_scriptInterface->callFunction(2);
+		bool result = m_scriptInterface->callFunction(2);
 		m_scriptInterface->releaseScriptEnv();
 
-		return (result == LUA_NO_ERROR);
+		return result;
 	}
 	else
 	{
@@ -928,7 +928,7 @@ void WeaponDistance::onUsedWeapon(Player* player, Item* item, Tile* destTile) co
 
 void WeaponDistance::onUsedAmmo(Player* player, Item* item, Tile* destTile) const
 {
-	if(ammoAction == AMMOACTION_MOVEBACK && breakChance > 0 && random_range(1, 100) < breakChance)
+	if(ammoAction == AMMOACTION_MOVEBACK && breakChance > 0 && random_range(1, 100) <= breakChance)
 	{
 		int32_t newCount = std::max(0, item->getItemCount() - 1);
 		g_game.transformItem(item, item->getID(), newCount);

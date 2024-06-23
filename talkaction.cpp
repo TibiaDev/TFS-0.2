@@ -109,7 +109,7 @@ TalkActionResult_t TalkActions::playerSaySpell(Player* player, SpeakClasses type
 		if(it->first == str_words)
 		{
 			TalkAction* talkAction = it->second;
-			int32_t ret =  talkAction->executeSay(player, str_words, str_param);
+			int32_t ret = talkAction->executeSay(player, str_words, str_param);
 			if(ret == 1)
 				return TALKACTION_CONTINUE;
 			else
@@ -174,14 +174,14 @@ int32_t TalkAction::executeSay(Creature* creature, const std::string& words, con
 		lua_pushstring(L, words.c_str());
 		lua_pushstring(L, param.c_str());
 
-		int32_t result = m_scriptInterface->callFunction(3);
+		bool result = m_scriptInterface->callFunction(3);
 		m_scriptInterface->releaseScriptEnv();
 
-		return (result != LUA_FALSE);
+		return result;
 	}
 	else
 	{
-		std::cout << "[Error] Call stack overflow. TalkAction::executeSay" << std::endl;
+		std::cout << "[Error - Talkaction::executeSay] Call stack overflow." << std::endl;
 		return 0;
 	}
 }

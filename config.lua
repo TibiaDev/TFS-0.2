@@ -31,7 +31,6 @@
 	timeToDecreaseFrags = 24 * 60 * 60 * 1000
 	whiteSkullTime = 15 * 60 * 1000
 	oldConditionAccuracy = "no"
-	alternativeExhaust = 1000
 	stairJumpExhaustion = 2000
 	animationTextOnHeal = "yes"
 
@@ -40,6 +39,7 @@
 
 	-- Connection Config
 	ip = "127.0.0.1"
+	bindOnlyGlobalAddress = "no"
 	loginProtocolPort = 7171
 	gameProtocolPort = 7172
 	adminProtocolPort = 7171
