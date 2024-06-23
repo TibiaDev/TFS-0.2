@@ -82,7 +82,6 @@ bool Combat::getMinMaxValues(Creature* creature, Creature* target, int32_t& min,
 					max = (int32_t)((player->getLevel() * 2 + player->getMagicLevel() * 3) * 1. * mina + minb);
 					min = (int32_t)((player->getLevel() * 2 + player->getMagicLevel() * 3) * 1. * maxa + maxb);
 					return true;
-					break;
 				}
 
 				case FORMULA_SKILL:
@@ -104,7 +103,6 @@ bool Combat::getMinMaxValues(Creature* creature, Creature* target, int32_t& min,
 						max = (int32_t)maxb;
 
 					return true;
-					break;
 				}
 
 				case FORMULA_VALUE:
@@ -112,7 +110,6 @@ bool Combat::getMinMaxValues(Creature* creature, Creature* target, int32_t& min,
 					min = (int32_t)mina;
 					max = (int32_t)maxa;
 					return true;
-					break;
 				}
 
 				default:
@@ -120,7 +117,6 @@ bool Combat::getMinMaxValues(Creature* creature, Creature* target, int32_t& min,
 					min = 0;
 					max = 0;
 					return false;
-					break;
 				}
 			}
 		}
@@ -139,7 +135,9 @@ void Combat::getCombatArea(const Position& centerPos, const Position& targetPos,
 {
 	if(area)
 		area->getList(centerPos, targetPos, list);
-	else if(targetPos.z < MAP_MAX_LAYERS)
+	else if(targetPos.x >= 0 && targetPos.x < 0xFFFF &&
+		targetPos.y >= 0 && targetPos.y < 0xFFFF &&
+		targetPos.z >= 0 && targetPos.z < MAP_MAX_LAYERS)
 	{
 		Tile* tile = g_game.getTile(targetPos.x, targetPos.y, targetPos.z);
 		if(!tile)
@@ -1146,8 +1144,9 @@ bool AreaCombat::getList(const Position& centerPos, const Position& targetPos, s
 		{
 			if(area->getValue(y, x) != 0)
 			{
-				if(tmpPosX >= 0 && tmpPosY >= 0 && tmpPosZ >= 0 &&
-					tmpPosX <= 0xFFFF && tmpPosY <= 0xFFFF && tmpPosZ < MAP_MAX_LAYERS)
+				if(tmpPosX >= 0 && tmpPosX < 0xFFFF &&
+					tmpPosY >= 0 && tmpPosY < 0xFFFF &&
+					tmpPosZ  >= 0 && tmpPosZ < MAP_MAX_LAYERS)
 				{
 					if(g_game.isSightClear(targetPos, Position(tmpPosX, tmpPosY, tmpPosZ), true))
 					{
@@ -1421,43 +1420,46 @@ void MagicField::onStepInField(Creature* creature)
 {
 	//remove magic walls/wild growth
 	if(isBlocking())
-		g_game.internalRemoveItem(this, 1);
-	else
 	{
-		const ItemType& it = items[getID()];
-		if(it.condition)
+		if(!creature->isInGhostMode())
+			 g_game.internalRemoveItem(this, 1);
+
+		return;
+	}
+
+	const ItemType& it = items[getID()];
+	if(it.condition)
+	{
+		Condition* conditionCopy = it.condition->clone();
+		uint32_t owner = getOwner();
+		if(owner != 0)
 		{
-			Condition* conditionCopy = it.condition->clone();
-			uint32_t owner = getOwner();
-			if(owner != 0)
+			bool harmfulField = true;
+			if(g_game.getWorldType() == WORLD_TYPE_NO_PVP || getTile()->hasFlag(TILESTATE_NOPVPZONE))
 			{
-				bool harmfulField = true;
-				if(g_game.getWorldType() == WORLD_TYPE_NO_PVP || getTile()->hasFlag(TILESTATE_NOPVPZONE))
+				Creature* creature = g_game.getCreatureByID(owner);
+				if(creature)
 				{
-					Creature* creature = g_game.getCreatureByID(owner);
-					if(creature)
-					{
-						if(creature->getPlayer() || (creature->isSummon() && creature->getMaster()->getPlayer()))
-							harmfulField = false;
-					}
+					if(creature->getPlayer() || (creature->isSummon() && creature->getMaster()->getPlayer()))
+						harmfulField = false;
 				}
-
-				Player* targetPlayer = creature->getPlayer();
-				if(targetPlayer)
-				{
-					Player* attackerPlayer = g_game.getPlayerByID(owner);
-					if(attackerPlayer)
-					{
-						if(Combat::isProtected(attackerPlayer, targetPlayer))
-							harmfulField = false;
-					}
-				}
-
-				if(!harmfulField || (OTSYS_TIME() - createTime <= 5000) || creature->hasBeenAttacked(owner))
-					conditionCopy->setParam(CONDITIONPARAM_OWNER, owner);
 			}
 
-			creature->addCondition(conditionCopy);
+			Player* targetPlayer = creature->getPlayer();
+			if(targetPlayer)
+			{
+				Player* attackerPlayer = g_game.getPlayerByID(owner);
+				if(attackerPlayer)
+				{
+					if(Combat::isProtected(attackerPlayer, targetPlayer))
+						harmfulField = false;
+				}
+			}
+
+			if(!harmfulField || (OTSYS_TIME() - createTime <= 5000) || creature->hasBeenAttacked(owner))
+				conditionCopy->setParam(CONDITIONPARAM_OWNER, owner);
 		}
+
+		creature->addCondition(conditionCopy);
 	}
 }

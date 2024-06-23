@@ -123,12 +123,13 @@ class ScriptEnviroment
 
 		void getEventInfo(int32_t& scriptId, std::string& desc, LuaScriptInterface*& scriptInterface, int32_t& callbackId, bool& timerEvent);
 
+		static void addTempItem(ScriptEnviroment* env, Item* item);
+		static void removeTempItem(ScriptEnviroment* env, Item* item);
+		static void removeTempItem(Item* item);
 		static void addUniqueThing(Thing* thing);
 		static void removeUniqueThing(Thing* thing);
 		uint32_t addThing(Thing* thing);
 		void insertThing(uint32_t uid, Thing* thing);
-		void addTempItem(Item* item);
-		void removeTempItem(Item* item);
 
 		void addGlobalStorageValue(const uint32_t key, const int32_t value);
 		bool getGlobalStorageValue(const uint32_t key, int32_t& value) const;
@@ -185,7 +186,8 @@ class ScriptEnviroment
 		ThingMap m_localMap;
 
 		//temporary item list
-		ItemList m_tempItems;
+		typedef std::map<ScriptEnviroment*, ItemList> TempItemListMap;
+		static TempItemListMap m_tempItems;
 
 		//area map
 		static uint32_t m_lastAreaId;
@@ -215,6 +217,7 @@ enum PlayerInfo_t{
 	PlayerInfoName,
 	PlayerInfoPosition,
 	PlayerInfoVocation,
+	PlayerInfoMasterPos,
 	PlayerInfoTown,
 	PlayerInfoSoul,
 	PlayerInfoFreeCap,
@@ -330,6 +333,7 @@ class LuaScriptInterface
 		static std::string getFieldString(lua_State* L, const char* key);
 		static void setFieldBool(lua_State* L, const char* index, bool val);
 		static bool getFieldBool(lua_State* L, const char* key);
+		static std::string escapeString(const std::string& string);
 
 	protected:
 		virtual bool closeState();
@@ -356,6 +360,7 @@ class LuaScriptInterface
 		static int32_t luaDoCreateItem(lua_State* L);
 		static int32_t luaDoCreateItemEx(lua_State* L);
 		static int32_t luaDoCreateTeleport(lua_State* L);
+		static int32_t luaDoCreateNpc(lua_State* L);
 		static int32_t luaDoSummonCreature(lua_State* L);
 		static int32_t luaDoConvinceCreature(lua_State* L);
 		static int32_t luaGetMonsterTargetList(lua_State* L);
@@ -410,6 +415,7 @@ class LuaScriptInterface
 		static int32_t luaGetTileItemById(lua_State* L);
 		static int32_t luaGetTileItemByType(lua_State* L);
 		static int32_t luaGetTileThingByPos(lua_State* L);
+		static int32_t luaGetTileThingByTopOrder(lua_State* L);
 		static int32_t luaGetTopCreature(lua_State* L);
 		static int32_t luaHasProperty(lua_State* L);
 		static int32_t luaGetDepotId(lua_State* L);
@@ -454,6 +460,7 @@ class LuaScriptInterface
 		static int32_t luaGetPlayerPosition(lua_State* L);
 		static int32_t luaGetPlayerSkill(lua_State* L);
 		static int32_t luaGetPlayerVocation(lua_State* L);
+		static int32_t luaGetPlayerMasterPos(lua_State* L);
 		static int32_t luaGetPromotedVocation(lua_State* L);
 		static int32_t luaGetPlayerTown(lua_State* L);
 		static int32_t luaGetPlayerItemCount(lua_State* L);
@@ -472,6 +479,7 @@ class LuaScriptInterface
 		static int32_t luaGetPlayerGuildNick(lua_State* L);
 		static int32_t luaGetPlayerSex(lua_State* L);
 		static int32_t luaGetPlayerLookDir(lua_State* L);
+		static int32_t luaDoCreatureSetLookDir(lua_State* L);
 		static int32_t luaGetPlayerBlessing(lua_State* L);
 		static int32_t luaDoPlayerAddBlessing(lua_State* L);
 		static int32_t luaGetPlayerGUID(lua_State* L);
@@ -584,6 +592,7 @@ class LuaScriptInterface
 		static int32_t luaGetItemName(lua_State* L);
 		static int32_t luaGetItemDescriptions(lua_State* L);
 		static int32_t luaGetItemWeight(lua_State* L);
+		static int32_t luaGetItemWeightByUID(lua_State* L);
 		static int32_t luaGetItemIdByName(lua_State* L);
 		static int32_t luaIsSightClear(lua_State* L);
 
@@ -603,6 +612,8 @@ class LuaScriptInterface
 
 		static int32_t luaGetOnlinePlayers(lua_State* L);
 		static int32_t luaSaveData(lua_State* L);
+		static int32_t luaRefreshMap(lua_State* L);
+		static int32_t luaCleanMap(lua_State* L);
 		static int32_t luaEscapeString(lua_State* L);
 
 		static int32_t luaDoSendTutorial(lua_State* L);
@@ -648,6 +659,7 @@ class LuaScriptInterface
 			int32_t scriptId;
 			int32_t function;
 			std::list<int> parameters;
+			uint32_t eventId;
 		};
 		uint32_t m_lastEventTimerId;
 

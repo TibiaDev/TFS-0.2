@@ -184,12 +184,10 @@ void Monster::onCreatureMove(const Creature* creature, const Tile* newTile, cons
 		if(isSummon() && getMaster() == creature)
 		{
 			if(canSeeNewPos)
-			{
-				//Turn the summon on again
-				isMasterInRange = true;
-				updateIdleStatus();
-			}
+				isMasterInRange = true;	//Turn the summon on again
 		}
+
+		updateIdleStatus();
 
 		if(!followCreature && !isSummon())
 		{
@@ -271,10 +269,10 @@ void Monster::onCreatureFound(Creature* creature, bool pushFront /*= false*/)
 				targetList.push_front(creature);
 			else
 				targetList.push_back(creature);
-
-			updateIdleStatus();
 		}
 	}
+
+	updateIdleStatus();
 }
 
 void Monster::onCreatureEnter(Creature* creature)
@@ -392,19 +390,49 @@ bool Monster::searchTarget(TargetSearchType_t searchType /*= TARGETSEARCH_DEFAUL
 		}
 	}
 
-	if(!resultList.empty())
+	switch(searchType)
 	{
-		uint32_t index = random_range(0, resultList.size() - 1);
-		CreatureList::iterator it = resultList.begin();
-		std::advance(it, index);
-#ifdef __DEBUG__
-		std::cout << "Selecting target " << (*it)->getName() << std::endl;
-#endif
-		return selectTarget(*it);
-	}
+		case TARGETSEARCH_NEAREAST:
+		{
+			Creature* target = NULL;
+			int32_t minRange = -1;
+			for(std::list<Creature*>::iterator it = resultList.begin(); it != resultList.end(); ++it)
+			{
+				if(minRange == -1 || std::max(std::abs(myPos.x - (*it)->getPosition().x), std::abs(myPos.y - (*it)->getPosition().y)) < minRange)
+				{
+					target = *it;
+					minRange = std::max(std::abs(myPos.x - (*it)->getPosition().x), std::abs(myPos.y - (*it)->getPosition().y));
+				}
+			}
 
-	if(searchType == TARGETSEARCH_ATTACKRANGE)
-		return false;
+			if(target && selectTarget(target))
+				return true;
+
+			break;
+		}
+
+		case TARGETSEARCH_DEFAULT:
+		case TARGETSEARCH_ATTACKRANGE:
+		case TARGETSEARCH_RANDOM:
+		default:
+		{
+			if(!resultList.empty())
+			{
+				uint32_t index = random_range(0, resultList.size() - 1);
+				CreatureList::iterator it = resultList.begin();
+				std::advance(it, index);
+#ifdef __DEBUG__
+				std::cout << "Selecting target " << (*it)->getName() << std::endl;
+#endif
+				return selectTarget(*it);
+			}
+
+			if(searchType == TARGETSEARCH_ATTACKRANGE)
+				return false;
+
+			break;
+		}
+	}
 
 	//lets just pick the first target in the list
 	for(CreatureList::iterator it = targetList.begin(); it != targetList.end(); ++it)
@@ -514,12 +542,17 @@ bool Monster::selectTarget(Creature* creature)
 
 void Monster::setIdle(bool _idle)
 {
+	if(isRemoved() || getHealth() <= 0)
+		return;
+
 	isIdle = _idle;
 	if(!isIdle)
 		g_game.addCreatureCheck(this);
 	else
 	{
 		onIdleStatus();
+		clearTargetList();
+		clearFriendList();
 		g_game.removeCreatureCheck(this);
 	}
 }
@@ -527,8 +560,7 @@ void Monster::setIdle(bool _idle)
 void Monster::updateIdleStatus()
 {
 	bool idle = false;
-
-	if(conditions.empty() && getHealth() > 0)
+	if(conditions.empty())
 	{
 		if(isSummon())
 		{
@@ -742,7 +774,12 @@ void Monster::onThinkTarget(uint32_t interval)
 					targetChangeCooldown = (uint32_t)mType->changeTargetSpeed;
 
 					if(mType->changeTargetChance >= random_range(1, 100))
-						searchTarget(TARGETSEARCH_RANDOM);
+					{
+						if(mType->targetDistance <= 1)
+							searchTarget(TARGETSEARCH_RANDOM);
+						else
+							searchTarget(TARGETSEARCH_NEAREAST);
+					}
 				}
 			}
 		}
@@ -829,9 +866,9 @@ void Monster::onThinkYell(uint32_t interval)
 				uint32_t index = random_range(0, mType->voiceVector.size() - 1);
 				const voiceBlock_t& vb = mType->voiceVector[index];
 				if(vb.yellText)
-					g_game.internalCreatureSay(this, SPEAK_MONSTER_YELL, vb.text);
+					g_game.internalCreatureSay(this, SPEAK_MONSTER_YELL, vb.text, false);
 				else
-					g_game.internalCreatureSay(this, SPEAK_MONSTER_SAY, vb.text);
+					g_game.internalCreatureSay(this, SPEAK_MONSTER_SAY, vb.text, false);
 			}
 		}
 	}
@@ -1170,7 +1207,7 @@ void Monster::death()
 
 	clearTargetList();
 	clearFriendList();
-	setIdle(true);
+	onIdleStatus();
 }
 
 Item* Monster::getCorpse()
@@ -1315,10 +1352,9 @@ void Monster::drainHealth(Creature* attacker, CombatType_t combatType, int32_t d
 
 void Monster::changeHealth(int32_t healthChange)
 {
-	Creature::changeHealth(healthChange);
-
 	//In case a player with ignore flag set attacks the monster
 	setIdle(false);
+	Creature::changeHealth(healthChange);
 }
 
 bool Monster::challengeCreature(Creature* creature)

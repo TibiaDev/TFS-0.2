@@ -42,6 +42,7 @@
 #include "weapons.h"
 #include "raids.h"
 #include "chat.h"
+#include "quests.h"
 #ifdef __ENABLE_SERVER_DIAGNOSTIC__
 #include "outputmessage.h"
 #include "connection.h"
@@ -634,14 +635,21 @@ bool Commands::reloadInfo(Creature* creature, const std::string& cmd, const std:
 		}
 		else if(tmpParam == "items")
 		{
-
 			Item::items.reload();
 			player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Reloaded items.");
 		}
-		else
+		else if(tmpParam == "weapon" || tmpParam == "weapons")
 		{
-			player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Reload type not found.");
+			g_weapons->reload();
+			player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Reloaded weapons.");
 		}
+		else if(tmpParam == "quest" || tmpParam == "quests")
+		{
+			Quests::getInstance()->reload();
+			player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Reloaded quests.");
+		}
+		else
+			player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Reload type not found.");
 	}
 	return true;
 }
@@ -1163,7 +1171,7 @@ bool Commands::newType(Creature* creature, const std::string& cmd, const std::st
 	if(player)
 	{
 		int32_t lookType = atoi(param.c_str());
-		if(lookType >= 0 && lookType != 1 && lookType != 135 && (lookType <= 160 || lookType >= 192) && lookType <= 333)
+		if(lookType >= 0 && lookType != 1 && lookType != 135 && (lookType <= 160 || lookType >= 192) && lookType <= 351)
 		{
 			g_game.internalCreatureChangeOutfit(creature, (const Outfit_t&)lookType);
 			return true;
@@ -1235,7 +1243,7 @@ bool Commands::addSkill(Creature* creature, const std::string& cmd, const std::s
 			if(param2[0] == 'l' || param2[0] == 'e')
 				paramPlayer->addExperience(Player::getExpForLevel(paramPlayer->getLevel() + 1) - paramPlayer->experience);
 			else if(param2[0] == 'm')
-				paramPlayer->addManaSpent(player->vocation->getReqMana(paramPlayer->getMagicLevel() + 1) - paramPlayer->manaSpent);
+				paramPlayer->addManaSpent(player->vocation->getReqMana(paramPlayer->getMagicLevel() + 1) - paramPlayer->manaSpent, false);
 			else
 				paramPlayer->addSkillAdvance(getSkillId(param2), paramPlayer->vocation->getReqSkillTries(getSkillId(param2), paramPlayer->getSkill(getSkillId(param2), SKILL_LEVEL) + 1));
 			return true;

@@ -219,10 +219,13 @@ class ItemType
 		bool blockProjectile;
 		bool blockPathFind;
 
+		bool allowPickupable;
+
 		unsigned short transformEquipTo;
 		unsigned short transformDeEquipTo;
 		bool showDuration;
 		bool showCharges;
+		bool showAttributes;
 		uint32_t charges;
 		int32_t breakChance;
 		int32_t hitChance;
@@ -285,8 +288,8 @@ class Items
 
 		void addItemType(ItemType* iType);
 
-		const ItemType* getElement(uint32_t id) const { return items->getElement(id);}
-		uint32_t size() { return items->size();}
+		const ItemType* getElement(uint32_t id) const {return items->getElement(id);}
+		uint32_t size() {return items->size();}
 
 	protected:
 		typedef std::map<int32_t, int32_t> ReverseItemMap;
@@ -314,8 +317,8 @@ A Array<A>::getElement(uint32_t id)
 {
 	if(id < m_size)
 		return m_data[id];
-	else
-		return 0;
+
+	return 0;
 }
 
 template<typename A>
@@ -323,8 +326,8 @@ const A Array<A>::getElement(uint32_t id) const
 {
 	if(id < m_size)
 		return m_data[id];
-	else
-		return 0;
+
+	return 0;
 }
 
 template<typename A>
@@ -333,8 +336,8 @@ void Array<A>::addElement(A a, uint32_t pos)
 	#define INCREMENT 5000
 	if(pos >= m_size)
 	{
-		m_data = (A*)realloc(m_data, sizeof(A)*(pos + INCREMENT));
-		memset(m_data + m_size, 0, sizeof(A)*(pos + INCREMENT - m_size));
+		m_data = (A*)realloc(m_data, sizeof(A) * (pos + INCREMENT));
+		memset(m_data + m_size, 0, sizeof(A) * (pos + INCREMENT - m_size));
 		m_size = pos + INCREMENT;
 	}
 	m_data[pos] = a;
@@ -347,7 +350,7 @@ void Array<A>::reset()
 	{
 		delete m_data[i];
 		m_data[i] = NULL;
- 	}
-	memset(this->m_data, 0, sizeof(A)*this->m_size);
+	}
+	memset(this->m_data, 0, sizeof(A) * this->m_size);
 }
 #endif

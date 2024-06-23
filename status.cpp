@@ -59,15 +59,6 @@ std::map<uint32_t, int64_t> ProtocolStatus::ipConnectMap;
 
 void ProtocolStatus::onRecvFirstMessage(NetworkMessage& msg)
 {
-	for(BlackList::const_iterator it = g_game.blacklist.begin(); it != g_game.blacklist.end(); it++)
-	{
-		if(*it == convertIPToString(getIP()))
-		{
-			getConnection()->closeConnection();
-			return;
-		}
-	}
-
 	std::map<uint32_t, int64_t>::const_iterator it = ipConnectMap.find(getIP());
 	if(it != ipConnectMap.end())
 	{
@@ -85,9 +76,9 @@ void ProtocolStatus::onRecvFirstMessage(NetworkMessage& msg)
 		//XML info protocol
 		case 0xFF:
 		{
-			if(msg.GetRaw() == "info")
+			if(msg.GetString(4) == "info") // in case some automatics would request players from 0.3
 			{
-				OutputMessage* output = OutputMessagePool::getInstance()->getOutputMessage(this, false);
+				OutputMessage_ptr output = OutputMessagePool::getInstance()->getOutputMessage(this, false);
 				if(output)
 				{
 					TRACK_MESSAGE(output);
@@ -105,7 +96,7 @@ void ProtocolStatus::onRecvFirstMessage(NetworkMessage& msg)
 		case 0x01:
 		{
 			uint32_t requestedInfo = msg.GetU16(); //Only a Byte is necessary, though we could add new infos here
-			OutputMessage* output = OutputMessagePool::getInstance()->getOutputMessage(this, false);
+			OutputMessage_ptr output = OutputMessagePool::getInstance()->getOutputMessage(this, false);
 			if(output)
 			{
 				TRACK_MESSAGE(output);
@@ -220,7 +211,7 @@ std::string Status::getStatusString() const
 	return xml;
 }
 
-void Status::getInfo(uint32_t requestedInfo, OutputMessage* output, NetworkMessage& msg) const
+void Status::getInfo(uint32_t requestedInfo, OutputMessage_ptr output, NetworkMessage& msg) const
 {
 	if(requestedInfo & REQUEST_BASIC_SERVER_INFO)
 	{

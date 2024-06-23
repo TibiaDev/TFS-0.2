@@ -140,6 +140,7 @@ void mainLoader(
 #endif
 	ServiceManager* servicer
 );
+void badAllocationHandler();
 
 #ifndef __CONSOLE__
 void serverMain(void* param)
@@ -147,6 +148,9 @@ void serverMain(void* param)
 int main(int argc, char *argv[])
 #endif
 {
+	// Setup bad allocation handler
+	std::set_new_handler(badAllocationHandler);
+
 	#ifdef WIN32
 	#ifndef __CONSOLE__
 	std::cout.rdbuf(&logger);
@@ -156,6 +160,7 @@ int main(int argc, char *argv[])
 	OTSYS_CREATE_THREAD(allocatorStatsThread, NULL);
 	#endif
 
+	// Provides stack traces when the server crashes, if compiled in.
 	#ifdef __EXCEPTION_TRACER__
 	ExceptionHandler mainExceptionHandler;
 	mainExceptionHandler.InstallHandler();
@@ -210,6 +215,15 @@ int main(int argc, char *argv[])
 #endif
 }
 
+void badAllocationHandler()
+{
+	// Use functions that only use stack allocation
+	puts("Allocation failed, server out of memory.\nDecrese the size of your map or compile in 64-bit mode.");
+	char buf[1024];
+	fgets(buf, 1024, stdin);
+	exit(-1);
+}
+
 #ifdef __CONSOLE__
 void mainLoader(int argc, char *argv[], ServiceManager* service_manager)
 #else
@@ -226,7 +240,7 @@ void mainLoader(ServiceManager* service_manager)
 	#endif
 	#endif
 	std::cout << STATUS_SERVER_NAME << " - Version " << STATUS_SERVER_VERSION << " (" << STATUS_SERVER_CODENAME << ")." << std::endl;
-	std::cout << "A server developed by Talaturen, Kiper, Kornholijo, Jonern, Lithium & Elf." << std::endl;
+	std::cout << "A server developed by Talaturen, Kornholijo and Elf." << std::endl;
 	std::cout << "Visit our forum for updates, support and resources: http://otland.net/." << std::endl;
 
 	#if defined __DEBUG__MOVESYS__ || defined __DEBUG_HOUSES__ || defined __DEBUG_MAILBOX__ || defined __DEBUG_LUASCRIPTS__ || defined __DEBUG_RAID__ || defined __DEBUG_NET__
@@ -529,7 +543,7 @@ void mainLoader(ServiceManager* service_manager)
 			g_scheduler.addEvent(createSchedulerTask(hoursLeftInMS + minutesLeftInMS, boost::bind(&Game::prepareServerSave, &g_game)));
 	}
 
-	g_game.fetchBlackList();
+	g_npcs.reload();
 
 	std::cout << ">> All modules has been loaded, server starting up..." << std::endl;
 
@@ -877,7 +891,7 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 						gui.m_logText = "";
 						gui.m_lineCount = 0;
 						std::cout << STATUS_SERVER_NAME << " - Version " << STATUS_SERVER_VERSION << " (" << STATUS_SERVER_CODENAME << ")." << std::endl;
-						std::cout << "A server developed by Talaturen, Kiper, Kornholijo, Jonern, Lithium & Elf." << std::endl;
+						std::cout << "A server developed by Talaturen, Kornholijo and Elf." << std::endl;
 						std::cout << "Visit our forum for updates, support and resources: http://otland.net/." << std::endl << std::endl;
 					}
 					break;
