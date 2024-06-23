@@ -117,7 +117,7 @@ ItemType::ItemType()
 	showCharges = false;
 	showAttributes = false;
 	charges	= 0;
-	hitChance = -1;
+	hitChance = 0;
 	maxHitChance = -1;
 	breakChance = -1;
 	shootRange = 1;
@@ -219,7 +219,7 @@ int32_t Items::loadFromOtb(std::string file)
 		std::cout << "Old version detected, a newer version of items.otb is required." << std::endl;
 		return ERROR_INVALID_FORMAT;
 	}
-	else if(Items::dwMinorVersion < CLIENT_VERSION_953)
+	else if(Items::dwMinorVersion < CLIENT_VERSION_961)
 	{
 		std::cout << "A newer version of items.otb is required." << std::endl;
 		return ERROR_INVALID_FORMAT;
@@ -479,13 +479,11 @@ bool Items::loadFromXml()
 	for(uint32_t i = 0; i < items->size(); ++i)
 	{
 		const ItemType* it = items->getElement(i);
-
 		if(!it)
 			continue;
 
 		//check bed items
-		if((it->transformToFree != 0 || it->transformToOnUse[PLAYERSEX_FEMALE] != 0 
-				|| it->transformToOnUse[PLAYERSEX_MALE] != 0) && it->type != ITEM_TYPE_BED)
+		if((it->transformToFree != 0 || it->transformToOnUse[PLAYERSEX_FEMALE] != 0 || it->transformToOnUse[PLAYERSEX_MALE] != 0) && it->type != ITEM_TYPE_BED)
 		{
 			std::cout << "Warning: [Items::loadFromXml] Item " << it->id << " is not set as a bed-type." << std::endl;
 		}
@@ -903,7 +901,7 @@ bool Items::parseItemNode(xmlNodePtr itemNode, uint32_t id)
 			else if(tmpStrValue == "hitchance")
 			{
 				if(readXMLInteger(itemAttributesNode, "value", intValue))
-					it.hitChance = std::min(100, std::max(0, intValue));
+					it.hitChance = std::min(100, std::max(-100, intValue));
 			}
 			else if(tmpStrValue == "maxhitchance")
 			{

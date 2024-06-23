@@ -1509,6 +1509,12 @@ void LuaScriptInterface::registerFunctions()
 	//doSetCreatureDropLoot(cid, doDrop)
 	lua_register(m_luaState, "doSetCreatureDropLoot", LuaScriptInterface::luaDoSetCreatureDropLoot);
 
+	//getPlayerParty(cid)
+	lua_register(m_luaState, "getPlayerParty", LuaScriptInterface::luaGetPlayerParty);
+
+	//doPlayerJoinParty(cid, leaderId)
+	lua_register(m_luaState, "doPlayerJoinParty", LuaScriptInterface::luaDoPlayerJoinParty);
+
 	//getPartyMembers(leaderId)
 	lua_register(m_luaState, "getPartyMembers", LuaScriptInterface::luaGetPartyMembers);
 
@@ -1804,6 +1810,9 @@ void LuaScriptInterface::registerFunctions()
 	//getItemIdByName(name)
 	lua_register(m_luaState, "getItemIdByName", LuaScriptInterface::luaGetItemIdByName);
 
+	//getTownId(townName)
+	lua_register(m_luaState, "getTownId", LuaScriptInterface::luaGetTownId);
+
 	//getTownName(townId)
 	lua_register(m_luaState, "getTownName", LuaScriptInterface::luaGetTownName);
 
@@ -1875,7 +1884,9 @@ void LuaScriptInterface::registerFunctions()
 	lua_register(m_luaState, "getAccountNumberByPlayerName", LuaScriptInterface::luaGetAccountNumberByPlayerName);
 
 	//getIPByPlayerName(name)
+	//getIpByName(name)
 	lua_register(m_luaState, "getIPByPlayerName", LuaScriptInterface::luaGetIPByPlayerName);
+	lua_register(m_luaState, "getIpByName", LuaScriptInterface::luaGetIPByPlayerName);
 
 	//getPlayersByIPAddress(ip[, mask = 0xFFFFFFFF])
 	lua_register(m_luaState, "getPlayersByIPAddress", LuaScriptInterface::luaGetPlayersByIPAddress);
@@ -1885,6 +1896,9 @@ void LuaScriptInterface::registerFunctions()
 
 	//isInWar(cid, target)
 	lua_register(m_luaState, "isInWar", LuaScriptInterface::luaIsInWar);
+
+	//doPlayerSetOfflineTrainingSkill(cid, skill)
+	lua_register(m_luaState, "doPlayerSetOfflineTrainingSkill", LuaScriptInterface::luaDoPlayerSetOfflineTrainingSkill);
 
 	//bit operations for Lua, based on bitlib project release 24
 	//bit.bnot, bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift
@@ -3340,7 +3354,7 @@ int32_t LuaScriptInterface::luaDoShowTextDialog(lua_State* L)
 	return 1;
 }
 
-int32_t LuaScriptInterface::luaDoSendTutorial(lua_State *L)
+int32_t LuaScriptInterface::luaDoSendTutorial(lua_State* L)
 {
 	//doSendTutorial(cid, tutorialid)
 	uint32_t tutorial = popNumber(L);
@@ -3360,7 +3374,7 @@ int32_t LuaScriptInterface::luaDoSendTutorial(lua_State *L)
 	return 1;
 }
 
-int32_t LuaScriptInterface::luaDoAddMark(lua_State *L)
+int32_t LuaScriptInterface::luaDoAddMark(lua_State* L)
 {
 	//doAddMapMark(cid, pos, type, <optional> description)
 	int32_t parameters = lua_gettop(L);
@@ -3623,12 +3637,24 @@ int32_t LuaScriptInterface::luaGetTileItemByType(lua_State* L)
 
 	if(!notFound)
 	{
-		for(uint32_t i = 0; i < tile->getThingCount(); ++i)
+		if(tile->ground)
 		{
-			if(Item* item = tile->__getThing(i)->getItem())
+			const ItemType& it = Item::items[tile->ground->getID()];
+			if(it.type == (ItemTypes_t) rType)
 			{
-				const ItemType& it = Item::items[item->getID()];
-				if(it.type == (ItemTypes_t) rType)
+				uint32_t uid = env->addThing(tile->ground);
+				pushThing(L, tile->ground, uid);
+				return 1;
+			}
+		}
+
+		if(const TileItemVector* items = tile->getItemList())
+		{
+			for(ItemVector::const_iterator it = items->begin(), end = items->end(); it != end; ++it)
+			{
+				Item* item = (*it);
+				const ItemType& itemType = Item::items[item->getID()];
+				if(itemType.type == (ItemTypes_t)rType)
 				{
 					uint32_t uid = env->addThing(item);
 					pushThing(L, item, uid);
@@ -7455,6 +7481,18 @@ int32_t LuaScriptInterface::luaGetTownTemplePosition(lua_State* L)
 	return 1;
 }
 
+int32_t LuaScriptInterface::luaGetTownId(lua_State* L)
+{
+	//getTownId(townName)
+	std::string townName = popString(L);
+	if(Town* town = Towns::getInstance().getTown(townName))
+		lua_pushnumber(L, town->getTownID());
+	else
+		lua_pushboolean(L, false);
+
+	return 1;
+}
+
 int32_t LuaScriptInterface::luaGetTownName(lua_State* L)
 {
 	//getTownName(townId)
@@ -7893,6 +7931,53 @@ int32_t LuaScriptInterface::luaGetOnlinePlayers(lua_State* L)
 	return 1;
 }
 
+int32_t LuaScriptInterface::luaGetPlayerParty(lua_State* L)
+{
+	//getPlayerParty(cid)
+	uint32_t cid = popNumber(L);
+
+	ScriptEnvironment* env = getScriptEnv();
+	if(Player* player = env->getPlayerByUID(cid))
+	{
+		if(Party* party = player->getParty())
+			lua_pushnumber(L, env->addThing(party->getLeader()));
+		else
+			lua_pushnil(L);
+	}
+	else
+	{
+		reportErrorFunc(getErrorDesc(LUA_ERROR_PLAYER_NOT_FOUND));
+		lua_pushboolean(L, false);
+	}
+
+	return 1;
+}
+
+int32_t LuaScriptInterface::luaDoPlayerJoinParty(lua_State* L)
+{
+	//doPlayerJoinParty(cid, lid)
+	ScriptEnvironment* env = getScriptEnv();
+
+	uint32_t cid = popNumber(L);
+	Player* leader = env->getPlayerByUID(cid);
+	if(!leader)
+	{
+		reportErrorFunc(getErrorDesc(LUA_ERROR_PLAYER_NOT_FOUND));
+		lua_pushboolean(L, false);
+	}
+
+	Player* player = env->getPlayerByUID(cid);
+	if(!player)
+	{
+		reportErrorFunc(getErrorDesc(LUA_ERROR_PLAYER_NOT_FOUND));
+		lua_pushboolean(L, false);
+	}
+
+	g_game.playerJoinParty(player->getID(), leader->getID());
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 int32_t LuaScriptInterface::luaGetPartyMembers(lua_State* L)
 {
 	//getPartyMembers(leaderId)
@@ -7947,6 +8032,28 @@ int32_t LuaScriptInterface::luaIsInWar(lua_State* L)
 		reportErrorFunc(getErrorDesc(LUA_ERROR_PLAYER_NOT_FOUND));
 
 	lua_pushboolean(L, false);
+	return 1;
+}
+
+int32_t LuaScriptInterface::luaDoPlayerSetOfflineTrainingSkill(lua_State* L)
+{
+	//doPlayerSetOfflineTrainingSkill(cid, skillid)
+	uint32_t skillid = (uint32_t)popNumber(L);
+	uint32_t cid = popNumber(L);
+
+	ScriptEnvironment* env = getScriptEnv();
+
+	Player* player = env->getPlayerByUID(cid);
+	if(player)
+	{
+		player->setOfflineTrainingSkill(skillid);
+		lua_pushboolean(L, true);
+	}
+	else
+	{
+		reportErrorFunc(getErrorDesc(LUA_ERROR_PLAYER_NOT_FOUND));
+		lua_pushboolean(L, false);
+	}
 	return 1;
 }
 

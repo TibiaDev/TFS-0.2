@@ -111,13 +111,15 @@ CREATE TABLE `players`
 	`premend` int(11) NOT NULL DEFAULT '0' COMMENT 'NOT IN USE BY THE SERVER',
 	`online` tinyint(4) NOT NULL DEFAULT '0',
 	`balance` bigint(20) unsigned NOT NULL DEFAULT '0',
+	`offlinetraining_time` smallint(5) unsigned NOT NULL DEFAULT 43200,
+	`offlinetraining_skill` int(11) NOT NULL DEFAULT -1,
 	PRIMARY KEY (`id`),
 	KEY `name` (`name`),
 	FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
 	FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`)
 ) ENGINE=InnoDB;
 
-INSERT INTO `players` VALUES (1,'Account Manager',1,1,1,0,150,150,0,0,0,0,0,110,0,0,0,0,0,0,0,50,50,7,'',400,0,0,0,0,0,0,0,'',0,0,0,10,10,10,0,0,0);
+INSERT INTO `players` VALUES (1,'Account Manager',1,1,1,0,150,150,0,0,0,0,0,110,0,0,0,0,0,0,0,50,50,7,'',400,0,0,0,0,0,0,0,'',0,0,0,10,10,10,0,0,0,43200,-1);
 
 CREATE TABLE `bans`
 (
@@ -319,7 +321,7 @@ CREATE TABLE `server_config`
 	UNIQUE KEY `config` (`config`)
 ) ENGINE=InnoDB;
 
-INSERT INTO `server_config` VALUES ('db_version','5'),('encryption','0');
+INSERT INTO `server_config` VALUES ('db_version','7'),('encryption','0');
 
 CREATE TABLE `market_history`
 (

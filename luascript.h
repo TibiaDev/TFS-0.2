@@ -602,6 +602,7 @@ class LuaScriptInterface
 		static int32_t luaGetItemWeight(lua_State* L);
 		static int32_t luaGetItemWeightByUID(lua_State* L);
 		static int32_t luaGetItemIdByName(lua_State* L);
+		static int32_t luaGetTownId(lua_State* L);
 		static int32_t luaGetTownName(lua_State* L);
 		static int32_t luaGetTownTemplePosition(lua_State* L);
 		static int32_t luaIsSightClear(lua_State* L);
@@ -629,7 +630,10 @@ class LuaScriptInterface
 		static int32_t luaDoAddMark(lua_State* L);
 
 		static int32_t luaIsInWar(lua_State* L);
+		static int32_t luaDoPlayerSetOfflineTrainingSkill(lua_State* L);
 
+		static int32_t luaGetPlayerParty(lua_State* L);
+		static int32_t luaDoPlayerJoinParty(lua_State* L);
 		static int32_t luaGetPartyMembers(lua_State* L);
 
 		//
