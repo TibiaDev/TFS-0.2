@@ -132,6 +132,8 @@ class Player : public Creature, public Cylinder
 		virtual const std::string& getNameDescription() const {return name;}
 		virtual std::string getDescription(int32_t lookDistance) const;
 
+		virtual const CreatureType_t getType() const {return CREATURETYPE_PLAYER;}
+
 		uint8_t getCurrentMount() const;
 		void setCurrentMount(uint8_t mountId);
 		bool isMounted() const { return defaultOutfit.lookMount != 0; }
@@ -238,6 +240,7 @@ class Player : public Creature, public Cylinder
 		void resetIdleTime() {idleTime = 0;}
 		bool getNoMove() const {return mayNotMove;}
 
+		bool isAccountManagerEx() const {return accountManagerEx;}
 		bool isAccountManager() const {return accountManager;}
 
 		bool isInGhostMode() const {return ghostMode;}
@@ -247,6 +250,7 @@ class Player : public Creature, public Cylinder
 		AccountType_t getAccountType() const {return accountType;}
 		uint32_t getLevel() const {return level;}
 		int32_t getMagicLevel() const {return getPlayerInfo(PLAYERINFO_MAGICLEVEL);}
+		uint32_t getBaseMagicLevel() const {return magLevel;}
 		bool isAccessPlayer() const {return accessLevel;}
 		bool isPremium() const;
 
@@ -300,6 +304,8 @@ class Player : public Creature, public Cylinder
 
 		bool isItemAbilityEnabled(slots_t slot) const {return inventoryAbilities[slot];}
 		void setItemAbility(slots_t slot, bool enabled) {inventoryAbilities[slot] = enabled;}
+
+		int32_t getBaseSkill(skills_t skill) const {return skills[skill][SKILL_LEVEL];}
 
 		int32_t getVarSkill(skills_t skill) const {return varSkills[skill];}
 		void setVarSkill(skills_t skill, int32_t modifier) {varSkills[skill] += modifier;}
@@ -366,7 +372,7 @@ class Player : public Creature, public Cylinder
 		virtual void onWalkComplete();
 
 		void stopWalk();
-		void openShopWindow(const std::list<ShopInfo>& shop);
+		void openShopWindow(Npc* npc, const std::list<ShopInfo>& shop);
 		void closeShopWindow(bool sendCloseShopWindow = true);
 		void updateSaleShopList(uint32_t itemId);
 		bool hasShopItemForSale(uint32_t itemId, uint8_t subType);
@@ -473,6 +479,8 @@ class Player : public Creature, public Cylinder
 
 		void sendChannelMessage(std::string author, std::string text, SpeakClasses type, unsigned char channel)
 			{if(client) client->sendChannelMessage(author, text, type, channel);}
+		void sendChannelEvent(uint16_t channelId, const std::string& playerName, ChannelEvent_t channelEvent)
+			{if(client) client->sendChannelEvent(channelId, playerName, channelEvent);}
 		void sendCreatureAppear(const Creature* creature, const Position& pos, bool isLogin)
 			{if(client) client->sendAddCreature(creature, pos, creature->getTile()->getClientIndexOfThing(this, creature), isLogin);}
 		void sendCreatureDisappear(const Creature* creature, uint32_t stackpos, bool isLogout)
@@ -508,6 +516,15 @@ class Player : public Creature, public Cylinder
 			{if(client) client->sendSpellCooldown(spellId, time);}
 		void sendSpellGroupCooldown(SpellGroup_t groupId, uint32_t time)
 			{if(client) client->sendSpellGroupCooldown(groupId, time);}
+
+		void sendDamageMessage(MessageClasses mclass, const std::string& message, const Position& pos,
+			uint32_t primaryDamage = 0, TextColor_t primaryColor = TEXTCOLOR_NONE,
+			uint32_t secondaryDamage = 0, TextColor_t secondaryColor = TEXTCOLOR_NONE)
+			{if(client) client->sendDamageMessage(mclass, message, pos, primaryDamage, primaryColor, secondaryDamage, secondaryColor);}
+		void sendHealMessage(MessageClasses mclass, const std::string& message, const Position& pos, uint32_t heal, TextColor_t color)
+			{if(client) client->sendHealMessage(mclass, message, pos, heal, color);}
+		void sendExperienceMessage(MessageClasses mclass, const std::string& message, const Position& pos, uint32_t exp, TextColor_t color)
+			{if(client) client->sendExperienceMessage(mclass, message, pos, exp, color);}
 
 		//container
 		void sendAddContainerItem(const Container* container, const Item* item);
@@ -556,8 +573,6 @@ class Player : public Creature, public Cylinder
 			Item* newItem, const ItemType& newType);
 		void onRemoveInventoryItem(slots_t slot, Item* item);
 
-		void sendAnimatedText(const Position& pos, unsigned char color, std::string text) const
-			{if(client) client->sendAnimatedText(pos,color,text);}
 		void sendCancel(const std::string& msg) const
 			{if(client) client->sendCancel(msg);}
 		void sendCancelMessage(ReturnValue message) const;
@@ -593,8 +608,8 @@ class Player : public Creature, public Cylinder
 			{if(client) client->sendTextWindow(windowTextId, itemId, text);}
 		void sendToChannel(Creature* creature, SpeakClasses type, const std::string& text, uint16_t channelId) const
 			{if(client) client->sendToChannel(creature, type, text, channelId);}
-		void sendShop() const
-			{if(client) client->sendShop(shopItemList);}
+		void sendShop(Npc* npc) const
+			{if(client) client->sendShop(npc, shopItemList);}
 		void sendSaleItemList() const
 			{if(client) client->sendSaleItemList(shopItemList);}
 		void sendCloseShop() const
@@ -738,7 +753,7 @@ class Player : public Creature, public Cylinder
 		bool ghostMode;
 		bool depotChange;
 
-		bool talkState[13], accountManager;
+		bool talkState[13], accountManager, accountManagerEx;
 		int32_t newVocation;
 		PlayerSex_t _newSex;
 		uint32_t realAccount, newAccount;

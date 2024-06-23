@@ -23,6 +23,28 @@
 #include <string>
 #include <list>
 
+enum ChannelEvent_t
+{
+	CHANNELEVENT_JOIN = 0,
+	CHANNELEVENT_LEAVE = 1,
+	CHANNELEVENT_INVITE = 2,
+	CHANNELEVENT_EXCLUDE = 3
+};
+
+enum ReportType_t
+{
+	REPORTTYPE_NAME = 0,
+	REPORTTYPE_STATEMENT = 1,
+	REPORTTYPE_BOT = 2
+};
+
+enum CreatureType_t
+{
+	CREATURETYPE_PLAYER = 0,
+	CREATURETYPE_MONSTER = 1,
+	CREATURETYPE_NPC = 2
+};
+
 enum StorageValues_t
 {
 	STORAGEVALUE_PROMOTION = 30018
@@ -38,7 +60,8 @@ enum GuildLevel_t
 enum OperatingSystem_t
 {
 	CLIENTOS_LINUX = 0x01,
-	CLIENTOS_WINDOWS = 0x02
+	CLIENTOS_WINDOWS = 0x02,
+	CLIENTOS_FLASH = 0x03
 };
 
 enum SpellGroup_t

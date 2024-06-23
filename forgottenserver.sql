@@ -6,6 +6,7 @@ DROP TRIGGER IF EXISTS `ondelete_accounts`;
 
 DROP TABLE IF EXISTS `player_depotitems`;
 DROP TABLE IF EXISTS `tile_items`;
+DROP TABLE IF EXISTS `tile_store`;
 DROP TABLE IF EXISTS `tiles`;
 DROP TABLE IF EXISTS `map_store`;
 DROP TABLE IF EXISTS `bans`;
@@ -243,7 +244,7 @@ CREATE TABLE `player_viplist`
 CREATE TABLE `map_store`
 (
 	`house_id` int(10) unsigned NOT NULL,
-	`data` blob NOT NULL,
+	`data` LONGBLOB NOT NULL,
 	KEY `house_id` (`house_id`)
 ) ENGINE = InnoDB;
 

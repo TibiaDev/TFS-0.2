@@ -22,6 +22,8 @@
 #include <string>
 #include <fstream>
 #include <utility>
+#include <cstring>
+#include <cerrno>
 
 #include "commands.h"
 #include "player.h"
@@ -144,8 +146,9 @@ bool Commands::loadFromXml()
 		xmlNodePtr root, p;
 		root = xmlDocGetRootElement(doc);
 
-		if(xmlStrcmp(root->name,(const xmlChar*)"commands") != 0)
+		if(xmlStrcmp(root->name,(const xmlChar*)"commands"))
 		{
+			std::clog << "[Error - Commands::loadFromXml] Malformed commands file." << std::endl;
 			xmlFreeDoc(doc);
 			return false;
 		}
@@ -255,7 +258,7 @@ bool Commands::exeCommand(Creature* creature, const std::string& cmd)
 	if(it == commandMap.end())
 		return false;
 
-	if(it->second->groupId > player->groupId || it->second->accountType > player->accountType || (g_config.getBoolean(ConfigManager::ACCOUNT_MANAGER) && player->name == "Account Manager"))
+	if(it->second->groupId > player->groupId || it->second->accountType > player->accountType || player->isAccountManagerEx())
 	{
 		if(player->accessLevel)
 			player->sendTextMessage(MSG_STATUS_SMALL, "You can not execute this command.");
@@ -273,7 +276,15 @@ bool Commands::exeCommand(Creature* creature, const std::string& cmd)
 		const tm* now = localtime(&ticks);
 		char buf[32], buffer[100];
 		strftime(buf, sizeof(buf), "%d/%m/%Y %H:%M", now);
-		sprintf(buffer, "data/logs/%s commands.log", player->name.c_str());
+		if(dirExists("data/logs") || createDir("data/logs"))
+			sprintf(buffer, "data/logs/%s commands.log", player->name.c_str());
+		else
+			std::clog << "[Warning - Commands::exeCommand] Cannot access \"data/logs\" for writing: " << strerror(errno) << "." << std::endl;
+
+		//avoid seg fault from std::ofstream just incase the directory does not exist
+		if (*buffer == '\0')
+			return true;
+
 		std::ofstream out(buffer, std::ios::app);
 		out << "[" << buf << "] " << cmd << std::endl;
 		out.close();
@@ -1034,7 +1045,7 @@ void Commands::removeThing(Player* player, const std::string& cmd, const std::st
 void Commands::newType(Player* player, const std::string& cmd, const std::string& param)
 {
 	int32_t lookType = atoi(param.c_str());
-	if(lookType >= 0 && lookType != 1 && lookType != 135 && (lookType <= 160 || lookType >= 192) && lookType <= 386)
+	if(lookType >= 0 && lookType != 1 && lookType != 135 && (lookType <= 160 || lookType >= 192) && lookType <= 410)
 	{
 		Outfit_t newOutfit = player->getDefaultOutfit();
 		newOutfit.lookType = lookType;

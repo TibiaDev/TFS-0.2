@@ -85,6 +85,7 @@ enum LightState_t
 
 typedef std::map<int32_t, int32_t> StageList;
 typedef std::vector< std::pair<std::string, unsigned int> > Highscore;
+typedef std::vector<std::string> StatusList;
 
 /**
   * Main Game class.
@@ -441,7 +442,7 @@ class Game
 		bool playerRevokePartyInvitation(uint32_t playerId, uint32_t invitedId);
 		bool playerPassPartyLeadership(uint32_t playerId, uint32_t newLeaderId);
 		bool playerLeaveParty(uint32_t playerId);
-		bool playerEnableSharedPartyExperience(uint32_t playerId, uint8_t sharedExpActive, uint8_t unknown);
+		bool playerEnableSharedPartyExperience(uint32_t playerId, bool sharedExpActive);
 		bool playerToggleMount(uint32_t playerId, bool mount);
 
 		void removePremium(Account account);
@@ -495,10 +496,6 @@ class Game
 		//animation help functions
 		void addCreatureHealth(const Creature* target);
 		void addCreatureHealth(const SpectatorVec& list, const Creature* target);
-		void addAnimatedText(const Position& pos, uint8_t textColor,
-			const std::string& text);
-		void addAnimatedText(const SpectatorVec& list, const Position& pos, uint8_t textColor,
-			const std::string& text);
 		void addMagicEffect(const Position& pos, uint8_t effect, bool ghostMode = false);
 		void addMagicEffect(const SpectatorVec& list, const Position& pos, uint8_t effect, bool ghostMode = false);
 		void addDistanceEffect(const Position& fromPos, const Position& toPos,
@@ -522,6 +519,11 @@ class Game
 
 		void setServerSaveMessage(int16_t key, bool value) {serverSaveMessage[key] = value;}
 		bool getServerSaveMessage(int16_t key) const {return serverSaveMessage[key];}
+
+		bool loadStatuslist();
+
+		bool isInBlacklist(std::string ip) const { for (StatusList::const_iterator it = blacklist.begin(); it != blacklist.end(); ++it) { if (*it == ip) return true; } return false; }
+		bool isInWhitelist(std::string ip) const { for (StatusList::const_iterator it = whitelist.begin(); it != whitelist.end(); ++it) { if (*it == ip) return true; } return false; }
 
 	protected:
 		bool playerSayCommand(Player* player, SpeakClasses type, const std::string& text);
@@ -597,5 +599,8 @@ class Game
 		bool useLastStageLevel;
 
 		std::vector<std::string> commandTags;
+
+		StatusList blacklist;
+		StatusList whitelist;
 };
 #endif

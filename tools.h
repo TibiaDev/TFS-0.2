@@ -93,9 +93,7 @@ OPENTIBIA_API Direction getDirection(std::string string);
 OPENTIBIA_API Direction getReverseDirection(Direction dir);
 OPENTIBIA_API Position getNextPosition(Direction direction, Position pos);
 
-#if !defined __GNUC__ || __GNUC__ < 3
-	OPENTIBIA_API char upchar(char c);
-#endif
+OPENTIBIA_API char upchar(char c);
 
 OPENTIBIA_API std::string parseParams(tokenizer::iterator &it, tokenizer::iterator end);
 
@@ -121,7 +119,18 @@ OPENTIBIA_API std::string getReason(int32_t reasonId);
 OPENTIBIA_API std::string getAction(int32_t actionId, bool IPBanishment);
 
 OPENTIBIA_API bool fileExists(const char* filename);
+OPENTIBIA_API bool dirExists(const std::string&);
+OPENTIBIA_API bool createDir(const std::string&);
+
 OPENTIBIA_API uint32_t adlerChecksum(uint8_t* data, size_t len);
+
+#ifdef __USE_TEMPLATES__
+#undef toString
+template<typename _Tp>
+OPENTIBIA_API std::string toString(_Tp __p);
+#endif
+
+OPENTIBIA_API std::string ucfirst(std::string);
 
 #undef OPENTIBIA_API
 
