@@ -148,6 +148,21 @@ bool IOBan::isPlayerNamelocked(const std::string& name)
 	return false;
 }
 
+bool IOBan::isAccountBanned(uint32_t account)
+{
+	Database* db = Database::getInstance();
+	if(!db->connect())
+		return false;
+
+	DBQuery query;
+	DBResult result;
+	query << "SELECT `type` FROM `bans` WHERE `type` = " << BAN_ACCOUNT << " AND `account` = " << account << " AND `time` > " << time(NULL) << " LIMIT 1;";
+	if(db->storeQuery(query, result))
+		return result.getNumRows() == 1;
+
+	return false;
+}
+
 bool IOBan::getBanInformation(uint32_t account, uint32_t& bannedBy, uint32_t& banTime, int32_t& reason, int32_t& action, std::string& comment, bool& deletion)
 {
 	Database* db = Database::getInstance();
@@ -306,7 +321,7 @@ bool IOBan::removeAccountBan(uint32_t account)
 		return false;
 
 	DBQuery query;
-	query << "UPDATE `bans` SET `time` = " << time(NULL) << " WHERE `type` = " << BAN_ACCOUNT << " AND `account` = " << account << " AND `time` > " << time(NULL) << " LIMIT 1;";
+	query << "UPDATE `bans` SET `time` = " << time(NULL) << " WHERE `type` = " << BAN_ACCOUNT << " AND `account` = " << account << " AND `time` > " << time(NULL) << db->getUpdateQueryLimit() << ";";
 	if(!db->executeQuery(query))
 		return false;
 

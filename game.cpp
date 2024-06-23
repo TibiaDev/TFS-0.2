@@ -52,11 +52,6 @@
 #include "ioguild.h"
 #include "quests.h"
 
-#ifdef __EXCEPTION_TRACER__
-#include "exception.h"
-extern OTSYS_THREAD_LOCKVAR maploadlock;
-#endif
-
 extern ConfigManager g_config;
 extern Actions* g_actions;
 extern Commands commands;
@@ -185,6 +180,12 @@ void Game::setGameState(GameState_t newState)
 
 					g_scheduler.stop();
 					g_dispatcher.stop();
+				}
+				else
+				{
+					g_scheduler.shutdown();
+					g_dispatcher.shutdown();
+					exit(1);
 				}
 				break;
 			}
@@ -1907,7 +1908,7 @@ Item* Game::transformItem(Item* item, uint16_t newId, int32_t newCount /*= -1*/)
 	return NULL;
 }
 
-ReturnValue Game::internalTeleport(Thing* thing, const Position& newPos, bool pushMove /*= true*/, uint32_t flags /*= 0*/)
+ReturnValue Game::internalTeleport(Thing* thing, const Position& newPos, bool pushMove/* = true*/, uint32_t flags /*= 0*/)
 {
 	if(newPos == thing->getPosition())
 		return RET_NOERROR;
@@ -1923,10 +1924,7 @@ ReturnValue Game::internalTeleport(Thing* thing, const Position& newPos, bool pu
 			if(ret != RET_NOERROR)
 				return ret;
 
-			if(pushMove && Position::areInRange<1,1,0>(creature->getPosition(), newPos) && toTile->ground)
-				creature->getTile()->moveCreature(creature, toTile, false);
-			else
-				creature->getTile()->moveCreature(creature, toTile, true);
+			creature->getTile()->moveCreature(creature, toTile, !pushMove);
 			return RET_NOERROR;
 		}
 		else if(Item* item = thing->getItem())
@@ -2966,8 +2964,8 @@ bool Game::internalCloseTrade(Player* player)
 	return true;
 }
 
-bool Game::playerPurchaseItem(uint32_t playerId, uint16_t spriteId, uint8_t count,
-	uint8_t amount)
+bool Game::playerPurchaseItem(uint32_t playerId, uint16_t spriteId, uint8_t count, uint8_t amount,
+	bool ignoreCap/* = false*/, bool inBackpacks/* = false*/)
 {
 	Player* player = getPlayerByID(playerId);
 	if(player == NULL || player->isRemoved())
@@ -2994,7 +2992,7 @@ bool Game::playerPurchaseItem(uint32_t playerId, uint16_t spriteId, uint8_t coun
 	else
 		subType = count;
 
-	merchant->onPlayerTrade(player, SHOPEVENT_BUY, onBuy, it.id, subType, amount);
+	merchant->onPlayerTrade(player, SHOPEVENT_BUY, onBuy, it.id, subType, amount, ignoreCap, inBackpacks);
 	return true;
 }
 
@@ -4036,6 +4034,11 @@ bool Game::combatChangeHealth(CombatType_t combatType, Creature* attacker, Creat
 								hitEffect = NM_ME_DRAW_BLOOD;
 								break;
 
+							case RACE_ENERGY:
+								textColor = TEXTCOLOR_PURPLE;
+								hitEffect = NM_ME_ENERGY_DAMAGE;
+								break;
+
 							default:
 								break;
 						}
@@ -4078,7 +4081,7 @@ bool Game::combatChangeHealth(CombatType_t combatType, Creature* attacker, Creat
 
 					case COMBAT_ICEDAMAGE:
 					{
-						textColor = TEXTCOLOR_LIGHTBLUE;
+						textColor = TEXTCOLOR_SKYBLUE;
 						hitEffect = NM_ME_ICEATTACK;
 						break;
 					}

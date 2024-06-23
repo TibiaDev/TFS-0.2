@@ -33,7 +33,6 @@
 #include "game.h"
 #include "gui.h"
 
-extern RSA* g_otservRSA;
 extern ConfigManager g_config;
 extern IPList serverIPs;
 extern Ban g_bans;
@@ -87,9 +86,9 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 	msg.SkipBytes(12);
 
 	if(version <= 760)
-		disconnectClient(0x0A, "Only clients with protocol 8.50 allowed!");
+		disconnectClient(0x0A, "Only clients with protocol 8.5 allowed!");
 
-	if(!RSA_decrypt(g_otservRSA, msg))
+	if(!RSA_decrypt(msg))
 	{
 		getConnection()->closeConnection();
 		return false;

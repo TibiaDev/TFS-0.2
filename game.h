@@ -364,7 +364,7 @@ class Game
 		  * Teleports an object to another position
 		  * \param thing is the object to teleport
 		  * \param newPos is the new position
-		  * \param pushMove should player be pushed if newPos is 1 sqm away
+		  * \param pushMove force teleport if false
 		  * \param flags optional flags to modify default behavior
 		  * \returns true if the teleportation was successful
 		  */
@@ -442,10 +442,9 @@ class Game
 			uint32_t tradePlayerId, uint16_t spriteId);
 		bool playerAcceptTrade(uint32_t playerId);
 		bool playerLookInTrade(uint32_t playerId, bool lookAtCounterOffer, int index);
-		bool playerPurchaseItem(uint32_t playerId, uint16_t spriteId, uint8_t count,
-			uint8_t amount);
-		bool playerSellItem(uint32_t playerId, uint16_t spriteId, uint8_t count,
-			uint8_t amount);
+		bool playerPurchaseItem(uint32_t playerId, uint16_t spriteId, uint8_t count, uint8_t amount,
+			bool ignoreCap = false, bool inBackpacks = false);
+		bool playerSellItem(uint32_t playerId, uint16_t spriteId, uint8_t count, uint8_t amount);
 		bool playerCloseShop(uint32_t playerId);
 		bool playerLookInShop(uint32_t playerId, uint16_t spriteId, uint8_t count);
 		bool playerCloseTrade(uint32_t playerId);
