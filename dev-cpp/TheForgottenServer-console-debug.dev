@@ -1,7 +1,7 @@
 [Project]
 FileName=TheForgottenServer-console-debug.dev
 Name=TheForgottenServer
-UnitCount=161
+UnitCount=163
 Type=1
 Ver=1
 ObjFiles=
@@ -11,8 +11,8 @@ PrivateResource=TheForgottenServer_private.rc
 ResourceIncludes=
 MakeIncludes=
 Compiler=
-CppCompiler=-D__NO_HOMEDIR_CONF___@@_-D__USE_MYSQL___@@_-D__USE_SQLITE___@@_-D__CONSOLE___@@_-D__EXCEPTION_TRACER___@@_
-Linker=-O1_@@_-lboost_regex_@@_-lboost_system_@@_-lgmp_@@_-lluasql_mysql_@@_-lluasql_sqlite_@@_-llua5.1_@@_-lmysql_@@_-lsqlite3_@@_-lwsock32_@@_-lxml2_@@_-lmysql_@@_-lws2_32_@@_-s_@@_
+CppCompiler=-D__NO_HOMEDIR_CONF___@@_-D__USE_MYSQL___@@_-D__USE_SQLITE___@@_-D_CONSOLE_@@_-D__EXCEPTION_TRACER___@@_
+Linker=-O1_@@_-lboost_regex_@@_-lboost_system_@@_-lgmp_@@_-llua5.1_@@_-lmysql_@@_-lsqlite3_@@_-lwsock32_@@_-lxml2_@@_-lmysql_@@_-lws2_32_@@_-s_@@_
 IsCpp=1
 Icon=TheForgottenServer-console-debug.ico
 ExeOutput=
@@ -1629,21 +1629,41 @@ Priority=1000
 OverrideBuildCmd=0
 BuildCmd=
 
+[Unit162]
+FileName=..\iomarket.cpp
+CompileCpp=1
+Folder=TheForgottenServer
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
+[Unit163]
+FileName=..\iomarket.h
+CompileCpp=1
+Folder=TheForgottenServer
+Compile=1
+Link=1
+Priority=1000
+OverrideBuildCmd=0
+BuildCmd=
+
 [VersionInfo]
 Major=0
 Minor=2
-Release=7
+Release=12
 Build=0
 LanguageID=1033
 CharsetID=1252
 CompanyName=
-FileVersion=0.2.7-debug
+FileVersion=0.2.12-debug
 FileDescription=The Forgotten Server
 InternalName=
 LegalCopyright=
 LegalTrademarks=
 OriginalFilename=TheForgottenServer.exe
 ProductName=The Forgotten Server
-ProductVersion=0.2.7-debug
+ProductVersion=0.2.12-debug
 AutoIncBuildNr=0
 

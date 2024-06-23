@@ -143,7 +143,7 @@ class ItemAttributes
 		void resetText() {removeAttribute(ATTR_ITEM_TEXT);}
 		const std::string& getText() const {return getStrAttr(ATTR_ITEM_TEXT);}
 
-		void setDate(uint64_t n) {setIntAttr(ATTR_ITEM_WRITTENDATE, n);}
+		void setDate(int32_t n) {setIntAttr(ATTR_ITEM_WRITTENDATE, n);}
 		void resetDate() {removeAttribute(ATTR_ITEM_WRITTENDATE);}
 		time_t getDate() const {return (time_t)getIntAttr(ATTR_ITEM_WRITTENDATE);}
 
@@ -164,17 +164,17 @@ class ItemAttributes
 		uint16_t getFluidType() const {return (uint16_t)getIntAttr(ATTR_ITEM_FLUIDTYPE);}
 
 		void setOwner(uint32_t _owner) {setIntAttr(ATTR_ITEM_OWNER, _owner);}
-		uint32_t getOwner() const {return (uint32_t)getIntAttr(ATTR_ITEM_OWNER);}
+		uint32_t getOwner() const {return getIntAttr(ATTR_ITEM_OWNER);}
 
 		void setCorpseOwner(uint32_t _corpseOwner) {setIntAttr(ATTR_ITEM_CORPSEOWNER, _corpseOwner);}
-		uint32_t getCorpseOwner() {return (uint32_t)getIntAttr(ATTR_ITEM_CORPSEOWNER);}
+		uint32_t getCorpseOwner() {return getIntAttr(ATTR_ITEM_CORPSEOWNER);}
 
 		void setDuration(int32_t time) {setIntAttr(ATTR_ITEM_DURATION, time);}
 		void decreaseDuration(int32_t time) {increaseIntAttr(ATTR_ITEM_DURATION, -time);}
-		int32_t getDuration() const {return (int32_t)getIntAttr(ATTR_ITEM_DURATION);}
+		uint32_t getDuration() const {return getIntAttr(ATTR_ITEM_DURATION);}
 
 		void setDecaying(ItemDecayState_t decayState) {setIntAttr(ATTR_ITEM_DECAYING, decayState);}
-		uint32_t getDecaying() const {return (uint32_t)getIntAttr(ATTR_ITEM_DECAYING);}
+		uint32_t getDecaying() const {return getIntAttr(ATTR_ITEM_DECAYING);}
 
 	protected:
 		enum itemAttrTypes
@@ -197,7 +197,6 @@ class ItemAttributes
 		bool hasAttribute(itemAttrTypes type) const;
 		void removeAttribute(itemAttrTypes type);
 
-	protected:
 		static std::string emptyString;
 
 		class Attribute
@@ -317,7 +316,7 @@ class Item : virtual public Thing, public ItemAttributes
 		int32_t getArmor() const {return items[id].armor;}
 		int32_t getDefense() const {return items[id].defense;}
 		int32_t getExtraDefense() const {return items[id].extraDefense;}
-		int32_t getSlotPosition() const {return items[id].slot_position;}
+		int32_t getSlotPosition() const {return items[id].slotPosition;}
 		int32_t getHitChance() const {return items[id].hitChance;}
 
 		bool isReadable() const {return items[id].canReadText;}
@@ -344,7 +343,6 @@ class Item : virtual public Thing, public ItemAttributes
 		bool isRoteable() const {const ItemType& it = items[id]; return it.rotable && it.rotateTo;}
 		bool isDoor() const {return items[id].isDoor();}
 		bool isBed() const {return items[id].isBed();}
-		bool isLevelDoor() const {return items[id].isLevelDoor();}
 		bool hasCharges() const {return getCharges() > 0;}
 
 		bool floorChangeDown() const {return items[id].floorChangeDown;}

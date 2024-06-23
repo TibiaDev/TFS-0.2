@@ -1219,9 +1219,9 @@ bool ConditionDamage::executeCondition(Creature* creature, int32_t interval)
 		creature->onTickCondition(getType(), bRemove);
 		damageInfo.timeLeft -= interval;
 
-		if(damageInfo.timeLeft <= 0){
+		if(damageInfo.timeLeft <= 0)
+		{
 			int32_t damage = damageInfo.value;
-
 			if(bRemove)
 				damageList.pop_front();
 			else
@@ -1388,7 +1388,7 @@ void ConditionDamage::generateDamageList(int32_t amount, int32_t start, std::lis
 	amount = std::abs(amount);
 	int32_t sum = 0;
 	int32_t med = 0;
-	float x1, x2;
+	double x1, x2;
 
 	for(int32_t i = start; i > 0; --i)
 	{
@@ -1467,7 +1467,8 @@ bool ConditionSpeed::unserializeProp(ConditionAttr_t attr, PropStream& propStrea
 		mina = value;
 		return true;
 	}
-	else if(attr == CONDITIONATTR_FORMULA_MINB){
+	else if(attr == CONDITIONATTR_FORMULA_MINB)
+	{
 		float value = 0;
 		if(!propStream.GET_VALUE(value))
 			return false;

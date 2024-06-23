@@ -77,7 +77,7 @@ Creature::Creature() :
 	forceUpdateFollowPath = false;
 	isMapLoaded = false;
 	isUpdatingPath = false;
-	memset(localMapCache, false, sizeof(localMapCache));
+	memset(localMapCache, 0, sizeof(localMapCache));
 
 	attackedCreature = NULL;
 	_lastHitCreature = NULL;
@@ -229,9 +229,9 @@ void Creature::onThink(uint32_t interval)
 	}
 
 	//scripting event - onThink
-	CreatureEvent* eventThink = getCreatureEvent(CREATURE_EVENT_THINK);
-	if(eventThink)
-		eventThink->executeOnThink(this, interval);
+	CreatureEventList thinkEvents = getCreatureEvents(CREATURE_EVENT_THINK);
+	for(CreatureEventList::const_iterator it = thinkEvents.begin(); it != thinkEvents.end(); ++it)
+		(*it)->executeOnThink(this, interval);
 }
 
 void Creature::onAttacking(uint32_t interval)
@@ -844,9 +844,9 @@ void Creature::dropCorpse()
 	}
 
 	//scripting event - onDeath
-	CreatureEvent* eventDeath = getCreatureEvent(CREATURE_EVENT_DEATH);
-	if(eventDeath)
-		eventDeath->executeOnDeath(this, corpse, _lastHitCreature, _mostDamageCreature, lastHitUnjustified, mostDamageUnjustified);
+	CreatureEventList deathEvents = getCreatureEvents(CREATURE_EVENT_DEATH);
+	for(CreatureEventList::const_iterator it = deathEvents.begin(); it != deathEvents.end(); ++it)
+		(*it)->executeOnDeath(this, corpse, _lastHitCreature, _mostDamageCreature, lastHitUnjustified, mostDamageUnjustified);
 
 	if(corpse)
 		dropLoot(corpse->getContainer());
@@ -1227,9 +1227,9 @@ bool Creature::onKilledCreature(Creature* target, bool lastHit/* = true*/)
 		getMaster()->onKilledCreature(target);
 
 	//scripting event - onKill
-	CreatureEvent* eventKill = getCreatureEvent(CREATURE_EVENT_KILL);
-	if(eventKill)
-		eventKill->executeOnKill(this, target);
+	CreatureEventList killEvents = getCreatureEvents(CREATURE_EVENT_KILL);
+	for(CreatureEventList::const_iterator it = killEvents.begin(); it != killEvents.end(); ++it)
+		(*it)->executeOnKill(this, target);
 
 	return false;
 }
@@ -1257,9 +1257,10 @@ void Creature::onGainExperience(uint64_t gainExp, Creature* target)
 		ssExp << getNameDescription() << " gained " << gainExp << " experience points.";
 		std::string strExp = ssExp.str();
 
-		const SpectatorVec& list = g_game.getSpectators(targetPos);
 		Player* tmpPlayer = NULL;
-		for(SpectatorVec::const_iterator it = list.begin(); it != list.end(); ++it)
+		SpectatorVec list;
+		g_game.getSpectators(list, targetPos);
+		for(SpectatorVec::const_iterator it = list.begin(), end = list.end(); it != end; ++it)
 		{
 			if((tmpPlayer = (*it)->getPlayer()))
 			{
@@ -1287,9 +1288,10 @@ void Creature::onGainSharedExperience(uint64_t gainExp)
 		ssExp << getNameDescription() << " gained " << gainExp << " experience points.";
 		std::string strExp = ssExp.str();
 
-		const SpectatorVec& list = g_game.getSpectators(targetPos);
 		Player* tmpPlayer = NULL;
-		for(SpectatorVec::const_iterator it = list.begin(); it != list.end(); ++it)
+		SpectatorVec list;
+		g_game.getSpectators(list, targetPos);
+		for(SpectatorVec::const_iterator it = list.begin(), end = list.end(); it != end; ++it)
 		{
 			if((tmpPlayer = (*it)->getPlayer()))
 			{
@@ -1620,47 +1622,41 @@ void Creature::setNormalCreatureLight()
 bool Creature::registerCreatureEvent(const std::string& name)
 {
 	CreatureEvent* event = g_creatureEvents->getEventByName(name);
-	if(event)
-	{
-		CreatureEventType_t type = event->getEventType();
-		if(!hasEventRegistered(type))
-		{
-			// not was added, so set the bit in the bitfield
-			scriptEventsBitField = scriptEventsBitField | ((uint32_t)1 << type);
-		}
-		else
-		{
-			//had a previous event handler for this type
-			// and have to be removed
-			CreatureEventList::iterator it = findEvent(type);
-			eventsList.erase(it);
-		}
-		eventsList.push_back(event);
-		return true;
-	}
-	return false;
-}
+	if(!event)
+		return false;
 
-std::list<CreatureEvent*>::iterator Creature::findEvent(CreatureEventType_t type)
-{
-	CreatureEventList::iterator it;
-	for(it = eventsList.begin(); it != eventsList.end(); ++it)
-	{
-		if((*it)->getEventType() == type)
-			return it;
-	}
-	return eventsList.end();
-}
-
-CreatureEvent* Creature::getCreatureEvent(CreatureEventType_t type)
-{
+	CreatureEventType_t type = event->getEventType();
 	if(hasEventRegistered(type))
 	{
-		CreatureEventList::iterator it = findEvent(type);
-		if(it != eventsList.end())
-			return *it;
+		//check for duplicates
+		for(CreatureEventList::const_iterator it = eventsList.begin(); it != eventsList.end(); ++it)
+		{
+			if(*it == event)
+				return false;
+		}
 	}
-	return NULL;
+	else
+	{
+		//set the bit
+		scriptEventsBitField = scriptEventsBitField | ((uint32_t)1 << type);
+	}
+
+	eventsList.push_back(event);
+	return true;
+}
+
+CreatureEventList Creature::getCreatureEvents(CreatureEventType_t type)
+{
+	CreatureEventList tmpEventList;
+	if(!hasEventRegistered(type))
+		return tmpEventList;
+
+	for(CreatureEventList::const_iterator it = eventsList.begin(); it != eventsList.end(); ++it)
+	{
+		if((*it)->getEventType() == type)
+			tmpEventList.push_back(*it);
+	}
+	return tmpEventList;
 }
 
 FrozenPathingConditionCall::FrozenPathingConditionCall(const Position& _targetPos)

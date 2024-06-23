@@ -207,6 +207,10 @@ CONST_ME_INSECTS = 68
 CONST_ME_DRAGONHEAD = 69
 CONST_ME_ORCSHAMAN = 70
 CONST_ME_ORCSHAMAN_FIRE = 71
+CONST_ME_THUNDER = 72
+CONST_ME_FERUMBRAS = 73
+CONST_ME_CONFETTI_HORIZONTAL = 74
+CONST_ME_CONFETTI_VERTICAL = 75
 CONST_ME_NONE = 255
 
 CONST_ANI_SPEAR = 0
@@ -251,6 +255,9 @@ CONST_ANI_SMALLEARTH = 38
 CONST_ANI_EARTHARROW = 39
 CONST_ANI_EXPLOSION = 40
 CONST_ANI_CAKE = 41
+CONST_ANI_TARSALARROW = 43
+CONST_ANI_VORTEXBOLT = 44
+CONST_ANI_FOOTBALL = 46
 CONST_ANI_WEAPONTYPE = 254
 CONST_ANI_NONE = 255
 
@@ -300,11 +307,12 @@ MESSAGE_EVENT_ORANGE = 34
 MESSAGE_STATUS_CONSOLE_ORANGE = 35
 
 TEXTCOLOR_BLUE = 5
-TEXTCOLOR_LIGHTBLUE = 35
 TEXTCOLOR_LIGHTGREEN = 30
+TEXTCOLOR_LIGHTBLUE = 35
 TEXTCOLOR_GREEN = 54
 TEXTCOLOR_TEAL = 65
 TEXTCOLOR_PLATINUMBLUE = 89
+TEXTCOLOR_MAYABLUE = 95
 TEXTCOLOR_LIGHTGREY = 129
 TEXTCOLOR_SKYBLUE = 143
 TEXTCOLOR_DARKRED = 144
@@ -344,6 +352,8 @@ ITEM_TYPE_DOOR = 5
 ITEM_TYPE_MAGICFIELD = 6
 ITEM_TYPE_TELEPORT = 7
 ITEM_TYPE_BED = 8
+ITEM_TYPE_KEY = 9
+ITEM_TYPE_RUNE = 10
 
 CONST_PROP_BLOCKSOLID = 0
 CONST_PROP_HASHEIGHT = 1
@@ -378,6 +388,9 @@ SKULL_RED = 4
 WORLD_TYPE_NO_PVP = 1
 WORLD_TYPE_PVP = 2
 WORLD_TYPE_PVP_ENFORCED = 3
+
+PLAYERSEX_FEMALE = 0
+PLAYERSEX_MALE = 1
 
 STACKPOS_GROUND = 0
 STACKPOS_FIRST_ITEM_ABOVE_GROUNDTILE = 1
@@ -501,7 +514,7 @@ verticalOpenDoors = {1211, 1220, 1224, 1228, 1233, 1238, 1242, 1246, 1251, 1256,
 horizontalOpenDoors = {1214, 1222, 1226, 1230, 1236, 1240, 1244, 1248, 1254, 1258, 1262, 1542, 3537, 3539, 3541, 3543, 4918, 5085, 5100, 5102, 5104, 5106, 5118, 5120, 5122, 5124, 5136, 5139, 5280, 5287, 5291, 5295, 5518, 5734, 5746, 6197, 6201, 6205, 6209, 6254, 6258, 6262, 6266, 6796, 6800, 6893, 6895, 6897, 6899, 7035, 7037, 7039, 7041, 7057, 8546, 8550, 8554, 8558, 9170, 9174, 9272, 9276, 9280, 9284, 10273, 10277, 10281, 10285, 10470, 10472, 10476, 10474}
 openSpecialDoors = {1224, 1226, 1228, 1230, 1242, 1244, 1246, 1248, 1256, 1258, 1260, 1262, 3541, 3543, 3550, 3552, 5104, 5106, 5113, 5115, 5122, 5124, 5131, 5133, 5289, 5291, 5293, 5295, 6203, 6205, 6207, 6209, 6260, 6262, 6264, 6266, 6897, 6899, 6906, 6908, 7039, 7041, 7048, 7050, 8552, 8554, 8556, 8558, 9176, 9178, 9180, 9182, 9278, 9280, 9282, 9284, 10279, 10281, 10283, 10285, 10474, 10476, 10483, 10485}
 questDoors = {1223, 1225, 1241, 1243, 1255, 1257, 3542, 3551, 5105, 5114, 5123, 5132, 5288, 5290, 5745, 5748, 6202, 6204, 6259, 6261, 6898, 6907, 7040, 7049, 8551, 8553, 9175, 9177, 9277, 9279, 10278, 10280, 10475, 10484}
-levelDoors = {1227, 1229, 1245, 1247, 1259, 1261, 3540, 3549, 5103, 5112, 5121, 5130, 5292, 5294, 6206, 6208, 6263, 6265, 6896, 6905, 7038, 7047, 8555, 8557, 9179, 9181, 9281, 9283, 10282, 10284, 10473, 10482}
+levelDoors = {1227, 1229, 1245, 1247, 1259, 1261, 3540, 3549, 5103, 5112, 5121, 5130, 5292, 5294, 6206, 6208, 6263, 6265, 6896, 6905, 7038, 7047, 8555, 8557, 9179, 9181, 9281, 9283, 10282, 10284, 10473, 10482, 10780, 10789}
 keys = {2086, 2087, 2088, 2089, 2090, 2091, 2092, 10032}
 
 BLUEBERRYBUSH_DECAY_INTERVAL = 300000
@@ -518,6 +531,30 @@ ITEM_BLUEBERRYBUSH = 2785
 ITEM_BUSH = 2786
 ITEM_PARCEL = 2595
 ITEM_LABEL = 2599
+
+ITEM_FIREFIELD_PVP_FULL = 1487
+ITEM_FIREFIELD_PVP_MEDIUM = 1488
+ITEM_FIREFIELD_PVP_SMALL = 1489
+ITEM_FIREFIELD_PERSISTENT_FULL = 1492
+ITEM_FIREFIELD_PERSISTENT_MEDIUM = 1493
+ITEM_FIREFIELD_PERSISTENT_SMALL = 1494
+ITEM_FIREFIELD_NOPVP = 1500
+
+ITEM_POISONFIELD_PVP = 1490
+ITEM_POISONFIELD_PERSISTENT = 1496
+ITEM_POISONFIELD_NOPVP = 1503
+
+ITEM_ENERGYFIELD_PVP = 1491
+ITEM_ENERGYFIELD_PERSISTENT = 1495
+ITEM_ENERGYFIELD_NOPVP = 1504
+
+ITEM_MAGICWALL = 1497
+ITEM_MAGICWALL_PERSISTENT = 1498
+ITEM_MAGICWALL_SAFE = 11098
+
+ITEM_WILDGROWTH = 1499
+ITEM_WILDGROWTH_PERSISTENT = 2721
+ITEM_WILDGROWTH_SAFE = 11099
 
 function doPlayerGiveItem(cid, itemid, count, charges)
 	local isFluidContainer = isItemFluidContainer(itemid) == TRUE
@@ -623,8 +660,9 @@ function isPremium(cid)
 end
 
 function rows(result)
-	return function ()
-		return result:fetch()
+	return function()
+		print("Deprecated function")
+		return nil
 	end
 end
 
@@ -674,11 +712,9 @@ function doPlayerAddAddons(cid, addon)
 end
 
 function numRows(result)
-	local row = result:fetch()
 	local rows = 0
-	while row do
+	while result:fetch() do
 		rows = rows + 1
-		row = result:fetch()
 	end
 	result:close()
 	return rows
@@ -1135,4 +1171,260 @@ function isMonsterInRange(monsterName, fromPos, toPos)
 		end
 	end
 	return false
+end
+
+-- LuaSQL wrapper
+luasql_environment = {
+	connections = {}
+}
+function luasql_environment:new() return self end
+function luasql_environment:connect()
+	local connection = luasql_connection:new()
+	table.insert(self.connections, connection)
+	return connection
+end
+function luasql_environment:close()
+	for _, v in pairs(self.connections) do
+		v:close()
+	end
+	self.connections = {}
+	return true
+end
+
+luasql_connection = {
+	resultIds = {}
+}
+function luasql_connection:new() return self end
+function luasql_connection:close()
+	for _, v in ipairs(self.resultIds) do
+		result.free(v)
+	end
+	self.resultIds = {}
+	return true
+end
+function luasql_connection:execute(statement)
+	if statement:sub(1, 6):upper() == "SELECT" then
+		local cursor = luasql_cursor:new(self, statement)
+		if cursor.resultId ~= false then
+			table.insert(self.resultIds, cursor.resultId)
+		end
+		return cursor
+	end
+	return db.query(statement)
+end
+function luasql_connection:closedCursor(resultId)
+	for k, v in ipairs(self.resultIds) do
+		if v == resultId then
+			table.remove(self.resultIds, k)
+			break
+		end
+	end
+end
+
+luasql_cursor = {
+	connection,
+	resultId
+}
+function luasql_cursor:new(connection, statement)
+	self.connection = connection
+	self.resultId = db.storeQuery(statement)
+	return self
+end
+function luasql_cursor:close()
+	if self.resultId == false then
+		return true
+	end
+
+	self.connection:closedCursor(self.resultId)
+	return result.free(self.resultId)
+end
+function luasql_cursor:fetch()
+	if self.resultId == false then
+		return nil
+	end
+
+	local ret = result.getAllData(self.resultId)
+	if ret == false then
+		self:close()
+		self.resultId = false
+		return nil
+	end
+
+	if result.next(self.resultId) == false then
+		self:close()
+		self.resultId = false
+	end
+	return ret
+end
+
+luasql = {
+	mysql = function() return luasql_environment:new() end,
+	sqlite3 = function() return luasql_environment:new() end,
+	odbc = function() return luasql_environment:new() end,
+	postgres = function() return luasql_environment:new() end
+}
+--
+
+function escapeString(str)
+	str = db.escapeString(str)
+	if str:len() <= 2 then
+		return ""
+	end
+	return str:sub(2, str:len() - 1)
+end
+
+function createClass(parent)
+	local newClass = {}
+	function newClass:new(instance)
+		local instance = instance or {}
+		setmetatable(instance, {__index = newClass})
+		return instance
+	end
+
+	if(parent ~= nil) then
+		setmetatable(newClass, {__index = parent})
+	end
+
+	function newClass:getSelf()
+		return newClass
+	end
+
+	function newClass:getParent()
+		return baseClass
+	end
+
+	function newClass:isa(class)
+		local tmp = newClass
+		while(tmp ~= nil) do
+			if(tmp == class) then
+				return true
+			end
+
+			tmp = tmp:getParent()
+		end
+
+		return false
+	end
+
+	function newClass:setAttributes(attributes)
+		for k, v in pairs(attributes) do
+			newClass[k] = v
+		end
+	end
+
+	return newClass
+end
+
+Result = createClass(nil)
+Result:setAttributes({
+	id = -1,
+	query = ""
+})
+
+function Result:getID()
+	return self.id
+end
+
+function Result:setID(_id)
+	self.id = _id
+end
+
+function Result:getQuery()
+	return self.query
+end
+
+function Result:setQuery(_query)
+	self.query = _query
+end
+
+function Result:create(_query)
+	self:setQuery(_query)
+	local _id = db.storeQuery(self:getQuery())
+	if(_id) then
+		self:setID(_id)
+	end
+
+	return self:getID()
+end
+
+function Result:getRows(free)
+	local free = free or false
+	if(self:getID() == -1) then
+		error("[Result:getRows] Result not set!")
+	end
+
+	local c = 0
+	repeat
+		c = c + 1
+	until not self:next()
+
+	local _query = self:getQuery()
+	self:free()
+	if(not free) then
+		self:create(_query)
+	end
+
+	return c
+end
+
+function Result:getDataInt(s)
+	if(self:getID() == -1) then
+		error("[Result:getDataInt] Result not set!")
+	end
+
+	return result.getDataInt(self:getID(), s)
+end
+
+function Result:getDataLong(s)
+	if(self:getID() == -1) then
+		error("[Result:getDataLong] Result not set!")
+	end
+
+	return result.getDataLong(self:getID(), s)
+end
+
+function Result:getDataString(s)
+	if(self:getID() == -1) then
+		error("[Result:getDataString] Result not set!")
+	end
+
+	return result.getDataString(self:getID(), s)
+end
+
+function Result:getDataStream(s)
+	if(self:getID() == -1) then
+		error("[Result:getDataStream] Result not set!")
+	end
+
+	return result.getDataStream(self:getID(), s)
+end
+
+function Result:next()
+	if(self:getID() == -1) then
+		error("[Result:next] Result not set!")
+	end
+
+	return result.next(self:getID())
+end
+
+function Result:free()
+	if(self:getID() == -1) then
+		error("[Result:free] Result not set!")
+	end
+
+	self:setQuery("")
+	local ret = result.free(self:getID())
+	self:setID(-1)
+	return ret
+end
+
+Result.numRows = Result.getRows
+function db.getResult(query)
+	if(type(query) ~= 'string') then
+		return nil
+	end
+
+	local ret = Result:new()
+	ret:create(query)
+	return ret
 end

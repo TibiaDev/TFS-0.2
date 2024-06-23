@@ -19,7 +19,7 @@
 				<Option compiler="gcc" />
 				<Option use_console_runner="0" />
 				<Compiler>
-					<Add option="-D__CONSOLE__" />
+					<Add option="-D_CONSOLE" />
 				</Compiler>
 			</Target>
 		</Build>
@@ -44,8 +44,6 @@
 			<Add option="-lboost_thread" />
 			<Add option="-liconv" />
 			<Add option="-lwsock32" />
-			<Add option="-lluajitsql_sqlite3" />
-			<Add option="-lluajitsql_mysql" />
 		</Linker>
 		<Unit filename="..\account.h" />
 		<Unit filename="..\actions.cpp" />
@@ -86,6 +84,8 @@
 		<Unit filename="..\cylinder.h" />
 		<Unit filename="..\database.cpp" />
 		<Unit filename="..\database.h" />
+		<Unit filename="..\databasemanager.cpp" />
+		<Unit filename="..\databasemanager.h" />
 		<Unit filename="..\databasemysql.cpp" />
 		<Unit filename="..\databasemysql.h" />
 		<Unit filename="..\databasesqlite.cpp" />
@@ -118,6 +118,8 @@
 		<Unit filename="..\iomap.h" />
 		<Unit filename="..\iomapserialize.cpp" />
 		<Unit filename="..\iomapserialize.h" />
+		<Unit filename="..\iomarket.cpp" />
+		<Unit filename="..\iomarket.h" />
 		<Unit filename="..\item.cpp" />
 		<Unit filename="..\item.h" />
 		<Unit filename="..\itemloader.h" />

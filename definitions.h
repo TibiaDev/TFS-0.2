@@ -21,18 +21,21 @@
 #ifndef __OTSERV_DEFINITIONS_H__
 #define __OTSERV_DEFINITIONS_H__
 
+#define CLIENT_VERSION_MIN 944
+#define CLIENT_VERSION_MAX 946
+#define CLIENT_VERSION_MIN_STR "9.44"
+
 #ifdef _WIN32
 #ifndef WIN32
 #define WIN32
 #endif
 #endif
 
-#if __GNUC__ > 3
-#define FUNCTION_INFO __PRETTY_FUNCTION__
-#elif _MSC_VER
-#define FUNCTION_INFO __FUNCTION__ /// \note I don't know the macro for MSVC
-#else
-#define FUNCTION_INFO
+#undef MULTI_SQL_DRIVERS
+#define SQL_DRIVERS __USE_SQLITE__+__USE_MYSQL__
+
+#if SQL_DRIVERS > 1
+#define MULTI_SQL_DRIVERS
 #endif
 
 #ifdef _WIN32
@@ -58,8 +61,8 @@
 #endif
 
 #ifndef WIN32
-#ifndef __CONSOLE__
-#define __CONSOLE__
+#ifndef _CONSOLE
+#define _CONSOLE
 #endif
 #endif
 
@@ -77,15 +80,6 @@
 	#else
 		#define DEBUG_REPORT
 	#endif
-#endif
-
-#if defined __USE_MYSQL__ && defined __USE_SQLITE__
-enum sqlType_t
-{
-	SQL_TYPE_NONE = 0,
-	SQL_TYPE_SQLITE = 1,
-	SQL_TYPE_MYSQL = 2
-};
 #endif
 
 enum passwordType_t
@@ -139,8 +133,6 @@ enum passwordType_t
 #else
 	typedef unsigned long long uint64_t;
 
-	#define _WIN32_WINNT 0x0500
-
 	#ifndef NOMINMAX
 		#define NOMINMAX
 	#endif
@@ -182,7 +174,6 @@ enum passwordType_t
 	#pragma warning(disable:4250) // 'class1' : inherits 'class2::member' via dominance
 	#pragma warning(disable:4244) //'argument' : conversion from 'type1' to 'type2', possible loss of data
 	#pragma warning(disable:4267) //'var' : conversion from 'size_t' to 'type', possible loss of data
-
 #endif
 
 //*nix systems

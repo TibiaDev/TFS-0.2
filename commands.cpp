@@ -148,7 +148,7 @@ bool Commands::loadFromXml()
 
 		if(xmlStrcmp(root->name,(const xmlChar*)"commands"))
 		{
-			std::clog << "[Error - Commands::loadFromXml] Malformed commands file." << std::endl;
+			std::cout << "[Error - Commands::loadFromXml] Malformed commands file." << std::endl;
 			xmlFreeDoc(doc);
 			return false;
 		}
@@ -166,12 +166,13 @@ bool Commands::loadFromXml()
 					int32_t aTypeLevel;
 					if(it != commandMap.end())
 					{
-						if(readXMLInteger(p,"group",gId))
+						Command* command = it->second;
+						if(readXMLInteger(p, "group", gId))
 						{
-							if(!it->second->loadedGroupId)
+							if(!command->loadedGroupId)
 							{
-								it->second->groupId = gId;
-								it->second->loadedGroupId = true;
+								command->groupId = gId;
+								command->loadedGroupId = true;
 							}
 							else
 								std::cout << "Duplicated command " << strCmd << std::endl;
@@ -181,10 +182,10 @@ bool Commands::loadFromXml()
 
 						if(readXMLInteger(p, "acctype", aTypeLevel))
 						{
-							if(!it->second->loadedAccountType)
+							if(!command->loadedAccountType)
 							{
-								it->second->accountType = (AccountType_t)aTypeLevel;
-								it->second->loadedAccountType = true;
+								command->accountType = (AccountType_t)aTypeLevel;
+								command->loadedAccountType = true;
 							}
 							else
 								std::cout << "Duplicated command " << strCmd << std::endl;
@@ -207,12 +208,14 @@ bool Commands::loadFromXml()
 		xmlFreeDoc(doc);
 	}
 
-	for(CommandMap::iterator it = commandMap.begin(); it != commandMap.end(); ++it)
+	for(CommandMap::iterator it = commandMap.begin(), end = commandMap.end(); it != end; ++it)
 	{
 		if(!it->second->loadedGroupId)
 			std::cout << "Warning: Missing group id for command " << it->first << std::endl;
+
 		if(!it->second->loadedAccountType)
 			std::cout << "Warning: Missing acctype level for command " << it->first << std::endl;
+
 		g_game.addCommandTag(it->first.substr(0, 1));
 	}
 	return loaded;
@@ -223,10 +226,11 @@ bool Commands::reload()
 	loaded = false;
 	for(CommandMap::iterator it = commandMap.begin(); it != commandMap.end(); ++it)
 	{
-		it->second->groupId = 1;
-		it->second->accountType = ACCOUNT_TYPE_GOD;
-		it->second->loadedGroupId = false;
-		it->second->loadedAccountType = false;
+		Command* command = it->second;
+		command->groupId = 1;
+		command->accountType = ACCOUNT_TYPE_GOD;
+		command->loadedGroupId = false;
+		command->loadedAccountType = false;
 	}
 	g_game.resetCommandTag();
 	return loadFromXml();
@@ -258,7 +262,8 @@ bool Commands::exeCommand(Creature* creature, const std::string& cmd)
 	if(it == commandMap.end())
 		return false;
 
-	if(it->second->groupId > player->groupId || it->second->accountType > player->accountType || player->isAccountManagerEx())
+	Command* command = it->second;
+	if(command->groupId > player->groupId || command->accountType > player->accountType || player->isAccountManager())
 	{
 		if(player->accessLevel)
 			player->sendTextMessage(MSG_STATUS_SMALL, "You can not execute this command.");
@@ -267,7 +272,7 @@ bool Commands::exeCommand(Creature* creature, const std::string& cmd)
 	}
 
 	//execute command
-	CommandFunc cfunc = it->second->f;
+	CommandFunc cfunc = command->f;
 	(this->*cfunc)(player, str_command, str_param);
 	if(player->accessLevel)
 	{
@@ -279,7 +284,7 @@ bool Commands::exeCommand(Creature* creature, const std::string& cmd)
 		if(dirExists("data/logs") || createDir("data/logs"))
 			sprintf(buffer, "data/logs/%s commands.log", player->name.c_str());
 		else
-			std::clog << "[Warning - Commands::exeCommand] Cannot access \"data/logs\" for writing: " << strerror(errno) << "." << std::endl;
+			std::cout << "[Warning - Commands::exeCommand] Cannot access \"data/logs\" for writing: " << strerror(errno) << "." << std::endl;
 
 		//avoid seg fault from std::ofstream just incase the directory does not exist
 		if (*buffer == '\0')
@@ -324,7 +329,10 @@ void Commands::placeMonster(Player* player, const std::string& cmd, const std::s
 
 	// Place the monster
 	if(g_game.placeCreature(monster, player->getPosition()))
+	{
+		g_game.addMagicEffect(monster->getPosition(), NM_ME_TELEPORT);
 		g_game.addMagicEffect(player->getPosition(), NM_ME_MAGIC_BLOOD);
+	}
 	else
 	{
 		delete monster;
@@ -351,6 +359,8 @@ void Commands::placeSummon(Player* player, const std::string& cmd, const std::st
 		player->sendCancelMessage(RET_NOTENOUGHROOM);
 		g_game.addMagicEffect(player->getPosition(), NM_ME_POFF);
 	}
+	else
+		g_game.addMagicEffect(monster->getPosition(), NM_ME_TELEPORT);
 }
 
 void Commands::broadcastMessage(Player* player, const std::string& cmd, const std::string& param)
@@ -897,7 +907,7 @@ void Commands::buyHouse(Player* player, const std::string& cmd, const std::strin
 		return;
 	}
 
-	for(HouseMap::iterator it = Houses::getInstance().getHouseBegin(); it != Houses::getInstance().getHouseEnd(); it++)
+	for(HouseMap::iterator it = Houses::getInstance().getHouseBegin(), end = Houses::getInstance().getHouseEnd(); it != end; ++it)
 	{
 		if(it->second->getHouseOwner() == player->guid)
 		{
@@ -907,7 +917,7 @@ void Commands::buyHouse(Player* player, const std::string& cmd, const std::strin
 	}
 
 	uint32_t price = 0;
-	for(HouseTileList::iterator it = house->getHouseTileBegin(); it != house->getHouseTileEnd(); it++)
+	for(HouseTileList::iterator it = house->getHouseTileBegin(), end = house->getHouseTileEnd(); it != end; ++it)
 		price += g_config.getNumber(ConfigManager::HOUSE_PRICE);
 
 	if(g_game.getMoney(player) >= price && g_game.removeMoney(player, price))
@@ -996,9 +1006,11 @@ void Commands::changeFloor(Player* player, const std::string& cmd, const std::st
 
 void Commands::showPosition(Player* player, const std::string& cmd, const std::string& param)
 {
-	char buffer[100];
-	sprintf(buffer, "Your current position is [X: %d | Y: %d | Z: %d].", player->getPosition().x, player->getPosition().y, player->getPosition().z);
-	player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, buffer);
+	const Position& pos = player->getPosition();
+
+	std::stringstream ss;
+	ss << "Your current position is [X: " << pos.x << " | Y: " << pos.y << " | Z: " << pos.z << "].";
+	player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, ss.str());
 }
 
 void Commands::removeThing(Player* player, const std::string& cmd, const std::string& param)
@@ -1045,7 +1057,7 @@ void Commands::removeThing(Player* player, const std::string& cmd, const std::st
 void Commands::newType(Player* player, const std::string& cmd, const std::string& param)
 {
 	int32_t lookType = atoi(param.c_str());
-	if(lookType >= 0 && lookType != 1 && lookType != 135 && lookType != 411 && lookType != 415 && lookType && 424 && (lookType <= 160 || lookType >= 192) && lookType <= 438)
+	if(lookType >= 0 && lookType != 1 && lookType != 135 && lookType != 411 && lookType != 415 && lookType != 424 && (lookType <= 160 || lookType >= 192) && lookType != 439 && lookType != 440 && lookType != 468 && lookType != 469 && lookType != 474 && lookType <= 484)
 	{
 		Outfit_t newOutfit = player->getDefaultOutfit();
 		newOutfit.lookType = lookType;
@@ -1149,7 +1161,7 @@ void Commands::joinGuild(Player* player, const std::string& cmd, const std::stri
 	char buffer[80];
 	sprintf(buffer, "%s has joined the guild.", player->name.c_str());
 
-	ChatChannel* guildChannel = g_chat.getChannel(player, 0x00);
+	ChatChannel* guildChannel = g_chat.getChannel(player, CHANNEL_GUILD);
 	if(guildChannel)
 		guildChannel->sendToAll(buffer, SPEAK_CHANNEL_R1);
 }
@@ -1163,15 +1175,18 @@ void Commands::createGuild(Player* player, const std::string& cmd, const std::st
 	}
 
 	trimString((std::string&)param);
-	if(param.length() < 4)
+	if(param.length() < (uint32_t)g_config.getNumber(ConfigManager::MIN_GUILD_NAME))
 	{
-		player->sendCancel("That guild name is too short, please select a longer name.");
+		std::stringstream ss;
+		ss << "That guild name is too short, it has to be at least " << g_config.getNumber(ConfigManager::MIN_GUILD_NAME) << " characters.";
+		player->sendCancel(ss.str());
 		return;
 	}
-
-	if(param.length() > 20)
+	else if(param.length() > (uint32_t)g_config.getNumber(ConfigManager::MAX_GUILD_NAME))
 	{
-		player->sendCancel("That guild name is too long, please select a shorter name.");
+		std::stringstream ss;
+		ss << "That guild name is too long, it can not be longer than " << g_config.getNumber(ConfigManager::MAX_GUILD_NAME) << " characters.";
+		player->sendCancel(ss.str());
 		return;
 	}
 
@@ -1315,8 +1330,8 @@ void Commands::playerKills(Player* player, const std::string& cmd, const std::st
 	{
 		int32_t frags = (int32_t)ceil(player->redSkullTicks / (double)fragTime);
 		int32_t remainingTime = (player->redSkullTicks % fragTime) / 1000;
-		int32_t hours = (int32_t)floor(remainingTime / 3600);
-		int32_t minutes = (int32_t)floor((remainingTime % 3600) / 60);
+		int32_t hours = remainingTime / 3600;
+		int32_t minutes = (remainingTime % 3600) / 60;
 
 		std::stringstream ss;
 		ss << "You have " << frags << " unjustified kill" << (frags > 1 ? "s" : "") << ". The amount of unjustified kills will decrease after: " << hours << " hour" << (hours != 1 ? "s" : "") << " and " << minutes << " minute" << (minutes != 1 ? "s" : "") << ".";
@@ -1329,9 +1344,13 @@ void Commands::playerKills(Player* player, const std::string& cmd, const std::st
 void Commands::clean(Player* player, const std::string& cmd, const std::string& param)
 {
 	uint32_t count = g_game.getMap()->clean();
-	char info[40];
-	sprintf(info, "Deleted %u item%s.", count, (count != 1 ? "s" : ""));
-	player->sendCancel(info);
+	std::stringstream ss;
+	if(count == 1)
+		ss << "Deleted 1 item.";
+	else
+		ss << "Deleted " << count << " items.";
+
+	player->sendCancel(ss.str());
 }
 
 #ifdef __ENABLE_SERVER_DIAGNOSTIC__
@@ -1431,47 +1450,35 @@ void Commands::multiClientCheck(Player* player, const std::string& cmd, const st
 {
 	std::list<uint32_t> ipList;
 
-	std::stringstream text;
-	text << "Multiclient Check List:";
-	player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, text.str().c_str());
-	text.str("");
-
+	player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, "Multiclient Check List:");
+	std::map< uint32_t, std::vector<Player*> > ipMap;
 	for(AutoList<Player>::listiterator it = Player::listPlayer.list.begin(); it != Player::listPlayer.list.end(); ++it)
 	{
-		if(it->second->isRemoved() || it->second->getIP() == 0 || std::find(ipList.begin(), ipList.end(), it->second->getIP()) != ipList.end())
+		if (it->second->isRemoved() || it->second->getIP() == 0)
 			continue;
 
-		std::list< std::pair<std::string, uint32_t> > playerList;
-		for(AutoList<Player>::listiterator it2 = Player::listPlayer.list.begin(); it2 != Player::listPlayer.list.end(); ++it2)
+		ipMap[it->second->getIP()].push_back(it->second);
+	}
+
+	std::stringstream ss;
+	for(std::map< uint32_t, std::vector<Player*> >::const_iterator it = ipMap.begin(), end = ipMap.end(); it != end; ++it)
+	{
+		if(it->second.size() < 2)
+			continue;
+
+		Player* tmpPlayer = it->second[0];
+		ss << convertIPToString(it->first) << ": " << tmpPlayer->getName() << " [" << tmpPlayer->getLevel() << "]";
+		for(std::vector<Player*>::size_type i = 1, size = it->second.size(); i < size; ++i)
 		{
-			if(it->second == it2->second || it2->second->isRemoved())
-				continue;
-
-			if(it->second->getIP() == it2->second->getIP())
-				playerList.push_back(make_pair(it2->second->getName(), it2->second->getLevel()));
+			tmpPlayer = it->second[i];
+			ss << ", " << tmpPlayer->getName() << " [" << tmpPlayer->getLevel() << "]";
 		}
+		ss << ".\n";
+	}
 
-		if(!playerList.empty())
-		{
-			text << convertIPToString(it->second->getIP()) << ":\n"
-			<< it->second->getName() << " [" << it->second->getLevel() << "], ";
-			uint32_t tmp = 0;
-			for(std::list< std::pair<std::string, uint32_t> >::const_iterator p = playerList.begin(); p != playerList.end(); p++)
-			{
-				tmp++;
-				if(tmp != playerList.size())
-					text << p->first << " [" << p->second << "], ";
-				else
-					text << p->first << " [" << p->second << "].";
-			}
-
-			ipList.push_back(it->second->getIP());
-		}
-
-		if(text.str() != "")
-		{
-			player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, text.str().c_str());
-			text.str("");
-		}
+	if(ss.str() != "")
+	{
+		player->sendTextMessage(MSG_STATUS_CONSOLE_BLUE, ss.str());
+		ss.str("");
 	}
 }

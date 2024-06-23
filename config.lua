@@ -32,7 +32,6 @@
 	whiteSkullTime = 15 * 60 * 1000
 	oldConditionAccuracy = "no"
 	stairJumpExhaustion = 2000
-	animationTextOnHeal = "yes"
 
 	-- Commands
 	displayGamemastersWithOnlineCommand = "no"
@@ -64,6 +63,8 @@
 	-- Guilds
 	ingameGuildSystem = "yes"
 	levelToCreateGuild = 8
+	minGuildNameLength = 4
+	maxGuildNameLength = 20
 
 	-- Highscores
 	highscoreDisplayPlayers = 15
@@ -83,8 +84,15 @@
 	-- Map
 	mapName = "forgotten"
 	mapAuthor = "Komic"
-	randomizeTiles = "yes"
+	randomizeTiles = "no"
 	mapStorageType = "relational"
+
+	-- Market
+	marketEnabled = "yes"
+	marketOfferDuration = 30 * 24 * 60 * 60
+	premiumToCreateMarketOffer = "yes"
+	checkExpiredMarketOffersEachMinutes = 60
+	maxMarketOffersAtATimePerPlayer = 100
 
 	-- Messaging
 	maxMessageBuffer = 4
@@ -138,6 +146,7 @@
 
 	-- Startup
 	defaultPriority = "high"
+	startupDatabaseOptimization = "yes"
 
 	-- Shutdown
 	freeMemoryAtShutdown = "yes"

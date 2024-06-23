@@ -41,7 +41,8 @@
 #include "status.h"
 #include "beds.h"
 #include "mounts.h"
-#ifndef __CONSOLE__
+#include "quests.h"
+#ifndef _CONSOLE
 #include "gui.h"
 #endif
 
@@ -52,9 +53,6 @@ extern Vocations g_vocations;
 extern MoveEvents* g_moveEvents;
 extern Weapons* g_weapons;
 extern CreatureEvents* g_creatureEvents;
-#ifndef __CONSOLE__
-extern GUI gui;
-#endif
 
 AutoList<Player> Player::listPlayer;
 MuteCountMap Player::muteCountMap;
@@ -76,7 +74,6 @@ Creature()
 	depotChange = false;
 	accountNumber = 0;
 	name = _name;
-	accountManagerEx = g_config.getBoolean(ConfigManager::ACCOUNT_MANAGER) && name == "Account Manager";
 	setVocation(0);
 	capacity = 400.00;
 	mana = 0;
@@ -102,8 +99,8 @@ Creature()
 	lastLoginSaved = 0;
 	lastLogout = 0;
  	lastIP = 0;
-	npings = 0;
-	internalPing = 0;
+	lastPing = OTSYS_TIME();
+	lastPong = OTSYS_TIME();
 	MessageBufferTicks = 0;
 	MessageBufferCount = 0;
 	nextAction = 0;
@@ -130,6 +127,8 @@ Creature()
 	blessings = 0;
 
 	mayNotMove = false;
+
+	marketDepotId = -1;
 
 	chaseMode = CHASEMODE_STANDSTILL;
 	fightMode = FIGHTMODE_ATTACK;
@@ -166,15 +165,10 @@ Creature()
 	maxVipLimit = 20;
 	groupFlags = 0;
 
- 	accountManager = false;
-	removeChar = "";
-	for(int8_t i = 0; i <= 13; i++)
-		talkState[i] = false;
-	newVocation = 0;
-	namelockedPlayer = "";
+	accountManager = NULL;
 
 	sex = PLAYERSEX_FEMALE;
- 	vocation_id = 0;
+ 	vocationId = 0;
 
  	town = 0;
 
@@ -189,6 +183,8 @@ Creature()
 
 	groupId = 0;
 
+	bankBalance = 0;
+
 	ghostMode = false;
 	requestedOutfit = false;
 #ifdef __ENABLE_SERVER_DIAGNOSTIC__
@@ -198,7 +194,7 @@ Creature()
 
 Player::~Player()
 {
-	for(int i = 0; i < 11; i++)
+	for(int i = 0; i < 11; ++i)
 	{
 		if(inventory[i])
 		{
@@ -209,8 +205,7 @@ Player::~Player()
 		}
 	}
 
-	DepotMap::iterator it;
-	for(it = depots.begin();it != depots.end(); it++)
+	for(DepotMap::iterator it = depots.begin(), end = depots.end(); it != end; ++it)
 		it->second->releaseThing2();
 
 	//std::cout << "Player destructor " << this << std::endl;
@@ -224,7 +219,7 @@ Player::~Player()
 
 void Player::setVocation(uint32_t vocId)
 {
-	vocation_id = vocId;
+	vocationId = vocId;
 	vocation = g_vocations.getVocation(vocId);
 
 	Condition* condition = getCondition(CONDITION_REGENERATION, CONDITIONID_DEFAULT);
@@ -258,7 +253,7 @@ std::string Player::getDescription(int32_t lookDistance) const
 		s << "yourself.";
 		if(accessLevel != 0)
 			s << " You are " << groupName << ".";
-		else if(vocation_id != VOCATION_NONE)
+		else if(vocationId != VOCATION_NONE)
 			s << " You are " << vocation->getVocDescription() << ".";
 		else
 			s << " You have no vocation.";
@@ -277,7 +272,7 @@ std::string Player::getDescription(int32_t lookDistance) const
 
 		if(accessLevel != 0)
 			s << " is " << groupName << ".";
-		else if(vocation_id != VOCATION_NONE)
+		else if(vocationId != VOCATION_NONE)
 			s << " is " << vocation->getVocDescription() << ".";
 		else
 			s << " has no vocation.";
@@ -309,8 +304,9 @@ std::string Player::getDescription(int32_t lookDistance) const
 
 Item* Player::getInventoryItem(slots_t slot) const
 {
-	if(slot > 0 && slot < 11)
+	if(slot >= SLOT_FIRST && slot < SLOT_LAST)
 		return inventory[slot];
+
 	return NULL;
 }
 
@@ -448,10 +444,7 @@ int32_t Player::getArmor() const
 	if(getInventoryItem(SLOT_RING))
 		armor += getInventoryItem(SLOT_RING)->getArmor();
 
-	if(vocation->armorMultipler != 1.0)
-		armor = int32_t(armor * vocation->armorMultipler);
-
-	return armor;
+	return int32_t(armor * vocation->armorMultipler);
 }
 
 void Player::getShieldAndWeapon(const Item* &shield, const Item* &weapon) const
@@ -510,8 +503,7 @@ int32_t Player::getDefense() const
 		defenseSkill = getSkill(SKILL_SHIELD, SKILL_LEVEL);
 	}
 
-	if(vocation->defenseMultipler != 1.0)
-		defenseValue = int32_t(defenseValue * vocation->defenseMultipler);
+	defenseValue = int32_t(defenseValue * vocation->defenseMultipler);
 
 	if(defenseSkill == 0)
 		return 0;
@@ -646,9 +638,10 @@ void Player::addSkillAdvance(skills_t skill, uint32_t count)
 		skills[skill][SKILL_LEVEL]++;
 		skills[skill][SKILL_TRIES] = 0;
 		skills[skill][SKILL_PERCENT] = 0;
-		char advMsg[50];
-		sprintf(advMsg, "You advanced in %s.", getSkillName(skill).c_str());
-		sendTextMessage(MSG_EVENT_ADVANCE, advMsg);
+
+		std::stringstream ss;
+		ss << "You advanced to " << getSkillName(skill) << " level " << skills[skill][SKILL_LEVEL] << ".";
+		sendTextMessage(MSG_EVENT_ADVANCE, ss.str());
 
 		g_creatureEvents->playerAdvance(this, skill, (skills[skill][SKILL_LEVEL] - 1), skills[skill][SKILL_LEVEL]);
 		advance = true;
@@ -794,7 +787,7 @@ uint16_t Player::getLookCorpse() const
 
 void Player::dropLoot(Container* corpse)
 {
-	if(corpse && lootDrop && vocation_id != VOCATION_NONE)
+	if(corpse && lootDrop && vocationId != VOCATION_NONE)
 	{
 		if(inventory[SLOT_NECKLACE] && inventory[SLOT_NECKLACE]->getID() == ITEM_AMULETOFLOSS &&
 			getSkull() != SKULL_RED && g_game.getWorldType() != WORLD_TYPE_PVP_ENFORCED)
@@ -819,7 +812,7 @@ void Player::dropLoot(Container* corpse)
 	}
 
 	if(!inventory[SLOT_BACKPACK])
-		__internalAddThing(SLOT_BACKPACK, Item::CreateItem(1987));
+		__internalAddThing(SLOT_BACKPACK, Item::CreateItem(ITEM_BAG));
 }
 
 void Player::addStorageValue(const uint32_t key, const int32_t value)
@@ -852,7 +845,11 @@ void Player::addStorageValue(const uint32_t key, const int32_t value)
 	if(value == -1)
 		storageMap.erase(key);
 	else
+	{
 		storageMap[key] = value;
+		if(Quests::getInstance()->isQuestStorage(key, value))
+			sendTextMessage(MSG_EVENT_ADVANCE, "Your questlog has been updated.");
+	}
 }
 
 bool Player::getStorageValue(const uint32_t key, int32_t& value) const
@@ -894,9 +891,8 @@ bool Player::canSeeCreature(const Creature* creature) const
 
 void Player::onReceiveMail(uint32_t depotId)
 {
-	if(isNearDepotBox(depotId)){
+	if(isNearDepotBox(depotId))
 		sendTextMessage(MSG_INFO_DESCR, "New mail has arrived.");
-	}
 }
 
 bool Player::isNearDepotBox(uint32_t depotId)
@@ -945,12 +941,20 @@ Depot* Player::getDepot(uint32_t depotId, bool autoCreateDepot)
 	//create a new depot?
 	if(autoCreateDepot)
 	{
-		Depot* depot = NULL;
+		Depot* depot;
 		Item* tmpDepot = Item::CreateItem(ITEM_LOCKER1);
 		if(tmpDepot->getContainer() && (depot = tmpDepot->getContainer()->getDepot()))
 		{
+			Item* market = Item::CreateItem(ITEM_MARKET);
+			depot->__internalAddThing(market);
+
+			Item* inbox = Item::CreateItem(ITEM_INBOX);
+			depot->__internalAddThing(inbox);
+			depot->setInbox(inbox->getContainer());
+
 			Item* depotChest = Item::CreateItem(ITEM_DEPOT);
 			depot->__internalAddThing(depotChest);
+			depot->setChest(depotChest->getContainer());
 
 			addDepot(depot, depotId);
 			return depot;
@@ -962,17 +966,53 @@ Depot* Player::getDepot(uint32_t depotId, bool autoCreateDepot)
 				", for player: " << getName() << std::endl;
 		}
 	}
-
 	return NULL;
 }
 
 bool Player::addDepot(Depot* depot, uint32_t depotId)
 {
-	Depot* depot2 = getDepot(depotId, false);
-	if(depot2)
+	if(getDepot(depotId, false))
 		return false;
 
+	for(ItemList::const_iterator it = depot->getItems(), end = depot->getEnd(); it != end; ++it)
+	{
+		Item* item = *it;
+		if(item->getID() == ITEM_DEPOT)
+		{
+			depot->setChest(item->getContainer());
+			if(depot->getInbox())
+				break;
+		}
+		else if(item->getID() == ITEM_INBOX)
+		{
+			depot->setInbox(item->getContainer());
+			if(depot->getChest())
+				break;
+		}
+	}
+
+	if(!depot->getChest())
+	{
+		Item* chest = Item::CreateItem(ITEM_DEPOT);
+		depot->__internalAddThing(chest);
+		depot->setChest(chest->getContainer());
+		depotChange = true;
+	}
+
+	if(!depot->getInbox())
+	{
+		depot->__internalAddThing(Item::CreateItem(ITEM_MARKET));
+
+		Item* inbox = Item::CreateItem(ITEM_INBOX);
+		depot->__internalAddThing(inbox);
+		depot->setInbox(inbox->getContainer());
+
+		depot->moveChestToFront();
+		depotChange = true;
+	}
+
 	depots[depotId] = depot;
+	depot->setDepotId(depotId);
 	depot->setMaxDepotLimit(maxDepotLimit);
 	return true;
 }
@@ -1231,18 +1271,17 @@ void Player::sendStats()
 		client->sendStats();
 }
 
-void Player::sendPing(uint32_t interval)
+void Player::sendPing()
 {
-	internalPing += interval;
-	if(internalPing >= 5000) //1 ping each 5 seconds
+	int64_t timeNow = OTSYS_TIME();
+	if(timeNow - lastPing >= 5000)
 	{
-		internalPing = 0;
-		npings++;
+		lastPing = timeNow;
 		if(client)
 			client->sendPing();
 	}
 
-	if(canLogout() && npings > 12)
+	if((timeNow - lastPong) >= 60000 && canLogout())
 	{
 		if(!client)
 		{
@@ -1415,8 +1454,8 @@ void Player::onCreatureAppear(const Creature* creature, bool isLogin)
 			#endif
 		}
 
-		#ifndef __CONSOLE__
-		gui.m_pBox.addPlayer(this);
+		#ifndef _CONSOLE
+		GUI::getInstance()->m_pBox.addPlayer(this);
 		#endif
 		std::cout << name << " has logged in." << std::endl;
 		g_game.checkPlayersRecord();
@@ -1515,8 +1554,8 @@ void Player::onCreatureDisappear(const Creature* creature, uint32_t stackpos, bo
 
 		g_chat.removeUserFromAllChannels(this);
 
-		#ifndef __CONSOLE__
-		gui.m_pBox.removePlayer(this);
+		#ifndef _CONSOLE
+		GUI::getInstance()->m_pBox.removePlayer(this);
 		#endif
 		std::cout << getName() << " has logged out." << std::endl;
 		IOLoginData::getInstance()->updateOnlineStatus(guid, false);
@@ -1778,7 +1817,8 @@ uint32_t Player::getNextActionTime() const
 void Player::onThink(uint32_t interval)
 {
 	Creature::onThink(interval);
-	sendPing(interval);
+
+	sendPing();
 
 	MessageBufferTicks += interval;
 	if(MessageBufferTicks >= 1500)
@@ -1787,7 +1827,7 @@ void Player::onThink(uint32_t interval)
 		addMessageBuffer();
 	}
 
-	if(accountManagerEx)
+	if(accountManager)
 	{
 		idleTime += interval;
 		if(idleTime > 150000)
@@ -1802,9 +1842,9 @@ void Player::onThink(uint32_t interval)
 			kickPlayer(true);
 		else if(client && idleTime == 60000 * g_config.getNumber(ConfigManager::KICK_AFTER_MINUTES))
 		{
-			char buffer[130];
-			sprintf(buffer, "You have been idle for %d minutes. You will be disconnected in one minute if you are still idle then.", g_config.getNumber(ConfigManager::KICK_AFTER_MINUTES));
-			client->sendTextMessage(MSG_STATUS_WARNING, buffer);
+			std::stringstream ss;
+			ss << "You have been idle for " << g_config.getNumber(ConfigManager::KICK_AFTER_MINUTES) << " minutes. You will be disconnected in one minute if you are still idle then.";
+			client->sendTextMessage(MSG_STATUS_WARNING, ss.str());
 		}
 	}
 
@@ -1850,7 +1890,7 @@ void Player::removeMessageBuffer()
 			addCondition(condition);
 
 			char buffer[50];
-			sprintf(buffer, "You are muted for %d seconds.", muteTime);
+			sprintf(buffer, "You are muted for %u seconds.", muteTime);
 			sendTextMessage(MSG_STATUS_SMALL, buffer);
 		}
 	}
@@ -1889,10 +1929,12 @@ void Player::addManaSpent(uint64_t amount, bool withMultiplier /*= true*/)
 
 			magLevel++;
 			manaSpent = 0;
-			char MaglvMsg[50];
-			sprintf(MaglvMsg, "You advanced to magic level %d.", magLevel);
-			sendTextMessage(MSG_EVENT_ADVANCE, MaglvMsg);
-			g_creatureEvents->playerAdvance(this, MAGLEVEL, magLevel-1, magLevel);
+
+			std::stringstream ss;
+			ss << "You advanced to magic level " << magLevel << ".";
+			sendTextMessage(MSG_EVENT_ADVANCE, ss.str());
+
+			g_creatureEvents->playerAdvance(this, SKILL__MAGLEVEL, magLevel - 1, magLevel);
 
 			currReqMana = nextReqMana;
 			nextReqMana = vocation->getReqMana(magLevel + 1);
@@ -1940,9 +1982,10 @@ void Player::addExperience(uint64_t exp, bool useMult/* = false*/, bool sendText
 		ssExp << getNameDescription() << " gained " << gainExp << " experience points.";
 		std::string strExp = ssExp.str();
 
-		const SpectatorVec& list = g_game.getSpectators(targetPos);
+		SpectatorVec list;
+		g_game.getSpectators(list, targetPos);
 		Player* tmpPlayer = NULL;
-		for(SpectatorVec::const_iterator it = list.begin(); it != list.end(); ++it)
+		for(SpectatorVec::const_iterator it = list.begin(), end = list.end(); it != end; ++it)
 		{
 			if((tmpPlayer = (*it)->getPlayer()))
 			{
@@ -1989,7 +2032,7 @@ void Player::addExperience(uint64_t exp, bool useMult/* = false*/, bool sendText
 
 		char levelMsg[60];
 		sprintf(levelMsg, "You advanced from Level %d to Level %d.", prevLevel, newLevel);
-		g_creatureEvents->playerAdvance(this, LEVEL, prevLevel, newLevel);
+		g_creatureEvents->playerAdvance(this, SKILL__LEVEL, prevLevel, newLevel);
 		sendTextMessage(MSG_EVENT_ADVANCE, levelMsg);
 	}
 
@@ -2107,11 +2150,15 @@ BlockType_t Player::blockHit(Creature* attacker, CombatType_t combatType, int32_
 				continue;
 
 			const ItemType& it = Item::items[item->getID()];
-			if(it.abilities.absorbPercent[combatType] != 0)
+			if(it.abilities)
 			{
-				blocked += (int32_t)std::ceil((float)damage * it.abilities.absorbPercent[combatType] / 100);
-				if(item->hasCharges())
-					g_game.transformItem(item, item->getID(), std::max((int32_t)0, (int32_t)item->getCharges() - 1));
+				const int16_t& absorbPercent = it.abilities->absorbPercent[combatTypeToIndex(combatType)];
+				if(absorbPercent != 0)
+				{
+					blocked += (int32_t)std::ceil((float)damage * absorbPercent / 100);
+					if(item->hasCharges())
+						g_game.transformItem(item, item->getID(), std::max((int32_t)0, (int32_t)item->getCharges() - 1));
+				}
 			}
 		}
 
@@ -2155,7 +2202,7 @@ void Player::death()
 	if(skillLoss)
 	{
 		//Magic level loss
-		uint32_t sumMana = 0;
+		uint64_t sumMana = 0;
 		uint64_t lostMana = 0;
 
 		//sum up all the mana
@@ -2164,9 +2211,8 @@ void Player::death()
 
 		sumMana += manaSpent;
 
-		lostMana = (int32_t)(sumMana * getLostPercent());
-
-		while((uint64_t)lostMana > manaSpent && magLevel > 0)
+		lostMana = (uint64_t)(sumMana * getLostPercent());
+		while(lostMana > manaSpent && magLevel > 0)
 		{
 			lostMana -= manaSpent;
 			manaSpent = vocation->getReqMana(magLevel);
@@ -2181,19 +2227,15 @@ void Player::death()
 			magLevelPercent = 0;
 
 		//Skill loss
-		uint32_t lostSkillTries;
-		uint32_t sumSkillTries;
-		for(int16_t i = 0; i <= 6; ++i) //for each skill
+		for(int16_t i = SKILL_FIRST; i <= SKILL_LAST; ++i) //for each skill
 		{
-			lostSkillTries = 0;
-			sumSkillTries = 0;
-
+			uint32_t sumSkillTries = 0;
 			for(uint32_t c = 11; c <= skills[i][SKILL_LEVEL]; ++c) //sum up all required tries for all skill levels
 				sumSkillTries += vocation->getReqSkillTries(i, c);
 
 			sumSkillTries += skills[i][SKILL_TRIES];
-			lostSkillTries = (uint32_t)(sumSkillTries * getLostPercent());
 
+			uint32_t lostSkillTries = (uint32_t)(sumSkillTries * getLostPercent());
 			while(lostSkillTries > skills[i][SKILL_TRIES])
 			{
 				lostSkillTries -= skills[i][SKILL_TRIES];
@@ -2225,7 +2267,7 @@ void Player::death()
 		if(newLevel != level)
 		{
 			char lvMsg[90];
-			sprintf(lvMsg, "You were downgraded from Level %d to Level %d.", level, newLevel);
+			sprintf(lvMsg, "You were downgraded from Level %u to Level %u.", level, newLevel);
 			sendTextMessage(MSG_EVENT_ADVANCE, lvMsg);
 		}
 
@@ -2830,47 +2872,43 @@ Cylinder* Player::__queryDestination(int32_t& index, const Thing* thing, Item** 
 					n--;
 				}
 
-				for(n = 0; n < tmpContainer->capacity(); ++n)
+				for(ItemList::const_iterator it = tmpContainer->getItems(), end = tmpContainer->getEnd(); it != end; ++it)
 				{
-					Item* tmpItem = tmpContainer->getItem(n);
-					if(tmpItem)
-					{
-						if(Container* subContainer = tmpItem->getContainer())
-							containerList.push_back(subContainer);
-					}
+					if(Container* subContainer = (*it)->getContainer())
+						containerList.push_back(subContainer);
 				}
 				continue;
 			}
 
-			for(uint32_t n = 0; n < tmpContainer->capacity(); ++n)
+			uint32_t n = 0;
+			for(ItemList::const_iterator it = tmpContainer->getItems(), end = tmpContainer->getEnd(); it != end; ++it)
 			{
-				Item* tmpItem = tmpContainer->getItem(n);
+				Item* tmpItem = *it;
+				if(tmpItem == tradeItem)
+					continue;
 
-				if(tmpItem)
-				{
-					if(tmpItem == tradeItem)
-						continue;
+				if(tmpItem == item)
+					continue;
 
-					if(tmpItem == item)
-						continue;
-
-					//try find an already existing item to stack with
-					if(tmpItem != item && tmpItem->getID() == item->getID() && tmpItem->getItemCount() < 100)
-					{
-						index = n;
-						*destItem = tmpItem;
-						return tmpContainer;
-					}
-
-					if(Container* subContainer = tmpItem->getContainer())
-						containerList.push_back(subContainer);
-				}
-				else if(tmpContainer->__queryAdd(n, item, item->getItemCount(), flags) == RET_NOERROR) //empty slot
+				//try find an already existing item to stack with
+				if(tmpItem != item && tmpItem->getID() == item->getID() && tmpItem->getItemCount() < 100)
 				{
 					index = n;
-					*destItem = NULL;
+					*destItem = tmpItem;
 					return tmpContainer;
 				}
+
+				if(Container* subContainer = tmpItem->getContainer())
+					containerList.push_back(subContainer);
+
+				n++;
+			}
+			
+			if(n < tmpContainer->capacity() && tmpContainer->__queryAdd(n, item, item->getItemCount(), flags) == RET_NOERROR)
+			{
+				index = n;
+				*destItem = NULL;
+				return tmpContainer;
 			}
 		}
 
@@ -3729,8 +3767,11 @@ void Player::onTargetCreatureGainHealth(Creature* target, int32_t points)
 		Player* tmpPlayer = NULL;
 		if(target->getPlayer())
 			tmpPlayer = target->getPlayer();
-		else if(target->getMaster() && target->getMaster()->getPlayer())
-			tmpPlayer = target->getMaster()->getPlayer();
+		else if(Creature* targetMaster = target->getMaster())
+		{
+			if(Player* targetMasterPlayer = targetMaster->getPlayer())
+				tmpPlayer = targetMasterPlayer;
+		}
 
 		if(isPartner(tmpPlayer))
 			getParty()->addPlayerHealedMember(this, points);
@@ -3928,6 +3969,17 @@ bool Player::remOutfit(uint32_t _looktype, uint32_t _addons)
 	return m_playerOutfits.remOutfit(outfit);
 }
 
+uint32_t Player::getOutfitAddons(uint32_t looktype)
+{
+	const OutfitListType& outfits = m_playerOutfits.getOutfits();
+	for(OutfitListType::const_iterator it = outfits.begin(); it != outfits.end(); ++it)
+	{
+		if((*it)->looktype == looktype)
+			return (*it)->addons;
+	}
+	return 0;
+}
+
 void Player::setSex(PlayerSex_t newSex)
 {
 	sex = newSex;
@@ -4041,13 +4093,13 @@ void Player::checkRedSkullTicks(int32_t ticks)
 	}
 }
 
-bool Player::isPromoted()
+bool Player::isPromoted() const
 {
-	int32_t promotedVocation = g_vocations.getPromotedVocation(vocation_id);
-	return promotedVocation == 0 && vocation_id != promotedVocation;
+	int32_t promotedVocation = g_vocations.getPromotedVocation(vocationId);
+	return promotedVocation == 0 && vocationId != promotedVocation;
 }
 
-double Player::getLostPercent()
+double Player::getLostPercent() const
 {
 	uint32_t lostPercent = g_config.getNumber(ConfigManager::DEATH_LOSE_PERCENT);
 	if(isPromoted())
@@ -4060,7 +4112,7 @@ double Player::getLostPercent()
 
 	for(int16_t i = 0; i < 5; i++)
 	{
-		if(!lostPercent)
+		if(lostPercent == 0)
 			return 0;
 
 		if(hasBlessing(i))
@@ -4095,97 +4147,113 @@ void Player::manageAccount(const std::string &text)
 {
 	std::stringstream msg;
 	msg << "Account Manager: ";
-	if(namelockedPlayer != "")
+	if(accountManager->namelockedPlayerName != "")
 	{
-		if(!talkState[1])
+		if(accountManager->talkState == 0)
 		{
-			newCharacterName = text;
-			trimString(newCharacterName);
-			if(newCharacterName.length() < 4)
+			accountManager->accountManagerInput = text;
+			trimString(accountManager->accountManagerInput);
+			if(accountManager->accountManagerInput.length() < 4)
 				msg << "The name you want is too short, please select a longer name.";
-			else if(newCharacterName.length() > 20)
+			else if(accountManager->accountManagerInput.length() > 20)
 				msg << "The name you want is too long, please select a shorter name.";
-			else if(asLowerCaseString(newCharacterName).substr(0, 4) == "god "
-				|| asLowerCaseString(newCharacterName).substr(0, 3) == "gm "
-				|| asLowerCaseString(newCharacterName).substr(0, 3) == "cm ")
-			{
-				msg << "You are not a gamemaster, please pick another name.";
-			}
-			else if(IOLoginData::getInstance()->playerExists(newCharacterName))
-				msg << "A player with this name currently exists, please choose another name.";
-			else if(!isValidName(newCharacterName))
-				msg << "That name seems to contain invalid symbols tell me another name.";
 			else
 			{
-				talkState[1] = true;
-				talkState[2] = true;
-				msg << newCharacterName << ", are you sure?";
+				std::string lowerCaseInput = asLowerCaseString(accountManager->accountManagerInput);
+				if(lowerCaseInput.substr(0, 4) == "god " || lowerCaseInput.substr(0, 3) == "gm " || lowerCaseInput.substr(0, 3) == "cm ")
+					msg << "You are not a gamemaster, please pick another name.";
+				else if(IOLoginData::getInstance()->playerExists(accountManager->accountManagerInput))
+					msg << "A player with this name currently exists, please choose another name.";
+				else if(!isValidName(accountManager->accountManagerInput))
+					msg << "That name seems to contain invalid symbols tell me another name.";
+				else
+				{
+					accountManager->talkState++;
+					msg << accountManager->accountManagerInput << ", are you sure?";
+				}
 			}
 		}
-		else if(checkText(text, "no") && talkState[2])
+		else if(accountManager->talkState == 1 && checkText(text, "no"))
 		{
-			talkState[1] = false;
-			talkState[2] = true;
+			accountManager->talkState--;
 			msg << "What else would you like to name your character?";
 		}
-		else if(checkText(text, "yes") && talkState[2])
+		else if(accountManager->talkState == 1 && checkText(text, "yes"))
 		{
-			if(!IOLoginData::getInstance()->playerExists(newCharacterName))
+			if(!IOLoginData::getInstance()->playerExists(accountManager->accountManagerInput))
 			{
 				uint32_t _guid;
-				IOLoginData::getInstance()->getGuidByName(_guid, namelockedPlayer);
-				if(IOLoginData::getInstance()->changeName(_guid, newCharacterName))
+				IOLoginData::getInstance()->getGuidByName(_guid, accountManager->namelockedPlayerName);
+				if(IOLoginData::getInstance()->changeName(_guid, accountManager->accountManagerInput))
 				{
 					IOBan::getInstance()->removePlayerNamelock(_guid);
 
-					talkState[1] = true;
-					talkState[2] = false;
+					accountManager->talkState++;
 					msg << "Your character has successfully been renamed, you should now be able to login at it without any problems.";
 				}
 				else
 				{
-					talkState[1] = false;
-					talkState[2] = true;
+					accountManager->talkState--;
 					msg << "Failed to change your name, please try another name.";
 				}
 			}
 			else
 			{
-				talkState[1] = false;
-				talkState[2] = true;
+				accountManager->talkState--;
 				msg << "A player with that name already exists, please pick another name.";
 			}
 		}
 		else
 			msg << "Sorry, but I can't understand you, please try to repeat that!";
 	}
-	else if(accountManager)
+	else if(accountManager->managingAccount)
 	{
-		Account account = IOLoginData::getInstance()->loadAccount(realAccount);
-		if(checkText(text, "cancel") || (checkText(text, "account") && !talkState[1]))
+		if(checkText(text, "cancel") || (accountManager->talkState == 0 && checkText(text, "account")))
 		{
-			talkState[1] = true;
-			for(int8_t i = 2; i <= 12; i++)
-				talkState[i] = false;
+			accountManager->talkState = 1;
 			msg << "Do you want to change your 'password', request a 'recovery key', add a 'character', or 'delete' a character?";
 		}
-		else if(checkText(text, "delete") && talkState[1])
+		else if(accountManager->talkState == 1)
 		{
-			talkState[1] = false;
-			talkState[2] = true;
-			msg << "Which character would you like to delete?";
+			if(checkText(text, "delete"))
+			{
+				accountManager->talkState = 2;
+				msg << "Which character would you like to delete?";
+			}
+			else if(checkText(text, "password"))
+			{
+				accountManager->talkState = 4;
+				msg << "What would you like to change your password to?";
+			}
+			else if(checkText(text, "character"))
+			{
+				Account account = IOLoginData::getInstance()->loadAccount(accountManager->realAccount);
+				if(account.charList.size() <= 15)
+				{
+					accountManager->talkState = 6;
+					msg << "What would you like as your character name?";
+				}
+				else
+					msg << "Your account has reached the limit of 15 players, you must 'delete' a character if you want to create a new one.";
+			}
+			else if(checkText(text, "recovery key"))
+			{
+				accountManager->talkState = 12;
+				msg << "Would you like a recovery key?";
+			}
+			else
+				msg << "Do you want to change your 'password', request a 'recovery key', add a 'character', or 'delete' a character?";
 		}
-		else if(talkState[2])
+		else if(accountManager->talkState == 2)
 		{
-			removeChar = text;
-			trimString(removeChar);
-			talkState[2] = false;
-			talkState[3] = true;
-			msg << "Do you really want to delete the character named " << removeChar << "?";
+			accountManager->accountManagerInput = text;
+			trimString(accountManager->accountManagerInput);
+			accountManager->talkState++;
+			msg << "Do you really want to delete the character named " << accountManager->accountManagerInput << "?";
 		}
-		else if(checkText(text, "yes") && talkState[3])
+		else if(accountManager->talkState == 3 && checkText(text, "yes"))
 		{
-			int32_t result = IOLoginData::getInstance()->deleteCharacter(realAccount, removeChar);
+			int32_t result = IOLoginData::getInstance()->deleteCharacter(accountManager->realAccount, accountManager->accountManagerInput);
 			switch(result)
 			{
 				case 0:
@@ -4208,23 +4276,14 @@ void Player::manageAccount(const std::string &text)
 					msg << "A character with that name is currently online, to delete a character it has to be offline.";
 					break;
 			}
-			talkState[1] = true;
-			for(int8_t i = 2; i <= 12; i++)
-				talkState[i] = false;
+			accountManager->talkState = 1;
 		}
-		else if(checkText(text, "no") && talkState[3])
+		else if(accountManager->talkState == 3 && checkText(text, "no"))
 		{
-			talkState[1] = true;
-			talkState[3] = false;
+			accountManager->talkState--;
 			msg << "Tell me what character you want to delete.";
 		}
-		else if(checkText(text, "password") && talkState[1])
-		{
-			talkState[1] = false;
-			talkState[4] = true;
-			msg << "Tell me your new password please.";
-		}
-		else if(talkState[4])
+		else if(accountManager->talkState == 4)
 		{
 			std::string tmpStr = text;
 			trimString(tmpStr);
@@ -4232,10 +4291,9 @@ void Player::manageAccount(const std::string &text)
 			{
 				if(tmpStr.length() > 5)
 				{
-					talkState[4] = false;
-					talkState[5] = true;
-					newPassword = tmpStr;
-					msg << "Should '" << newPassword << "' be your new password?";
+					accountManager->talkState++;
+					msg << "Should '" << tmpStr << "' be your new password?";
+					accountManager->accountManagerInput = tmpStr;
 				}
 				else
 					msg << "That password is too short, please select a longer password.";
@@ -4243,220 +4301,182 @@ void Player::manageAccount(const std::string &text)
 			else
 				msg << "That password contains invalid characters... tell me another one.";
 		}
-		else if(checkText(text, "yes") && talkState[5])
+		else if(accountManager->talkState == 5)
 		{
-			talkState[1] = true;
-			for(int8_t i = 2; i <= 12; i++)
-				talkState[i] = false;
-
-			IOLoginData::getInstance()->setNewPassword(realAccount, newPassword);
-			msg << "Your password has been changed.";
-		}
-		else if(checkText(text, "no") && talkState[5])
-		{
-			talkState[1] = true;
-			for(int8_t i = 2; i <= 12; i++)
-				talkState[i] = false;
-			msg << "Then not.";
-		}
-		else if(checkText(text, "character") && talkState[1])
-		{
-			if(account.charList.size() <= 15)
+			if(checkText(text, "yes"))
 			{
-				talkState[1] = false;
-				talkState[6] = true;
-				msg << "What would you like as your character name?";
+				accountManager->talkState = 1;
+				IOLoginData::getInstance()->setNewPassword(accountManager->realAccount, accountManager->accountManagerInput);
+				msg << "Your password has been changed.";
+			}
+			else if(checkText(text, "no"))
+			{
+				accountManager->talkState = 1;
+				msg << "Then not.";
 			}
 			else
-			{
-				talkState[1] = true;
-				for(int8_t i = 2; i <= 12; i++)
-					talkState[i] = false;
-				msg << "Your account reach the limit of 15 players, you can 'delete' a character if you want to create a new one.";
-			}
+				msg << "I don't understand, should it be your new password, yes or no?";
 		}
-		else if(talkState[6])
+		else if(accountManager->talkState == 6)
 		{
-			newCharacterName = text;
-			trimString(newCharacterName);
-			if(newCharacterName.length() < 4)
+			accountManager->accountManagerInput = text;
+			trimString(accountManager->accountManagerInput);
+			if(accountManager->accountManagerInput.length() < 4)
 				msg << "The name you want is too short, please select a longer name.";
-			else if(newCharacterName.length() > 20)
+			else if(accountManager->accountManagerInput.length() > 20)
 				msg << "The name you want is too long, please select a shorter name.";
-			else if(asLowerCaseString(newCharacterName).substr(0, 4) == "god "
-				|| asLowerCaseString(newCharacterName).substr(0, 3) == "gm "
-				|| asLowerCaseString(newCharacterName).substr(0, 3) == "cm ")
-			{
-				msg << "You are not a gamemaster, please pick another name.";
-			}
-			else if(IOLoginData::getInstance()->playerExists(newCharacterName))
-				msg << "A player with this name currently exists, please choose another name.";
-			else if(!isValidName(newCharacterName))
-				msg << "That name seems to contain invalid symbols tell me another name.";
 			else
 			{
-				talkState[6] = false;
-				talkState[7] = true;
-				msg << newCharacterName << ", are you sure?";
+				std::string lowerCaseInput = asLowerCaseString(accountManager->accountManagerInput);
+				if(lowerCaseInput.substr(0, 4) == "god " || lowerCaseInput.substr(0, 3) == "gm " || lowerCaseInput.substr(0, 3) == "cm ")
+					msg << "You are not a gamemaster, please pick another name.";
+				else if(!isValidName(accountManager->accountManagerInput))
+					msg << "That name seems to contain invalid symbols tell me another name.";
+				else if(IOLoginData::getInstance()->playerExists(accountManager->accountManagerInput))
+					msg << "A player with this name currently exists, please choose another name.";
+				else
+				{
+					accountManager->talkState++;
+					msg << accountManager->accountManagerInput << ", are you sure?";
+				}
 			}
 		}
-		else if(checkText(text, "no") && talkState[7])
+		else if(accountManager->talkState == 7 && checkText(text, "no"))
 		{
-			talkState[6] = true;
-			talkState[7] = false;
+			accountManager->talkState--;
 			msg << "What else would you like to name your character?";
 		}
-		else if(checkText(text, "yes") && talkState[7])
+		else if(accountManager->talkState == 7 && checkText(text, "yes"))
 		{
-			talkState[7] = false;
-			talkState[8] = true;
-			msg << "Should your character be a 'male' or a 'female'.";
+			accountManager->talkState++;
+			msg << "Should your character be a 'male' or a 'female'?";
 		}
-		else if(talkState[8] && (checkText(text, "female") || checkText(text, "male")))
+		else if(accountManager->talkState == 8)
 		{
-			talkState[8] = false;
-			talkState[9] = true;
 			if(checkText(text, "female"))
 			{
 				msg << "A female, are you sure?";
-				_newSex = PLAYERSEX_FEMALE;
+				accountManager->talkState++;
+				accountManager->newSex = PLAYERSEX_FEMALE;
 			}
-			else
+			else if(checkText(text, "male"))
 			{
 				msg << "A male, are you sure?";
-				_newSex = PLAYERSEX_MALE;
+				accountManager->talkState++;
+				accountManager->newSex = PLAYERSEX_MALE;
 			}
+			else
+				msg << "I don't understand, should your character be a 'male' or a 'female'?";
 		}
-		else if(checkText(text, "no") && talkState[9])
+		else if(accountManager->talkState == 9 && checkText(text, "no"))
 		{
-			talkState[8] = true;
-			talkState[9] = false;
+			accountManager->talkState--;
 			msg << "Tell me.. would you like to be a 'male' or a 'female'?";
 		}
-		else if(checkText(text, "yes") && talkState[9])
+		else if(accountManager->talkState == 9 && checkText(text, "yes"))
 		{
 			if(g_config.getBoolean(ConfigManager::START_CHOOSEVOC))
 			{
-				talkState[9] = false;
-				talkState[11] = true;
-				bool firstPart = true;
-				for(VocationsMap::iterator it = g_vocations.getFirstVocation(); it != g_vocations.getLastVocation(); ++it)
+				accountManager->talkState++;
+				std::vector<std::string> vocations;
+				for(VocationsMap::iterator it = g_vocations.getFirstVocation(), end = g_vocations.getLastVocation(); it != end; ++it)
 				{
-					if(it->first == (it->second)->getFromVocation() && it->first != 0)
-					{
-						if(firstPart)
-						{
-							msg << "What do you want to be... " << (it->second)->getVocDescription();
-							firstPart = false;
-						}
-						else if(it->first - 1 != 0)
-							msg << ", " << (it->second)->getVocDescription();
-						else
-							msg << " or " << (it->second)->getVocDescription() << ".";
-					}
+					if(it->first == VOCATION_NONE || it->first != it->second->getFromVocation())
+						continue;
+
+					vocations.push_back(it->second->getVocDescription());
 				}
+
+				if(!vocations.empty())
+				{
+					msg << "What do you want to be... " << vocations[0];
+					std::vector<std::string>::size_type size = vocations.size() - 1;
+					for (std::vector<std::string>::size_type i = 1; i < size; ++i) {
+						msg << ", " << vocations[i];
+					}
+					msg << " or " << vocations[size] << "?";
+				}
+				else
+					msg << "Something is wrong with vocations, please contact a gamemaster.";
+			}
+			else if(IOLoginData::getInstance()->createCharacter(accountManager->realAccount, accountManager->accountManagerInput, accountManager->newVocation, accountManager->newSex))
+			{
+				accountManager->talkState = 1;
+				msg << "Your character has been created.";
 			}
 			else
 			{
-				if(!IOLoginData::getInstance()->playerExists(newCharacterName))
-				{
-					talkState[1] = true;
-					for(int8_t i = 2; i <= 12; i++)
-						talkState[i] = false;
-					if(IOLoginData::getInstance()->createCharacter(realAccount, newCharacterName, newVocation, _newSex))
-						msg << "Your character has been made.";
-					else
-						msg << "Your character has NOT been made, please try again.";
-				}
-				else
-				{
-					talkState[6] = true;
-					talkState[9] = false;
-					msg << "A player with this name currently exists, please choose another name.";
-				}
+				accountManager->talkState = 6;
+				msg << "A player with this name already exists, please choose another name.";
 			}
 		}
-		else if(talkState[11])
+		else if(accountManager->talkState == 10)
 		{
-			for(VocationsMap::iterator it = g_vocations.getFirstVocation(); it != g_vocations.getLastVocation(); ++it)
+			for(VocationsMap::iterator it = g_vocations.getFirstVocation(), end = g_vocations.getLastVocation(); it != end; ++it)
 			{
-				std::string vocationName = (it->second)->getVocName();
+				Vocation* voc = it->second;
+				std::string vocationName = voc->getVocName();
 				std::transform(vocationName.begin(), vocationName.end(), vocationName.begin(), tolower);
-				if(checkText(text, vocationName) && it != g_vocations.getLastVocation() && it->first == (it->second)->getFromVocation() && it->first != 0)
+				trimString(vocationName);
+				if(it->first != VOCATION_NONE && it->first == voc->getFromVocation() && checkText(text, vocationName))
 				{
-					msg << "So you would like to be " << (it->second)->getVocDescription() << "... are you sure?";
-					newVocation = it->first;
-					talkState[11] = false;
-					talkState[12] = true;
+					msg << "So you would like to be " << voc->getVocDescription() << "... are you sure?";
+					accountManager->newVocation = it->first;
+					accountManager->talkState++;
+					break;
 				}
 			}
+
 			if(msg.str().length() == 17)
 				msg << "I don't understand what vocation you would like to be... could you please repeat it?";
 		}
-		else if(checkText(text, "yes") && talkState[12])
+		else if(accountManager->talkState == 11 && checkText(text, "yes"))
 		{
-			if(!IOLoginData::getInstance()->playerExists(newCharacterName))
+			if(IOLoginData::getInstance()->createCharacter(accountManager->realAccount, accountManager->accountManagerInput, accountManager->newVocation, accountManager->newSex))
 			{
-				talkState[1] = true;
-				for(int8_t i = 2; i <= 12; i++)
-					talkState[i] = false;
-				if(IOLoginData::getInstance()->createCharacter(realAccount, newCharacterName, newVocation, _newSex))
-					msg << "Your character has been made.";
-				else
-					msg << "Your character has NOT been made, please try again.";
+				accountManager->talkState = 1;
+				msg << "Your character has been created.";
 			}
 			else
 			{
-				talkState[6] = true;
-				talkState[9] = false;
-				msg << "A player with this name currently exists, please choose another name.";
+				accountManager->talkState = 6;
+				msg << "A player with this name already exists, please choose another name.";
 			}
 		}
-		else if(checkText(text, "no") && talkState[12])
+		else if(accountManager->talkState == 11 && checkText(text, "no"))
 		{
-			talkState[11] = true;
-			talkState[12] = false;
+			accountManager->talkState = 10;
 			msg << "No? Then what would you like to be?";
 		}
-		else if(checkText(text, "recovery key") && talkState[1])
+		else if(accountManager->talkState == 12 && checkText(text, "yes"))
 		{
-			talkState[1] = false;
-			talkState[10] = true;
-			msg << "Would you like a recovery key?";
-		}
-		else if(checkText(text, "yes") && talkState[10])
-		{
+			Account account = IOLoginData::getInstance()->loadAccount(accountManager->realAccount);
 			if(account.recoveryKey != "0")
 				msg << "Sorry, you already have a recovery key, for security reasons I may not give you a new one.";
 			else
 			{
-				recoveryKey = generateRecoveryKey(4, 4);
-				IOLoginData::getInstance()->setRecoveryKey(realAccount, recoveryKey);
+				const std::string& recoveryKey = generateRecoveryKey(4, 4);
+				IOLoginData::getInstance()->setRecoveryKey(accountManager->realAccount, recoveryKey);
 				msg << "Your recovery key is: " << recoveryKey << ".";
 			}
-			talkState[1] = true;
-			for(int8_t i = 2; i <= 12; i++)
-				talkState[i] = false;
+			accountManager->talkState = 1;
 		}
-		else if(checkText(text, "no") && talkState[10])
+		else if(accountManager->talkState == 12 && checkText(text, "no"))
 		{
 			msg << "Then not.";
-			talkState[1] = true;
-			for(int8_t i = 2; i <= 12; i++)
-				talkState[i] = false;
+			accountManager->talkState = 1;
 		}
 		else
 			msg << "Please read the latest message that I have specified, I dont understand the current requested action.";
 	}
 	else
 	{
-		if(checkText(text, "account") && !talkState[1])
+		if(accountManager->talkState == 0 && checkText(text, "account"))
 		{
 			msg << "What would you like your password to be?";
-			talkState[1] = true;
-			talkState[2] = true;
+			accountManager->talkState++;
 		}
-		else if(talkState[2])
+		else if(accountManager->talkState == 1)
 		{
 			std::string tmpStr = text;
 			trimString(tmpStr);
@@ -4464,124 +4484,113 @@ void Player::manageAccount(const std::string &text)
 			{
 				if(tmpStr.length() > 5)
 				{
-					newPassword = tmpStr;
-					msg << newPassword << " is it? 'yes' or 'no'?";
-					talkState[3] = true;
-					talkState[2] = false;
+					msg << tmpStr << " is it? 'yes' or 'no'?";
+					accountManager->accountManagerInput = tmpStr;
+					accountManager->talkState++;
 				}
 				else
 					msg << "That password is too short, please select a longer password.";
 			}
 			else
-				msg << "That password contains invalid characters... tell me another one.";
+				msg << "That password contains invalid characters, try again.";
 		}
-		else if(checkText(text, "yes") && talkState[3])
+		else if(accountManager->talkState == 2 && checkText(text, "yes"))
 		{
 			if(g_config.getBoolean(ConfigManager::GENERATE_ACCOUNT_NUMBER))
 			{
 				do
 				{
-					sprintf(newAccountNumber, "%d%d%d%d%d%d%d", random_range(2, 9), random_range(2, 9), random_range(2, 9), random_range(2, 9), random_range(2, 9), random_range(2, 9), random_range(2, 9));
-					newAccount = atoi(newAccountNumber);
+					std::stringstream ss;
+					ss << random_range(2, 9) << random_range(2, 9) << random_range(2, 9) << random_range(2, 9) << random_range(2, 9) << random_range(2, 9) << random_range(2, 9);
+					accountManager->newAccountName = ss.str();
 				}
-				while(IOLoginData::getInstance()->accountExists(newAccount));
-				msg << "Your account has been created, you login with account number '" << newAccount << "' and password '" << newPassword << "', if the account number is hard to remember please write it down!";
+				while(IOLoginData::getInstance()->accountNameExists(accountManager->newAccountName));
+				msg << "Your account has been created, you login with account name '" << accountManager->newAccountName << "' and password '" << accountManager->accountManagerInput << "', if the account name is hard to remember please write it down!";
 
-				IOLoginData::getInstance()->createAccount(newAccount, newPassword);
-				for(int8_t i = 2; i <= 8; i++)
-					talkState[i] = false;
+				IOLoginData::getInstance()->createAccount(accountManager->newAccountName, accountManager->accountManagerInput);
+				accountManager->talkState = -1;
 			}
 			else
 			{
-				msg << "What would you like your account number to be?";
-				talkState[3] = false;
-				talkState[4] = true;
+				msg << "What would you like your account name to be?";
+				accountManager->talkState++;
 			}
 		}
-		else if(checkText(text, "no") && talkState[3])
+		else if(accountManager->talkState == 2 && checkText(text, "no"))
 		{
-			talkState[2] = true;
-			talkState[3] = false;
+			accountManager->talkState--;
 			msg << "What would you like your password to be then?";
 		}
-		else if(talkState[4])
+		else if(accountManager->talkState == 3)
 		{
 			std::string tmpStr = text;
 			trimString(tmpStr);
-			if(isNumbers(tmpStr))
+			if(isValidAccountName(tmpStr))
 			{
 				if(tmpStr.length() >= 6)
 				{
-					if(tmpStr.length() <= 8)
+					if(tmpStr.length() <= 30)
 					{
-						newAccount = atoi(tmpStr.c_str());
-						msg << newAccount << ", are you sure?";
-						talkState[4] = false;
-						talkState[5] = true;
+						msg << tmpStr << ", are you sure?";
+						accountManager->newAccountName = tmpStr;
+						accountManager->talkState++;
 					}
 					else
-						msg << "That account number is too long.. an account number has to be atleast 6 numbers and not more than 8 numbers, please pick another account number.";
+						msg << "That account name is too long.. an account name has to be atleast 6 characters but no more than 30, please pick another account name.";
 				}
 				else
-					msg << "That account number is too short.. an account number has to be atleast 6 numbers and not more than 8 numbers, please pick another account number.";
+					msg << "That account name is too short.. an account name has to be atleast 6 characters but no more than 30, please pick another account name.";
 			}
 			else
-				msg << "Your account number may only contain numbers, please pick another account number.";
+				msg << "Your account name may only contain characters from a to z and numbers, please pick another account name.";
 		}
-		else if(checkText(text, "yes") && talkState[5])
+		else if(accountManager->talkState == 4 && checkText(text, "yes"))
 		{
-			if(!IOLoginData::getInstance()->accountExists(newAccount))
+			if(!IOLoginData::getInstance()->accountNameExists(accountManager->newAccountName))
 			{
-				IOLoginData::getInstance()->createAccount(newAccount, newPassword);
-				msg << "Your account has been created, you can login with account number: '" << newAccount << "' and password: '" << newPassword << "'!";
+				IOLoginData::getInstance()->createAccount(accountManager->newAccountName, accountManager->accountManagerInput);
+				msg << "Your account has been created, you can login with account name: '" << accountManager->newAccountName << "' and password: '" << accountManager->accountManagerInput << "'.";
 			}
 			else
 			{
-				msg << "An account with that number combination already exists, please try another account number.";
-				talkState[4] = true;
-				talkState[5] = false;
+				msg << "An account with that number combination already exists, please try another account name.";
+				accountManager->talkState--;
 			}
 		}
-		else if(checkText(text, "no") && talkState[5])
+		else if(accountManager->talkState == 4 && checkText(text, "no"))
 		{
-			talkState[5] = false;
-			talkState[4] = true;
-			msg << "What else would you like as your account number?";
+			accountManager->talkState--;
+			msg << "What else would you like as your account name?";
 		}
-		else if(checkText(text, "recover") && !talkState[6])
+		else if(accountManager->talkState == 0 && checkText(text, "recover"))
 		{
-			talkState[6] = true;
-			talkState[7] = true;
-			msg << "What was your account number?";
+			accountManager->talkState = 5;
+			msg << "What was your account name?";
 		}
-		else if(talkState[7])
+		else if(accountManager->talkState == 5)
 		{
-			accountNumberAttempt = text;
-			talkState[7] = false;
-			talkState[8] = true;
+			accountManager->accountManagerInput = text;
+			accountManager->talkState++;
 			msg << "What was your recovery key?";
 		}
-		else if(talkState[8])
+		else if(accountManager->talkState == 6)
 		{
-			recoveryKeyAttempt = text;
-			uint32_t accountId = atoi(accountNumberAttempt.c_str());
-			if(IOLoginData::getInstance()->validRecoveryKey(accountId, recoveryKeyAttempt) && recoveryKeyAttempt != "0")
+			if(text != "0" && IOLoginData::getInstance()->validRecoveryKey(accountManager->accountManagerInput, text))
 			{
-				char buffer[100];
-				sprintf(buffer, "%s%d", g_config.getString(ConfigManager::SERVER_NAME).c_str(), random_range(100, 999));
-				IOLoginData::getInstance()->setNewPassword(accountId, buffer);
-				msg << "Correct! Your new password is: " << buffer << ".";
+				std::stringstream ss;
+				ss << g_config.getString(ConfigManager::SERVER_NAME) << random_range(100, 999);
+				IOLoginData::getInstance()->setNewPassword(accountManager->accountManagerInput, ss.str());
+				msg << "Correct! Your new password is: " << ss.str() << ".";
 			}
 			else
 				msg << "Sorry, but that information you gave me did not match to any account :(.";
 
-			for(int8_t i = 2; i <= 8; i++)
-				talkState[i] = false;
+			accountManager->talkState = 0;
 		}
 		else
 			msg << "Sorry, but I can't understand you, please try to repeat that.";
 	}
-	sendTextMessage(MSG_STATUS_CONSOLE_BLUE, msg.str().c_str());
+	sendTextMessage(MSG_STATUS_CONSOLE_BLUE, msg.str());
 	resetIdleTime();
 }
 
@@ -4794,12 +4803,6 @@ bool Player::toggleMount(bool mount)
 			return false;
 		}
 
-		if(!isPremium())
-		{
-			sendCancelMessage(RET_YOUNEEDPREMIUMACCOUNT);
-			return false;
-		}
-
 		uint8_t currentMountId = getCurrentMount();
 		if(currentMountId == 0)
 		{
@@ -4810,6 +4813,12 @@ bool Player::toggleMount(bool mount)
 		Mount* currentMount = Mounts::getInstance()->getMountByID(currentMountId);
 		if(!currentMount)
 			return false;
+
+		if(currentMount->isPremium() && !isPremium())
+		{
+			sendCancelMessage(RET_YOUNEEDPREMIUMACCOUNT);
+			return false;
+		}
 
 		defaultOutfit.lookMount = currentMount->getClientID();
 		if(currentMount->getSpeed() != 0)
@@ -4836,9 +4845,9 @@ bool Player::tameMount(uint8_t mountId)
 	int key = PSTRG_MOUNTS_RANGE_START + (mountId / 31);
 	int32_t value = 0;
 	if(getStorageValue(key, value))
-		value |= (int32_t)pow(2, mountId % 31);
+		value |= (int32_t)pow(2.0f, mountId % 31);
 	else
-		value = (int32_t)pow(2, mountId % 31);
+		value = (int32_t)pow(2.0f, mountId % 31);
 
 	addStorageValue(key, value);
 	return true;
@@ -4855,7 +4864,7 @@ bool Player::untameMount(uint8_t mountId)
 	if(!getStorageValue(key, value))
 		return true;
 
-	value ^= (int32_t)pow(2, mountId % 31);
+	value ^= (int32_t)pow(2.0f, mountId % 31);
 	addStorageValue(key, value);
 
 	if(isMounted() && getCurrentMount() == (mountId + 1))

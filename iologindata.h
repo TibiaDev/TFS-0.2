@@ -26,16 +26,13 @@
 #include "player.h"
 #include "database.h"
 
-class PlayerGroup
+struct PlayerGroup
 {
-	public:
-		PlayerGroup() {}
-		virtual ~PlayerGroup() {}
-		std::string m_name;
-		uint64_t m_flags;
-		uint32_t m_access;
-		uint32_t m_maxdepotitems;
-		uint32_t m_maxviplist;
+	std::string m_name;
+	uint64_t m_flags;
+	uint32_t m_access;
+	uint32_t m_maxdepotitems;
+	uint32_t m_maxviplist;
 };
 
 typedef std::pair<int32_t, Item*> itemBlock;
@@ -45,7 +42,7 @@ class IOLoginData
 {
 	public:
 		IOLoginData() {}
-		virtual ~IOLoginData() {}
+		~IOLoginData() {}
 
 		static IOLoginData* getInstance()
 		{
@@ -54,13 +51,16 @@ class IOLoginData
 		}
 
 		Account loadAccount(uint32_t accno);
+		Account loadAccount(std::string name);
 		bool saveAccount(Account acc);
-		bool createAccount(uint32_t accountNumber, std::string newPassword);
-		bool getPassword(uint32_t accno, const std::string& name, std::string& password);
-		bool accountExists(uint32_t accno);
+		bool createAccount(const std::string& accountNumber, std::string newPassword);
+		bool getPassword(const std::string& accname, const std::string& name, std::string& password, uint32_t& accNumber);
+		bool getPasswordEx(const std::string& accname, std::string& password, uint32_t& accNumber);
+		bool accountNameExists(const std::string& name);
 		bool setRecoveryKey(uint32_t accountNumber, std::string recoveryKey);
-		bool validRecoveryKey(uint32_t accountNumber, const std::string recoveryKey);
+		bool validRecoveryKey(const std::string& accountName, const std::string& recoveryKey);
 		bool setNewPassword(uint32_t accountId, std::string newPassword);
+		bool setNewPassword(const std::string& accountName, std::string newPassword);
 		AccountType_t getAccountType(std::string name);
 
 		bool updateOnlineStatus(uint32_t guid, bool login);
@@ -79,11 +79,12 @@ class IOLoginData
 		bool changeName(uint32_t guid, std::string newName);
 		uint32_t getAccountNumberByName(std::string name);
 		bool createCharacter(uint32_t accountNumber, std::string characterName, int32_t vocationId, PlayerSex_t sex);
-		int16_t deleteCharacter(uint32_t accountNumber, const std::string characterName);
+		int16_t deleteCharacter(uint32_t accountNumber, const std::string& characterName);
 		bool addStorageValue(uint32_t guid, uint32_t storageKey, uint32_t storageValue);
 		const PlayerGroup* getPlayerGroup(uint32_t groupid);
 		uint32_t getLastIPByName(std::string name);
 		bool hasGuild(uint32_t guid);
+		void increaseBankBalance(uint32_t guid, uint64_t bankBalance);
 
 	protected:
 		bool storeNameByGuid(Database &mysql, uint32_t guid);
@@ -99,8 +100,8 @@ class IOLoginData
 
 		typedef std::map<int32_t ,std::pair<Item*, int32_t> > ItemMap;
 
-		void loadItems(ItemMap& itemMap, DBResult& result);
-		bool saveItems(const Player* player, const ItemBlockList& itemList, DBSplitInsert& query_insert);
+		void loadItems(ItemMap& itemMap, DBResult* result);
+		bool saveItems(const Player* player, const ItemBlockList& itemList, DBInsert& query_insert);
 
 		typedef std::map<uint32_t, std::string> NameCacheMap;
 		typedef std::map<std::string, uint32_t, StringCompareCase> GuidCacheMap;

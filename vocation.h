@@ -35,6 +35,8 @@ class Vocation
 		uint32_t getReqSkillTries(int32_t skill, int32_t level);
 		uint64_t getReqMana(uint32_t magLevel);
 
+		uint8_t getClientId() const {return clientId;}
+
 		uint32_t getHPGain() const {return gainHP;}
 		uint32_t getManaGain() const {return gainMana;}
 		uint32_t getCapGain() const {return gainCap;}
@@ -48,6 +50,7 @@ class Vocation
 		uint16_t getSoulGainTicks() const {return gainSoulTicks;}
 
 		uint32_t getAttackSpeed() const {return attackSpeed;}
+		uint32_t getBaseSpeed() const {return baseSpeed;}
 
 		uint32_t getFromVocation() const {return fromVocation;}
 
@@ -56,6 +59,8 @@ class Vocation
 	protected:
 		friend class Vocations;
 		Vocation();
+
+		uint8_t clientId;
 
 		std::string name;
 		std::string description;
@@ -74,14 +79,17 @@ class Vocation
 		uint32_t fromVocation;
 
 		uint32_t attackSpeed;
+		uint32_t baseSpeed;
 
 		static uint32_t skillBase[SKILL_LAST + 1];
 		float skillMultipliers[SKILL_LAST + 1];
 		float manaMultiplier;
 
-		typedef std::map<uint32_t, uint32_t> cacheMap;
-		cacheMap cacheMana;
-		cacheMap cacheSkill[SKILL_LAST + 1];
+		typedef std::map<uint32_t, uint64_t> manaCacheMap;
+		manaCacheMap cacheMana;
+
+		typedef std::map<uint32_t, uint32_t> skillCacheMap;
+		skillCacheMap cacheSkill[SKILL_LAST + 1];
 };
 
 typedef std::map<uint32_t, Vocation*> VocationsMap;
@@ -93,7 +101,7 @@ class Vocations
 		~Vocations();
 
 		bool loadFromXml();
-		Vocation* getVocation(uint32_t vocId);
+		Vocation* getVocation(uint32_t id);
 		int32_t getVocationId(const std::string& name);
 		int32_t getPromotedVocation(uint32_t vocationId);
 

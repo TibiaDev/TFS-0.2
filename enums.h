@@ -23,6 +23,28 @@
 #include <string>
 #include <list>
 
+enum MarketAction_t
+{
+	MARKETACTION_BUY = 0,
+	MARKETACTION_SELL = 1
+};
+
+enum MarketRequest_t
+{
+	MARKETREQUEST_OWN_OFFERS = 0xFFFE,
+	MARKETREQUEST_OWN_HISTORY = 0xFFFF
+};
+
+enum MarketOfferState_t
+{
+	OFFERSTATE_ACTIVE = 0,
+	OFFERSTATE_CANCELLED = 1,
+	OFFERSTATE_EXPIRED = 2,
+	OFFERSTATE_ACCEPTED = 3,
+
+	OFFERSTATE_ACCEPTEDEX = 255
+};
+
 enum ChannelEvent_t
 {
 	CHANNELEVENT_JOIN = 0,
@@ -73,6 +95,13 @@ enum SpellGroup_t
 	SPELLGROUP_SPECIAL = 4
 };
 
+enum DatabaseEngine_t
+{
+	DATABASE_ENGINE_NONE = 0,
+	DATABASE_ENGINE_MYSQL,
+	DATABASE_ENGINE_SQLITE
+};
+
 enum AccountType_t
 {
 	ACCOUNT_TYPE_NORMAL = 0x01,
@@ -94,21 +123,22 @@ enum RaceType_t
 
 enum CombatType_t
 {
-	COMBAT_FIRST		= 0,
-	COMBAT_NONE		= COMBAT_FIRST,
-	COMBAT_PHYSICALDAMAGE	= 1,
-	COMBAT_ENERGYDAMAGE	= 2,
-	COMBAT_EARTHDAMAGE	= 4,
-	COMBAT_FIREDAMAGE	= 8,
-	COMBAT_UNDEFINEDDAMAGE	= 16,
-	COMBAT_LIFEDRAIN	= 32,
-	COMBAT_MANADRAIN	= 64,
-	COMBAT_HEALING		= 128,
-	COMBAT_DROWNDAMAGE	= 256,
-	COMBAT_ICEDAMAGE	= 512,
-	COMBAT_HOLYDAMAGE	= 1024,
-	COMBAT_DEATHDAMAGE      = 2048,
-	COMBAT_LAST		= COMBAT_DEATHDAMAGE
+	COMBAT_FIRST = 0,
+	COMBAT_NONE = COMBAT_FIRST,
+	COMBAT_PHYSICALDAMAGE = 1,
+	COMBAT_ENERGYDAMAGE = 2,
+	COMBAT_EARTHDAMAGE = 4,
+	COMBAT_FIREDAMAGE = 8,
+	COMBAT_UNDEFINEDDAMAGE = 16,
+	COMBAT_LIFEDRAIN = 32,
+	COMBAT_MANADRAIN = 64,
+	COMBAT_HEALING = 128,
+	COMBAT_DROWNDAMAGE = 256,
+	COMBAT_ICEDAMAGE = 512,
+	COMBAT_HOLYDAMAGE = 1024,
+	COMBAT_DEATHDAMAGE = 2048,
+	COMBAT_LAST = COMBAT_DEATHDAMAGE,
+	COMBAT_COUNT = 12
 };
 
 enum CombatParam_t
@@ -138,7 +168,6 @@ enum ConditionParam_t
 	CONDITIONPARAM_OWNER = 1,
 	CONDITIONPARAM_TICKS = 2,
 	//CONDITIONPARAM_OUTFIT = 3,
-
 	CONDITIONPARAM_HEALTHGAIN = 4,
 	CONDITIONPARAM_HEALTHTICKS = 5,
 	CONDITIONPARAM_MANAGAIN = 6,
@@ -201,9 +230,10 @@ enum skills_t
 	SKILL_DIST = 4,
 	SKILL_SHIELD = 5,
 	SKILL_FISH = 6,
-	MAGLEVEL = 7,
-	LEVEL = 8,
-	SKILL_LAST = SKILL_FISH
+	SKILL__MAGLEVEL = 7,
+	SKILL__LEVEL = 8,
+	SKILL_LAST = SKILL_FISH,
+	SKILL__LAST = SKILL__LEVEL
 };
 
 enum stats_t
@@ -274,7 +304,7 @@ enum CharacterTypes_t
 	PLAYER_FEMALE_4 = 0x8B,
 	PLAYER_FEMALE_5 = 0x8C,
 	PLAYER_FEMALE_6 = 0x8D,
-	PLAYER_FEMALE_7 = 0x8E,
+	PLAYER_FEMALE_7 = 0x8E
 };
 
 struct Outfit_t
@@ -346,6 +376,65 @@ struct ShopInfo
 	};
 };
 
+struct MarketOffer
+{
+	uint32_t price;
+	uint32_t timestamp;
+	uint16_t amount;
+	uint16_t counter;
+	uint16_t itemId;
+	std::string playerName;
+};
+
+struct MarketOfferEx
+{
+	uint32_t playerId;
+	uint32_t timestamp;
+	uint32_t price;
+	uint16_t amount;
+	uint16_t counter;
+	uint16_t itemId;
+	MarketAction_t type;
+	std::string playerName;
+};
+
+struct ExpiredMarketOffer
+{
+	uint32_t id;
+	uint32_t price;
+	uint16_t amount;
+	uint16_t itemId;
+	uint32_t playerId;
+};
+
+struct HistoryMarketOffer
+{
+	uint32_t timestamp;
+	uint32_t price;
+	uint16_t itemId;
+	uint16_t amount;
+	MarketOfferState_t state;
+};
+
+struct MarketStatistics
+{
+	MarketStatistics()
+	{
+		numTransactions = 0;
+		highestPrice = 0;
+		totalPrice = 0;
+		lowestPrice = 0;
+	}
+
+	uint32_t numTransactions;
+	uint32_t highestPrice;
+	uint64_t totalPrice;
+	uint32_t lowestPrice;
+};
+
+typedef std::list<MarketOffer> MarketOfferList;
+typedef std::list<ExpiredMarketOffer> ExpiredMarketOfferList;
+typedef std::list<HistoryMarketOffer> HistoryMarketOfferList;
 typedef std::list<ShopInfo> ShopInfoList;
 
 #endif

@@ -1,4 +1,4 @@
-#ifndef __CONSOLE__
+#ifndef _CONSOLE
 	#define ID_KICK 101
 	#define ID_BAN 102
 	#define ID_ABOUT 104
@@ -44,5 +44,6 @@
 
 #define STATUS_SERVER_NAME "The Forgotten Server"
 #define STATUS_SERVER_CODENAME "Mystic Spirit"
-#define STATUS_SERVER_PROTOCOL "9.1"
-#define STATUS_SERVER_VERSION "0.2.11pl2"
+#define STATUS_SERVER_PROTOCOL "9.46"
+#define STATUS_SERVER_VERSION "0.2.12"
+#define STATUS_SERVER_DEVELOPERS "Talaturen, Kornholijo, Elf, Tryller, and Dalkon"

@@ -79,8 +79,8 @@ enum LightState_t
 };
 
 #define EVENT_LIGHTINTERVAL 10000
-#define EVENT_DECAYINTERVAL 1000
-#define EVENT_DECAY_BUCKETS 16
+#define EVENT_DECAYINTERVAL 250
+#define EVENT_DECAY_BUCKETS 4
 #define STATE_TIME 1000
 
 typedef std::map<int32_t, int32_t> StageList;
@@ -103,10 +103,10 @@ class Game
 		void forceAddCondition(uint32_t creatureId, Condition* condition);
 		void forceRemoveCondition(uint32_t creatureId, ConditionType_t type);
 
-		Highscore getHighscore(unsigned short skill);
+		Highscore getHighscore(uint16_t skill);
 		void timedHighscoreUpdate();
 		bool reloadHighscores();
-		std::string getHighscoreString(unsigned short skill);
+		std::string getHighscoreString(uint16_t skill);
 
 		void autoSave();
 		void prepareServerSave();
@@ -189,6 +189,13 @@ class Game
 		  * \returns A Pointer to the player
 		  */
 		Player* getPlayerByName(const std::string& s);
+
+		/**
+		  * Returns a player based on guid
+		  * \param guid
+		  * \returns A Pointer to the player
+		  */
+		Player* getPlayerByGUID(const uint32_t& guid);
 
 		/**
 		  * Returns a player based on a string name identifier, with support for the "~" wildcard.
@@ -434,6 +441,8 @@ class Game
 		bool playerRequestRemoveVip(uint32_t playerId, uint32_t guid);
 		bool playerTurn(uint32_t playerId, Direction dir);
 		bool playerRequestOutfit(uint32_t playerId);
+		bool playerShowQuestLog(uint32_t playerId);
+		bool playerShowQuestLine(uint32_t playerId, uint16_t questId);
 		bool playerSay(uint32_t playerId, uint16_t channelId, SpeakClasses type,
 			const std::string& receiver, const std::string& text);
 		bool playerChangeOutfit(uint32_t playerId, Outfit_t outfit);
@@ -444,8 +453,16 @@ class Game
 		bool playerLeaveParty(uint32_t playerId);
 		bool playerEnableSharedPartyExperience(uint32_t playerId, bool sharedExpActive);
 		bool playerToggleMount(uint32_t playerId, bool mount);
+		bool playerLeaveMarket(uint32_t playerId);
+		bool playerBrowseMarket(uint32_t playerId, uint16_t spriteId);
+		bool playerBrowseMarketOwnOffers(uint32_t playerId);
+		bool playerBrowseMarketOwnHistory(uint32_t playerId);
+		bool playerCreateMarketOffer(uint32_t playerId, uint8_t type, uint16_t spriteId, uint16_t amount, uint32_t price, bool anonymous);
+		bool playerCancelMarketOffer(uint32_t playerId, uint32_t timestamp, uint16_t counter);
+		bool playerAcceptMarketOffer(uint32_t playerId, uint32_t timestamp, uint16_t counter, uint16_t amount);
+		void checkExpiredMarketOffers();
 
-		void removePremium(Account account);
+		void updatePremium(Account& account);
 
 		void cleanup();
 		void shutdown();
@@ -511,7 +528,7 @@ class Game
 		void resetCommandTag();
 
 		void startDecay(Item* item);
-		int getLightHour() {return light_hour;}
+		int32_t getLightHour() {return lightHour;}
 		bool npcSpeakToPlayer(Npc* npc, Player* player, const std::string& text, bool publicize);
 
 		bool loadExperienceStages();
@@ -537,7 +554,7 @@ class Game
 		Highscore highscoreStorage[9];
 		time_t lastHSUpdate;
 
-		bool serverSaveMessage[2];
+		bool serverSaveMessage[3];
 		int64_t stateTime;
 
 		std::vector<Thing*> ToReleaseThings;
@@ -574,10 +591,10 @@ class Game
 		static const int32_t LIGHT_LEVEL_NIGHT = 40;
 		static const int32_t SUNSET = 1305;
 		static const int32_t SUNRISE = 430;
-		int32_t lightlevel;
-		LightState_t light_state;
-		int32_t light_hour;
-		int32_t light_hour_delta;
+		int32_t lightLevel;
+		LightState_t lightState;
+		int32_t lightHour;
+		int32_t lightHourDelta;
 
 		uint32_t maxPlayers;
 		uint32_t inFightTicks;
@@ -585,7 +602,7 @@ class Game
 		GameState_t gameState;
 		WorldType_t worldType;
 
-		ServiceManager* service_manager;
+		ServiceManager* services;
 		Map* map;
 
 		void savePlayersRecord();

@@ -26,8 +26,10 @@ Depot::Depot(uint16_t _type) :
 Container(_type)
 {
 	depotId = 0;
-	maxSize = 30;
+	maxSize = 3;
 	maxDepotLimit = 1500;
+	inbox = NULL;
+	chest = NULL;
 }
 
 Depot::~Depot()
@@ -37,7 +39,7 @@ Depot::~Depot()
 
 Attr_ReadValue Depot::readAttr(AttrTypes_t attr, PropStream& propStream)
 {
-	if(ATTR_DEPOT_ID == attr)
+	if(attr == ATTR_DEPOT_ID)
 	{
 		uint16_t _depotId;
 		if(!propStream.GET_USHORT(_depotId))
@@ -94,4 +96,13 @@ void Depot::postRemoveNotification(Thing* thing, const Cylinder* newParent, int3
 {
 	if(getParent() != NULL)
 		getParent()->postRemoveNotification(thing, newParent, index, isCompleteRemoval, LINK_PARENT);
+}
+
+void Depot::moveChestToFront()
+{
+	if(!chest)
+		return;
+
+	itemlist.remove(chest);
+	itemlist.push_front(chest);
 }

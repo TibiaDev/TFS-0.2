@@ -20,8 +20,7 @@
 
 #ifndef FORGOTTENSERVER_TEXTLOGGER_H
 #define FORGOTTENSERVER_TEXTLOGGER_H
-#ifndef __CONSOLE__
-#include <windows.h>
+#ifndef _CONSOLE
 #include <ostream>
 
 class TextLogger : public std::streambuf

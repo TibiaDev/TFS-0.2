@@ -42,10 +42,6 @@ extern Game g_game;
 uint32_t ProtocolLogin::protocolLoginCount = 0;
 #endif
 
-#ifndef __CONSOLE__
-extern GUI gui;
-#endif
-
 #ifdef __DEBUG_NET_DETAIL__
 void ProtocolLogin::deleteProtocolTask()
 {
@@ -70,8 +66,8 @@ void ProtocolLogin::disconnectClient(uint8_t error, const char* message)
 bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 {
 	if(
-#ifndef __CONSOLE__
-		!gui.m_connections ||
+#ifndef _CONSOLE
+		!GUI::getInstance()->m_connections ||
 #endif
 		g_game.getGameState() == GAME_STATE_SHUTDOWN)
 	{
@@ -87,7 +83,7 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 
 	if(version <= 760)
 	{
-		disconnectClient(0x0A, "Only clients with protocol 9.1 allowed!");
+		disconnectClient(0x0A, "Only clients with protocol " CLIENT_VERSION_MIN_STR " allowed!");
 		return false;
 	}
 
@@ -105,26 +101,26 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 	enableXTEAEncryption();
 	setXTEAKey(key);
 
-	uint32_t accnumber = atoi(msg.GetString().c_str());
+	std::string accountName = msg.GetString();
 	std::string password = msg.GetString();
 
-	if(!accnumber)
+	if(accountName.empty())
 	{
 		if(g_config.getBoolean(ConfigManager::ACCOUNT_MANAGER))
 		{
-			accnumber = 1;
+			accountName = "1";
 			password = "1";
 		}
 		else
 		{
-			disconnectClient(0x0A, "You must enter your account number.");
+			disconnectClient(0x0A, "Invalid Account Name.");
 			return false;
 		}
 	}
 
-	if(version < 910)
+	if(version < CLIENT_VERSION_MIN || version > CLIENT_VERSION_MAX)
 	{
-		disconnectClient(0x0A, "Only clients with protocol 9.1 allowed!");
+		disconnectClient(0x0A, "Only clients with protocol " CLIENT_VERSION_MIN_STR " allowed!");
 		return false;
 	}
 
@@ -162,12 +158,11 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 		}
 	}
 
-	Account account = IOLoginData::getInstance()->loadAccount(accnumber);
-	if(!(accnumber != 0 && account.accnumber == accnumber &&
-			passwordTest(password, account.password)))
+	Account account = IOLoginData::getInstance()->loadAccount(accountName);
+	if(account.id == 0 || !passwordTest(password, account.password))
 	{
 		g_bans.addLoginAttempt(clientip, false);
-		disconnectClient(0x0A, "Account number or password is not correct.");
+		disconnectClient(0x0A, "Account name or password is not correct.");
 		return false;
 	}
 
@@ -178,8 +173,8 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 	{
 		TRACK_MESSAGE(output);
 
-		//Remove premium days
-		g_game.removePremium(account);
+		//Update premium days
+		g_game.updatePremium(account);
 
 		//Add MOTD
 		output->AddByte(0x14);
@@ -189,7 +184,7 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 
 		//Add char list
 		output->AddByte(0x64);
-		if(g_config.getBoolean(ConfigManager::ACCOUNT_MANAGER) && accnumber != 1)
+		if(g_config.getBoolean(ConfigManager::ACCOUNT_MANAGER) && account.id != 1)
 		{
 			output->AddByte((uint8_t)account.charList.size() + 1);
 			output->AddString("Account Manager");
@@ -200,10 +195,10 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 		else
 			output->AddByte((uint8_t)account.charList.size());
 
-		std::list<std::string>::iterator it;
-		for(it = account.charList.begin(); it != account.charList.end(); it++)
+		std::list<std::string>::iterator it, end;
+		for(it = account.charList.begin(), end = account.charList.end(); it != end; ++it)
 		{
-			output->AddString((*it));
+			output->AddString(*it);
 			if(g_config.getBoolean(ConfigManager::ON_OR_OFF_CHARLIST))
 			{
 				if(g_game.getPlayerByName((*it)))
