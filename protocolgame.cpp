@@ -2545,7 +2545,6 @@ void ProtocolGame::sendHouseWindow(uint32_t windowTextId, House* _house,
 
 void ProtocolGame::sendOutfitWindow()
 {
-	#define MAX_NUMBER_OF_OUTFITS 25
 	NetworkMessage_ptr msg = getOutputBuffer();
 	if(!msg)
 		return;
@@ -2556,10 +2555,7 @@ void ProtocolGame::sendOutfitWindow()
 
 	const OutfitListType& global_outfits = Outfits::getInstance()->getOutfits(player->getSex());
 	int32_t count_outfits = global_outfits.size();
-
-	if(count_outfits > MAX_NUMBER_OF_OUTFITS)
-		count_outfits = MAX_NUMBER_OF_OUTFITS;
-	else if(count_outfits == 0)
+	if(count_outfits == 0)
 		return;
 
 	OutfitListType::const_iterator it, it_;
@@ -3206,7 +3202,7 @@ void ProtocolGame::AddShopItem(NetworkMessage_ptr msg, const ShopInfo item)
 	else if(it.isSplash() || it.isFluidContainer())
 		msg->AddByte(fluidMap[item.subType % 8]);
 	else
-		msg->AddByte(0x01);
+		msg->AddByte(0x00);
 
 	msg->AddString(item.realName);
 	msg->AddU32(uint32_t(it.weight * 100));
