@@ -79,12 +79,12 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 
 	uint32_t clientip = getConnection()->getIP();
 
-	/*uint16_t clientos =*/ msg.GetU16();
+	/*uint16_t clientos = */msg.GetU16();
 	uint16_t version  = msg.GetU16();
 	msg.SkipBytes(12);
 
 	if(version <= 760)
-		disconnectClient(0x0A, "Only clients with protocol 8.2 allowed!");
+		disconnectClient(0x0A, "Only clients with protocol 8.3 allowed!");
 
 	if(!RSA_decrypt(g_otservRSA, msg))
 	{
@@ -100,7 +100,7 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 	enableXTEAEncryption();
 	setXTEAKey(key);
 
-	uint32_t accnumber = msg.GetU32();
+	uint32_t accnumber = atoi(msg.GetString().c_str());
 	std::string password = msg.GetString();
 
 	if(!accnumber)
@@ -117,9 +117,9 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 		}
 	}
 
-	if(version < 820)
+	if(version < 830)
 	{
-		disconnectClient(0x0A, "Only clients with protocol 8.2 allowed!");
+		disconnectClient(0x0A, "Only clients with protocol 8.3 allowed!");
 		return false;
 	}
 
