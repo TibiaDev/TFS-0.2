@@ -7,6 +7,7 @@ DROP TRIGGER IF EXISTS `ondelete_accounts`;
 DROP TABLE IF EXISTS `player_depotitems`;
 DROP TABLE IF EXISTS `tile_items`;
 DROP TABLE IF EXISTS `tiles`;
+DROP TABLE IF EXISTS `map_store`;
 DROP TABLE IF EXISTS `bans`;
 DROP TABLE IF EXISTS `house_lists`;
 DROP TABLE IF EXISTS `houses`;
@@ -203,7 +204,7 @@ CREATE TABLE `player_items`
 	`sid` INT NOT NULL DEFAULT 0,
 	`itemtype` INT NOT NULL DEFAULT 0,
 	`count` INT NOT NULL DEFAULT 0,
-	`attributes` text NOT NULL,
+	`attributes` BLOB NOT NULL,
 	FOREIGN KEY (`player_id`) REFERENCES `players`(`id`) ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
@@ -239,6 +240,13 @@ CREATE TABLE `player_viplist`
 	FOREIGN KEY (`vip_id`) REFERENCES `players`(`id`) ON DELETE CASCADE
 ) ENGINE = InnoDB;
 
+CREATE TABLE `map_store`
+(
+	`house_id` int(10) unsigned NOT NULL,
+	`data` blob NOT NULL,
+	KEY `house_id` (`house_id`)
+) ENGINE = InnoDB;
+
 CREATE TABLE `tiles`
 (
 	`id` INT NOT NULL AUTO_INCREMENT,
@@ -256,7 +264,8 @@ CREATE TABLE `tile_items`
 	`itemtype` INT NOT NULL,
 	`count` INT NOT NULL DEFAULT 0,
 	`attributes` BLOB NOT NULL,
-	FOREIGN KEY (`tile_id`) REFERENCES `tiles`(`id`) ON DELETE CASCADE
+	FOREIGN KEY (`tile_id`) REFERENCES `tiles` (`id`) ON DELETE CASCADE,
+	INDEX (`sid`)
 ) ENGINE = InnoDB;
 
 DELIMITER |
