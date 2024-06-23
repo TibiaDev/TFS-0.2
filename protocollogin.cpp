@@ -83,7 +83,7 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 
 	if(version <= 760)
 	{
-		disconnectClient(0x0A, "Only clients with protocol " CLIENT_VERSION_MIN_STR " allowed!");
+		disconnectClient(0x0A, "Only clients with protocol " CLIENT_VERSION_STR " allowed!");
 		return false;
 	}
 
@@ -120,7 +120,7 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 
 	if(version < CLIENT_VERSION_MIN || version > CLIENT_VERSION_MAX)
 	{
-		disconnectClient(0x0A, "Only clients with protocol " CLIENT_VERSION_MIN_STR " allowed!");
+		disconnectClient(0x0A, "Only clients with protocol " CLIENT_VERSION_STR " allowed!");
 		return false;
 	}
 
@@ -178,9 +178,10 @@ bool ProtocolLogin::parseFirstPacket(NetworkMessage& msg)
 
 		//Add MOTD
 		output->AddByte(0x14);
-		char motd[1300];
-		sprintf(motd, "%d\n%s", g_game.getMotdNum(), g_config.getString(ConfigManager::MOTD).c_str());
-		output->AddString(motd);
+
+		std::ostringstream ss;
+		ss << g_game.getMotdNum() << "\n" << g_config.getString(ConfigManager::MOTD);
+		output->AddString(ss.str());
 
 		//Add char list
 		output->AddByte(0x64);

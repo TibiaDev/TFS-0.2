@@ -54,7 +54,7 @@ std::string Mission::getDescription(Player* player)
 	player->getStorageValue(storageID, value);
 	if(mainState != NULL)
 	{
-		std::stringstream s;
+		std::ostringstream s;
 		s << value;
 
 		std::string desc = mainState->getMissionDescription();
@@ -84,7 +84,7 @@ bool Mission::isStarted(Player* player) const
 	int32_t value;
 	if(!player->getStorageValue(storageID, value) || value < startValue || value > endValue)
 		return false;
-	
+
 	return true;
 }
 

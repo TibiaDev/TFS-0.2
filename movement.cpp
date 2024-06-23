@@ -49,52 +49,52 @@ MoveEvents::~MoveEvents()
 
 void MoveEvents::clear()
 {
-	MoveListMap::iterator it = m_itemIdMap.begin();
-	while(it != m_itemIdMap.end())
+	MoveListMap::iterator it1 = m_itemIdMap.begin();
+	while(it1 != m_itemIdMap.end())
 	{
-		MoveEventList& tmpMoveEventList = it->second;
+		MoveEventList& tmpMoveEventList = it1->second;
 		for(int32_t i = 0; i < MOVE_EVENT_LAST; ++i)
 		{
 			std::list<MoveEvent*>& moveEventList = tmpMoveEventList.moveEvent[i];
 			for(std::list<MoveEvent*>::iterator it = moveEventList.begin(), end = moveEventList.end(); it != end; ++it)
 				delete (*it);
 		}
-		m_itemIdMap.erase(it);
-		it = m_itemIdMap.begin();
+		m_itemIdMap.erase(it1);
+		it1 = m_itemIdMap.begin();
 	}
 
-	it = m_actionIdMap.begin();
-	while(it != m_actionIdMap.end())
+	MoveListMap::iterator it2 = m_actionIdMap.begin();
+	while(it2 != m_actionIdMap.end())
 	{
-		MoveEventList& tmpMoveEventList = it->second;
+		MoveEventList& tmpMoveEventList = it2->second;
 		for(int32_t i = 0; i < MOVE_EVENT_LAST; ++i)
 		{
 			std::list<MoveEvent*>& moveEventList = tmpMoveEventList.moveEvent[i];
 			for(std::list<MoveEvent*>::iterator it = moveEventList.begin(), end = moveEventList.end(); it != end; ++it)
 				delete (*it);
 		}
-		m_actionIdMap.erase(it);
-		it = m_actionIdMap.begin();
+		m_actionIdMap.erase(it2);
+		it2 = m_actionIdMap.begin();
 	}
 
-	it = m_uniqueIdMap.begin();
-	while(it != m_uniqueIdMap.end())
+	MoveListMap::iterator it3 = m_uniqueIdMap.begin();
+	while(it3 != m_uniqueIdMap.end())
 	{
-		MoveEventList& tmpMoveEventList = it->second;
+		MoveEventList& tmpMoveEventList = it3->second;
 		for(int32_t i = 0; i < MOVE_EVENT_LAST; ++i)
 		{
 			std::list<MoveEvent*>& moveEventList = tmpMoveEventList.moveEvent[i];
 			for(std::list<MoveEvent*>::iterator it = moveEventList.begin(), end = moveEventList.end(); it != end; ++it)
 				delete (*it);
 		}
-		m_uniqueIdMap.erase(it);
-		it = m_uniqueIdMap.begin();
+		m_uniqueIdMap.erase(it3);
+		it3 = m_uniqueIdMap.begin();
 	}
 
 	MovePosListMap::iterator posIter = m_positionMap.begin();
 	while(posIter != m_positionMap.end())
 	{
-		MoveEventList& tmpMoveEventList = it->second;
+		MoveEventList& tmpMoveEventList = posIter->second;
 		for(int i = 0; i < MOVE_EVENT_LAST; ++i)
 		{
 			std::list<MoveEvent*>& moveEventList = tmpMoveEventList.moveEvent[i];
@@ -204,7 +204,7 @@ bool MoveEvents::registerEvent(Event* event, xmlNodePtr p)
 		while(id < endId)
 			addEvent(new MoveEvent(moveEvent), ++id, m_uniqueIdMap);
 	}
-	else if(readXMLInteger(p, "actionid", id))
+	else if(readXMLInteger(p, "actionid", id) || readXMLInteger(p, "aid", id))
 		addEvent(moveEvent, id, m_actionIdMap);
 	else if(readXMLInteger(p, "fromaid", id) && readXMLInteger(p, "toaid", endId))
 	{
@@ -933,7 +933,7 @@ uint32_t MoveEvent::executeStep(Creature* creature, Item* item, const Position& 
 		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 
 		#ifdef __DEBUG_LUASCRIPTS__
-		std::stringstream desc;
+		std::ostringstream desc;
 		desc << creature->getName() << " itemid: " << item->getID() << " - " << pos;
 		env->setEventDesc(desc.str());
 		#endif
@@ -981,7 +981,7 @@ uint32_t MoveEvent::executeEquip(Player* player, Item* item, slots_t slot)
 		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 
 		#ifdef __DEBUG_LUASCRIPTS__
-		std::stringstream desc;
+		std::ostringstream desc;
 		desc << player->getName() << " itemid: " << item->getID() << " slot: " slot;
 		env->setEventDesc(desc.str());
 		#endif
@@ -1028,7 +1028,7 @@ uint32_t MoveEvent::executeAddRemItem(Item* item, Item* tileItem, const Position
 		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 
 		#ifdef __DEBUG_LUASCRIPTS__
-		std::stringstream desc;
+		std::ostringstream desc;
 		if(tileItem)
 			desc << "tileid: " << tileItem->getID();
 		desc << " itemid: " << item->getID() << " - " << pos;

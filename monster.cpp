@@ -74,6 +74,8 @@ Creature()
 	internalLight.level = mType->lightLevel;
 	internalLight.color = mType->lightColor;
 
+	hiddenHealth = mType->hiddenHealth;
+
 	minCombatValue = 0;
 	maxCombatValue = 0;
 
@@ -598,7 +600,7 @@ void Monster::onThink(uint32_t interval)
 
 	if(despawn())
 	{
-		g_game.removeCreature(this, true);
+		g_game.internalTeleport(this, masterPos);
 		setIdle(true);
 	}
 	else

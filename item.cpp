@@ -245,6 +245,7 @@ Item::Item(const Item &i) :
 	//std::cout << "Item copy constructor " << this << std::endl;
 	id = i.id;
 	count = i.count;
+	loadedFromMap = i.loadedFromMap;
 
 	m_attributes = i.m_attributes;
 	if(i.m_firstAttr)
@@ -731,7 +732,7 @@ double Item::getWeight() const
 std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 	const Item* item /*= NULL*/, int32_t subType /*= -1*/, bool addArticle /*= true*/)
 {
-	std::stringstream s;
+	std::ostringstream s;
 	s << getNameDescription(it, item, subType, addArticle);
 	if(item)
 		subType = item->getSubType();
@@ -743,7 +744,11 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 
 		if(it.runeLevel > 0 || it.runeMagLevel > 0)
 		{
-			s << "." << std::endl << "It can only be used with";
+			int32_t tmpSubType = subType;
+			if(item)
+				tmpSubType = item->getSubType();
+
+			s << ". " << (it.stackable && tmpSubType > 1 ? "They" : "It") << " can only be used with";
 			if(it.runeLevel > 0)
 				s << " level " << it.runeLevel;
 
@@ -778,14 +783,9 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 			if(it.attack != 0)
 			{
 				begin = false;
-				s << "Atk:";
-				if(it.abilities && it.abilities->elementType != COMBAT_NONE && it.decayTo < 1)
-				{
-					s << std::max(0, it.attack - it.abilities->elementDamage) << " physical + ";
-					s << it.abilities->elementDamage << " " << getCombatName(it.abilities->elementType);
-				}
-				else
-					s << it.attack;
+				s << "Atk:" << it.attack;
+				if(it.abilities && it.abilities->elementType != COMBAT_NONE && it.abilities->elementDamage != 0)
+					s << " physical + " << it.abilities->elementDamage << " " << getCombatName(it.abilities->elementType);
 			}
 
 			if(it.defense != 0 || it.extraDefense != 0)
@@ -799,13 +799,99 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 					s << " " << std::showpos << it.extraDefense << std::noshowpos;
 			}
 
-			if(it.abilities && it.abilities->stats[STAT_MAGICPOINTS] != 0)
+			if(it.abilities)
 			{
-				if(!begin)
-					s << ", ";
+				for(uint16_t i = SKILL_FIRST; i <= SKILL_LAST; i++)
+				{
+					if(!it.abilities->skills[i])
+						continue;
 
-				begin = false;
-				s << "magic level " << std::showpos << it.abilities->stats[STAT_MAGICPOINTS] << std::noshowpos;
+					if(begin)
+					{
+						begin = false;
+						s << " (";
+					}
+					else
+						s << ", ";
+
+					s << getSkillName(i) << " " << std::showpos << it.abilities->skills[i] << std::noshowpos;
+				}
+
+				if(it.abilities->stats[STAT_MAGICPOINTS])
+				{
+					if(begin)
+					{
+						begin = false;
+						s << " (";
+					}
+					else
+						s << ", ";
+
+					s << "magic level " << std::showpos << it.abilities->stats[STAT_MAGICPOINTS] << std::noshowpos;
+				}
+
+				int32_t show = it.abilities->absorbPercent[COMBAT_FIRST];
+				for(uint32_t i = (COMBAT_FIRST + 1); i <= COMBAT_COUNT; ++i)
+				{
+					if(it.abilities->absorbPercent[i] == show)
+						continue;
+
+					show = 0;
+					break;
+				}
+
+				if(!show)
+				{
+					bool tmp = true;
+					for(uint32_t i = COMBAT_FIRST; i <= COMBAT_COUNT; i++)
+					{
+						if(!it.abilities->absorbPercent[i])
+							continue;
+
+						if(tmp)
+						{
+							tmp = false;
+							if(begin)
+							{
+								begin = false;
+								s << " (";
+							}
+							else
+								s << ", ";
+
+							s << "protection ";
+						}
+						else
+							s << ", ";
+
+						s << getCombatName(indexToCombatType(i)) << " " << std::showpos << it.abilities->absorbPercent[i] << std::noshowpos << "%";
+					}
+				}
+				else
+				{
+					if(begin)
+					{
+						begin = false;
+						s << " (";
+					}
+					else
+						s << ", ";
+
+					s << "protection all " << std::showpos << show << std::noshowpos << "%";
+				}
+
+				if(it.abilities->speed)
+				{
+					if(begin)
+					{
+						begin = false;
+						s << " (";
+					}
+					else
+						s << ", ";
+
+					s << "speed " << std::showpos << (int32_t)(it.abilities->speed / 2) << std::noshowpos;
+				}
 			}
 
 			s << ")";
@@ -970,9 +1056,9 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 			else if(it.allowDistRead && it.id != 7369 && it.id != 7370 && it.id != 7371)
 			{
 				s << "." << std::endl;
-				if(item && item->getText() != "")
+				if(lookDistance <= 4)
 				{
-					if(lookDistance <= 4)
+					if(item && item->getText() != "")
 					{
 						if(item->getWriter().length())
 						{
@@ -989,10 +1075,10 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 						s << item->getText();
 					}
 					else
-						s << "You are too far away to read it";
+						s << "Nothing is written on it";
 				}
 				else
-					s << "Nothing is written on it";
+					s << "You are too far away to read it";
 			}
 			else if(it.levelDoor && item && item->getActionId() >= (int32_t)it.levelDoor)
 				s << " for level " << item->getActionId() - it.levelDoor;
@@ -1080,13 +1166,6 @@ std::string Item::getDescription(const ItemType& it, int32_t lookDistance,
 		}
 	}
 
-	if(it.abilities && it.abilities->elementType != COMBAT_NONE && it.decayTo > 0)
-	{
-		s << std::endl << "It is temporarily enchanted with " << getCombatName(it.abilities->elementType) << " (";
-		s << std::max(0, it.attack - it.abilities->elementDamage) << " physical + " << it.abilities->elementDamage;
-		s << " " << getCombatName(it.abilities->elementType) << " damage).";
-	}
-
 	if(item && item->getSpecialDescription() != "")
 		s << std::endl << item->getSpecialDescription().c_str();
 	else if(it.description.length() && lookDistance <= 1)
@@ -1109,7 +1188,7 @@ std::string Item::getNameDescription(const ItemType& it, const Item* item /*= NU
 	if(item)
 		subType = item->getSubType();
 
-	std::stringstream s;
+	std::ostringstream s;
 	if(it.name.length())
 	{
 		if(it.stackable && subType > 1)
@@ -1117,7 +1196,7 @@ std::string Item::getNameDescription(const ItemType& it, const Item* item /*= NU
 			if(it.showCount)
 				s << subType << " ";
 
-			s << it.pluralName;
+			s << it.getPluralName();
 		}
 		else
 		{
@@ -1141,7 +1220,7 @@ std::string Item::getNameDescription() const
 
 std::string Item::getWeightDescription(const ItemType& it, double weight, uint32_t _count /*= 1*/)
 {
-	std::stringstream ss;
+	std::ostringstream ss;
 	if(it.stackable && _count > 1 && it.showCount != 0)
 		ss << "They weigh " << std::fixed << std::setprecision(2) << weight << " oz.";
 	else

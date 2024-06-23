@@ -1124,7 +1124,7 @@ ResponseList Npc::loadInteraction(xmlNodePtr node)
 								{
 									const ItemType& itemType = Item::items[(*it).itemId];
 									if(itemType.id != 0)
-										action.strValue = itemType.pluralName;
+										action.strValue = itemType.getPluralName();
 								}
 								listItemProp.actionList.push_front(action);
 
@@ -1200,7 +1200,7 @@ bool Npc::canSee(const Position& pos) const
 
 std::string Npc::getDescription(int32_t lookDistance) const
 {
-	std::stringstream s;
+	std::ostringstream s;
 	s << name << ".";
 	return s.str();
 }
@@ -1820,7 +1820,7 @@ void Npc::processResponse(Player* player, NpcState* npcState, const NpcResponse*
 						env->setRealPos(getPosition());
 						env->setNpc(this);
 
-						std::stringstream scriptstream;
+						std::ostringstream scriptstream;
 						//attach various variables that could be interesting
 						scriptstream << "cid = " << env->addThing(player) << std::endl;
 						scriptstream << "text = \"" << LuaScriptInterface::escapeString(npcState->respondToText) << "\"" << std::endl;
@@ -2751,7 +2751,7 @@ std::string Npc::formatResponse(Creature* creature, const NpcState* npcState, co
 {
 	std::string responseString = response->getText();
 
-	std::stringstream ss;
+	std::ostringstream ss;
 	ss << npcState->price * npcState->amount;
 	replaceString(responseString, "|PRICE|", ss.str());
 
@@ -2807,7 +2807,7 @@ std::string Npc::formatResponse(Creature* creature, const NpcState* npcState, co
 		}
 		else
 		{
-			ss << it.pluralName;
+			ss << it.getPluralName();
 			replaceString(responseString, "|ITEMNAME|", ss.str());
 		}
 	}
@@ -3512,7 +3512,7 @@ NpcEventsHandler::~NpcEventsHandler()
 	//
 }
 
-bool NpcEventsHandler::isLoaded()
+bool NpcEventsHandler::isLoaded() const
 {
 	return m_loaded;
 }
@@ -3563,7 +3563,7 @@ void NpcScript::onCreatureAppear(const Creature* creature)
 		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 
 		#ifdef __DEBUG_LUASCRIPTS__
-		std::stringstream desc;
+		std::ostringstream desc;
 		desc << "npc " << m_npc->getName();
 		env->setEventDesc(desc.str());
 		#endif
@@ -3596,7 +3596,7 @@ void NpcScript::onCreatureDisappear(const Creature* creature)
 		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 
 		#ifdef __DEBUG_LUASCRIPTS__
-		std::stringstream desc;
+		std::ostringstream desc;
 		desc << "npc " << m_npc->getName();
 		env->setEventDesc(desc.str());
 		#endif
@@ -3629,7 +3629,7 @@ void NpcScript::onCreatureMove(const Creature* creature, const Position& oldPos,
 		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 
 		#ifdef __DEBUG_LUASCRIPTS__
-		std::stringstream desc;
+		std::ostringstream desc;
 		desc << "npc " << m_npc->getName();
 		env->setEventDesc(desc.str());
 		#endif
@@ -3664,7 +3664,7 @@ void NpcScript::onCreatureSay(const Creature* creature, SpeakClasses type, const
 		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 
 		#ifdef __DEBUG_LUASCRIPTS__
-		std::stringstream desc;
+		std::ostringstream desc;
 		desc << "npc " << m_npc->getName();
 		env->setEventDesc(desc.str());
 		#endif
@@ -3778,7 +3778,7 @@ void NpcScript::onThink()
 		ScriptEnvironment* env = m_scriptInterface->getScriptEnv();
 
 		#ifdef __DEBUG_LUASCRIPTS__
-		std::stringstream desc;
+		std::ostringstream desc;
 		desc << "npc " << m_npc->getName();
 		env->setEventDesc(desc.str());
 		#endif

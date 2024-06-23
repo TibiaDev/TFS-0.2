@@ -114,6 +114,7 @@ struct AccountManager
 		namelockedPlayerName = "";
 		talkState = 0;
 		newVocation = VOCATION_NONE;
+		newSex = PLAYERSEX_FEMALE;
 	}
 };
 
@@ -125,6 +126,7 @@ typedef std::set<uint32_t> VIPListSet;
 typedef std::map<uint32_t, uint32_t> MuteCountMap;
 typedef std::list<std::string> LearnedInstantSpellList;
 typedef std::list<uint32_t> InvitedToGuildsList;
+typedef std::list<uint32_t> GuildWarList;
 typedef std::list<Party*> PartyList;
 
 #define PLAYER_MAX_SPEED 1500
@@ -196,6 +198,9 @@ class Player : public Creature, public Cylinder
 		void hasRequestedOutfit(bool newValue) {requestedOutfit = newValue;}
 
 		const DepotMap& getDepots() const { return depots; }
+		
+		GuildWarList getGuildWarList() const {return guildWarList;}
+		void setGuildWarList(GuildWarList _guildWarList) {guildWarList = _guildWarList;}
 
 		Vocation* getVocation() const {return vocation;}
 
@@ -224,6 +229,8 @@ class Player : public Creature, public Cylinder
 		const std::string& getGuildNick() const {return guildNick;}
 		void setGuildNick(const std::string& nick) {guildNick = nick;}
 
+		bool isInWar(const Player* player) const;
+		bool isInWarList(uint32_t guild_id) const;
 		bool isInvitedToGuild(uint32_t guild_id) const;
 		void leaveGuild();
 
@@ -264,7 +271,7 @@ class Player : public Creature, public Cylinder
 		bool getNoMove() const {return mayNotMove;}
 
 		bool isAccountManager() const {return accountManager != NULL;}
-		void setAccountManager() {accountManager = new AccountManager();}
+		void setAccountManager() { if(accountManager == NULL) accountManager = new AccountManager();}
 		AccountManager* getAccountManager() const {return accountManager;}
 
 		bool isInGhostMode() const {return ghostMode;}
@@ -277,6 +284,7 @@ class Player : public Creature, public Cylinder
 		uint32_t getBaseMagicLevel() const {return magLevel;}
 		bool isAccessPlayer() const {return accessLevel;}
 		bool isPremium() const;
+		void setPremiumDays(int32_t v);
 
 		void setVocation(uint32_t vocId);
 		uint32_t getVocationId() const {return vocationId;}
@@ -482,7 +490,7 @@ class Player : public Creature, public Cylinder
 		void setSkull(Skulls_t newSkull) {skull = newSkull;}
 		void sendCreatureSkull(const Creature* creature) const
 			{if(client) client->sendCreatureSkull(creature);}
-		void checkRedSkullTicks(int32_t ticks);
+		void checkSkullTicks(int32_t ticks);
 
 		const OutfitListType& getPlayerOutfits();
 		bool canWear(uint32_t _looktype, uint32_t _addons);
@@ -620,7 +628,11 @@ class Player : public Creature, public Cylinder
 		void sendMagicEffect(const Position& pos, uint8_t type) const
 			{if(client) client->sendMagicEffect(pos, type);}
 		void sendPing();
+		void sendPingBack() const
+			{if(client) client->sendPingBack();}
 		void sendStats();
+		void sendBasicData() const
+			{if(client) client->sendBasicData();}
 		void sendSkills() const
 			{if(client) client->sendSkills();}
 		void sendTextMessage(MessageClasses mclass, const std::string& message, Position* pos = NULL, uint32_t value = 0, TextColor_t color = TEXTCOLOR_NONE) const
@@ -674,11 +686,11 @@ class Player : public Creature, public Cylinder
 		void sendTutorial(uint8_t tutorialId)
 			{if(client) client->sendTutorial(tutorialId);}
 		void sendAddMarker(const Position& pos, uint8_t markType, const std::string& desc)
-			{if (client) client->sendAddMarker(pos, markType, desc);}
+			{if(client) client->sendAddMarker(pos, markType, desc);}
 		void sendQuestLog()
-			{if (client) client->sendQuestLog(); }
+			{if(client) client->sendQuestLog(); }
 		void sendQuestLine(const Quest* quest)
-			{if (client) client->sendQuestLine(quest); }
+			{if(client) client->sendQuestLine(quest); }
 
 		void receivePing() {lastPong = OTSYS_TIME();}
 
@@ -705,6 +717,7 @@ class Player : public Creature, public Cylinder
 		uint32_t maxVipLimit;
 
 		InvitedToGuildsList invitedToGuildsList;
+		GuildWarList guildWarList;
 
 		//items
 		ContainerVector containerVec;
@@ -835,8 +848,8 @@ class Player : public Creature, public Cylinder
 		std::string password;
 
 		//inventory variables
-		Item* inventory[11];
-		bool inventoryAbilities[11];
+		Item* inventory[SLOT_LAST];
+		bool inventoryAbilities[SLOT_LAST];
 
 		//player advances variables
 		uint32_t skills[SKILL_LAST + 1][3];
@@ -890,7 +903,7 @@ class Player : public Creature, public Cylinder
 		House* editHouse;
 		uint32_t editListId;
 
-		int64_t redSkullTicks;
+		int64_t skullTicks;
 		Skulls_t skull;
 		typedef std::set<uint32_t> AttackedSet;
 		AttackedSet attackedSet;
@@ -916,6 +929,8 @@ class Player : public Creature, public Cylinder
 		bool isPromoted() const;
 
 		uint32_t getAttackSpeed() const {return vocation->getAttackSpeed();}
+
+		uint16_t getDropPercent() const;
 
 		static uint32_t getPercentLevel(uint64_t count, uint64_t nextLevelCount);
 		double getLostPercent() const;

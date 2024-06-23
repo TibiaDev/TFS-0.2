@@ -681,14 +681,9 @@ bool AdminProtocolConfig::loadXMLConfig()
 	return true;
 }
 
-bool AdminProtocolConfig::isEnabled()
+bool AdminProtocolConfig::isEnabled() const
 {
 	return m_enabled;
-}
-
-bool AdminProtocolConfig::onlyLocalHost()
-{
-	return m_onlyLocalHost;
 }
 
 bool AdminProtocolConfig::addConnection()
@@ -731,12 +726,12 @@ bool AdminProtocolConfig::allowIP(uint32_t ip)
 	return !g_bans.isIpDisabled(ip);
 }
 
-bool AdminProtocolConfig::requireLogin()
+bool AdminProtocolConfig::requireLogin() const
 {
 	return m_requireLogin;
 }
 
-bool AdminProtocolConfig::requireEncryption()
+bool AdminProtocolConfig::requireEncryption() const
 {
 	return m_requireEncryption;
 }

@@ -421,7 +421,8 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 		if(text == "!disband" || text == "!guildonline" || text.substr(0, 7) == "!invite" || text == "!leave"
 			|| text.substr(0, 5) == "!kick" || text.substr(0, 7) == "!revoke" || text.substr(0, 7) == "!demote"
 			|| text.substr(0, 8) == "!promote" || text.substr(0, 15) == "!passleadership" || text.substr(0, 5) == "!nick"
-			|| text.substr(0, 12) == "!setrankname" || text.substr(0, 8) == "!setmotd" || text == "!cleanmotd" || text == "!commands")
+			|| text.substr(0, 12) == "!setrankname" || text.substr(0, 8) == "!setmotd" || text == "!cleanmotd" || text == "!commands"
+			|| text.substr(0, 9) == "!startwar" || text.substr(0, 8) == "!stopwar" || text.substr(0, 10) == "!acceptwar")
 		{
 			if(!player->getGuildId() || !IOGuild::getInstance()->guildExists(player->getGuildId()))
 			{
@@ -441,13 +442,28 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 					return true;
 				}
 
+				if(!player->getGuildWarList().empty())
+				{
+					if(!IOGuild::getInstance()->canLeaveWar(player->getGuildId()))
+					{
+						player->sendCancel("You can not disband the guild during a war.");
+						return true;
+					}
+
+					if(player->hasCondition(CONDITION_INFIGHT))
+					{
+						player->sendCancel("You can not disband your guild while you have battle sign.");
+						return true;
+					}
+				}
+
 				uint32_t guildId = player->getGuildId();
-				guildChannel->sendToAll("The guild has been disbanded.", SPEAK_CHANNEL_R1);
+				guildChannel->sendToAll("The guild has been disbanded. If your guild was in a war, please relog in order for your yellow skull to disappear from the opponents view.", SPEAK_CHANNEL_R1);
 				IOGuild::getInstance()->disbandGuild(guildId);
 			}
 			else if(text == "!guildonline")
 			{
-				std::stringstream ss;
+				std::ostringstream ss;
 				ss << "Players online in your guild: ";
 				uint32_t i = 0;
 				AutoList<Player>::listiterator it = Player::listPlayer.list.begin();
@@ -506,8 +522,11 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 						return true;
 					}
 
-					std::stringstream ss;
+					std::ostringstream ss;
 					ss << player->getName() << " has invited you to join the guild, " << player->getGuildName() << ".";
+					if(IOGuild::getInstance()->isInWar(player->getGuildId()))
+						ss << " Please note that the guild is in war, and you will not be able to leave until the war is over!";
+
 					paramPlayer->sendTextMessage(MSG_INFO_DESCR, ss.str());
 
 					ss.str("");
@@ -533,7 +552,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 
 					IOGuild::getInstance()->invitePlayerToGuild(guid, player->getGuildId());
 
-					std::stringstream ss;
+					std::ostringstream ss;
 					ss << player->getName() << " has invited " << param << " to the guild.";
 					guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 				}
@@ -548,7 +567,22 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 					return true;
 				}
 
-				std::stringstream ss;
+				if(!player->getGuildWarList().empty())
+				{
+					if(!IOGuild::getInstance()->canLeaveWar(player->getGuildId()))
+					{
+						player->sendCancel("You can not leave the guild during a war.");
+						return true;
+					}
+
+					if(player->hasCondition(CONDITION_INFIGHT))
+					{
+						player->sendCancel("You can not leave your guild while you have battle sign.");
+						return true;
+					}
+				}
+
+				std::ostringstream ss;
 				ss << player->getName() << " has left the guild.";
 				guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 
@@ -586,7 +620,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 						return true;
 					}
 
-					std::stringstream ss;
+					std::ostringstream ss;
 					ss << player->getName() << " has revoked your invite to " << (player->getSex() == PLAYERSEX_FEMALE ? "her" : "his") << " guild.";
 					paramPlayer->sendTextMessage(MSG_INFO_DESCR, ss.str());
 					ss.str("");
@@ -605,7 +639,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 						return true;
 					}
 
-					std::stringstream ss;
+					std::ostringstream ss;
 					ss << player->getName() << " has revoked the guildinvite of " << param << ".";
 					guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 
@@ -674,7 +708,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 
 						paramPlayer->setGuildLevel(GUILDLEVEL_VICE);
 
-						std::stringstream ss;
+						std::ostringstream ss;
 						ss << player->getName() << " has promoted " << paramPlayer->getName() << " to " << paramPlayer->getGuildRank() << ".";
 						guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 					}
@@ -688,7 +722,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 
 						paramPlayer->setGuildLevel(GUILDLEVEL_MEMBER);
 
-						std::stringstream ss;
+						std::ostringstream ss;
 						ss << player->getName() << " has demoted " << paramPlayer->getName() << " to " << paramPlayer->getGuildRank() << ".";
 						guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 					}
@@ -702,7 +736,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 
 						if(paramPlayer->getLevel() < (uint32_t)g_config.getNumber(ConfigManager::LEVEL_TO_CREATE_GUILD))
 						{
-							std::stringstream ss;
+							std::ostringstream ss;
 							ss << "The new guild leader has to be at least Level " << g_config.getNumber(ConfigManager::LEVEL_TO_CREATE_GUILD) << ".";
 							player->sendCancel(ss.str());
 							return true;
@@ -712,7 +746,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 						player->setGuildLevel(GUILDLEVEL_VICE);
 						IOGuild::getInstance()->updateOwnerId(player->getGuildId(), paramPlayer->getGUID());
 
-						std::stringstream ss;
+						std::ostringstream ss;
 						ss << player->getName() << " has passed the guild leadership to " << paramPlayer->getName() << ".";
 						guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 					}
@@ -724,7 +758,22 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 							return true;
 						}
 
-						std::stringstream ss;
+						if(!paramPlayer->getGuildWarList().empty())
+						{
+							if(!IOGuild::getInstance()->canLeaveWar(paramPlayer->getGuildId()))
+							{
+								player->sendCancel("You can not kick a player from the guild during a war.");
+								return true;
+							}
+
+							if(paramPlayer->hasCondition(CONDITION_INFIGHT))
+							{
+								player->sendCancel("You can not kick a player with battle sign from the guild.");
+								return true;
+							}
+						}
+
+						std::ostringstream ss;
 						ss << paramPlayer->getName() << " has been kicked from the guild by " << player->getName() << ".";
 						guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 
@@ -766,7 +815,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 							IOGuild::getInstance()->getGuildLevel(guid),
 							IOGuild::getInstance()->getGuildId(guid));
 
-						std::stringstream ss;
+						std::ostringstream ss;
 						ss << player->getName() << " has promoted " << param << " to " << rankName << ".";
 						guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 					}
@@ -783,7 +832,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 							IOGuild::getInstance()->getGuildLevel(guid),
 							IOGuild::getInstance()->getGuildId(guid));
 
-						std::stringstream ss;
+						std::ostringstream ss;
 						ss << player->getName() << " has demoted " << param << " to " << rankName << ".";
 						guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 					}
@@ -797,7 +846,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 
 						if(IOLoginData::getInstance()->getLevel(guid) < g_config.getNumber(ConfigManager::LEVEL_TO_CREATE_GUILD))
 						{
-							std::stringstream ss;
+							std::ostringstream ss;
 							ss << "The new guild leader has to be at least Level " << g_config.getNumber(ConfigManager::LEVEL_TO_CREATE_GUILD) << ".";
 							player->sendCancel(ss.str());
 							return true;
@@ -807,13 +856,19 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 						player->setGuildLevel(GUILDLEVEL_VICE);
 						IOGuild::getInstance()->updateOwnerId(player->getGuildId(), guid);
 
-						std::stringstream ss;
+						std::ostringstream ss;
 						ss << player->getName() << " has passed the guild leadership to " << param << ".";
 						guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 					}
 					else
 					{
-						std::stringstream ss;
+						if(!IOGuild::getInstance()->canLeaveWar(player->getGuildId()))
+						{
+							player->sendCancel("You can not kick a player from the guild during a war.");
+							return true;
+						}
+
+						std::ostringstream ss;
 						ss << param << " has been kicked from the guild by " << player->getName() << ".";
 						guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 						IOLoginData::getInstance()->leaveGuild(guid);
@@ -880,7 +935,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 
 					paramPlayer->setGuildNick(param2);
 
-					std::stringstream ss;
+					std::ostringstream ss;
 					if(player != paramPlayer)
 						ss << player->getName() << " has set the guildnick of " << paramPlayer->getName() << " to: " << param2 << ".";
 					else
@@ -912,7 +967,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 
 					IOGuild::getInstance()->setGuildNick(guid, param2);
 
-					std::stringstream ss;
+					std::ostringstream ss;
 					ss << player->getName() << " has set the guildnick of " << param1 << " to: " << param2 << ".";
 					guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 				}
@@ -976,7 +1031,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 
 				IOGuild::getInstance()->changeRankName(param1, param2, player->getGuildId());
 
-				std::stringstream ss;
+				std::ostringstream ss;
 				ss << player->getName() << " has renamed the guildrank: " << param1 << ", to: " << param2 << ".";
 				guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 			}
@@ -1010,7 +1065,7 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 
 				IOGuild::getInstance()->setMotd(player->getGuildId(), param);
 
-				std::stringstream ss;
+				std::ostringstream ss;
 				ss << player->getName() << " has set the Message of the Day to: " << param;
 				guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 			}
@@ -1024,12 +1079,135 @@ bool Chat::talkToChannel(Player* player, SpeakClasses type, const std::string& t
 
 				IOGuild::getInstance()->setMotd(player->getGuildId(), "");
 
-				std::stringstream ss;
+				std::ostringstream ss;
 				ss << player->getName() << " has cleared the Message of the Day.";
 				guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
 			}
+			else if(text.substr(0, 9) == "!startwar")
+			{
+				if(player->getGuildLevel() != GUILDLEVEL_LEADER)
+				{
+					player->sendCancel("Only the leader of your guild can execute this command.");
+					return true;
+				}
+
+				if(text.length() <= 10)
+				{
+					player->sendCancel("Invalid guildcommand parameters.");
+					return true;
+				}
+
+				std::string param = text.substr(10);
+				trimString(param);
+				uint32_t guildId;
+				if(!IOGuild::getInstance()->getGuildIdByName(guildId, param) || guildId == player->getGuildId())
+				{
+					player->sendCancel("There is no guild with that name.");
+					return true;
+				}
+
+				if(IOGuild::getInstance()->getWarDeclaration(player->getGuildId(), guildId) || IOGuild::getInstance()->isInWar(player->getGuildId(), guildId))
+				{
+					player->sendCancel("You have already declared a war against that guild.");
+					return true;
+				}
+
+				IOGuild::getInstance()->declareWar(player->getGuildId(), guildId);
+
+				std::ostringstream ss;
+				ss << "You have declared a war against: " << IOGuild::getInstance()->getGuildNameById(guildId) << ".";
+				guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
+			}
+			else if(text.substr(0, 8) == "!stopwar")
+			{
+				if(player->getGuildLevel() != GUILDLEVEL_LEADER)
+				{
+					player->sendCancel("Only the leader of your guild can execute this command.");
+					return true;
+				}
+
+				if(text.length() <= 9)
+				{
+					player->sendCancel("Invalid guildcommand parameters.");
+					return true;
+				}
+
+				std::string param = text.substr(9);
+				trimString(param);
+				uint32_t guildId;
+				if(!IOGuild::getInstance()->getGuildIdByName(guildId, param))
+				{
+					player->sendCancel("There is no guild with that name.");
+					return true;
+				}
+
+				if(!IOGuild::getInstance()->isInWar(player->getGuildId()))
+				{
+					player->sendCancel("Your guild is not in any war.");
+					return true;
+				}
+
+				if(!IOGuild::getInstance()->isInWar(player->getGuildId(), guildId))
+				{
+					player->sendCancel("You are not in war with that guild.");
+					return true;
+				}
+
+				if(IOGuild::getInstance()->canLeaveWar(player->getGuildId()))
+				{
+					player->sendCancel("You have to wait at least 4 days before you can end the war.");
+					return true;
+				}
+
+				IOGuild::getInstance()->endWar(player->getGuildId(), guildId);
+
+				std::ostringstream ss;
+				ss << "You have ended the guildwar against: " << IOGuild::getInstance()->getGuildNameById(guildId) << ".";
+				guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
+			}
+			else if(text.substr(0, 10) == "!acceptwar")
+			{
+				if(player->getGuildLevel() != GUILDLEVEL_LEADER)
+				{
+					player->sendCancel("Only the leader of your guild can execute this command.");
+					return true;
+				}
+
+				if(text.length() <= 11)
+				{
+					player->sendCancel("Invalid guildcommand parameters.");
+					return true;
+				}
+
+				std::string param = text.substr(11);
+				trimString(param);
+				uint32_t guildId;
+				if(!IOGuild::getInstance()->getGuildIdByName(guildId, param))
+				{
+					player->sendCancel("There is no guild with that name.");
+					return true;
+				}
+
+				if(IOGuild::getInstance()->isInWar(player->getGuildId(), guildId))
+				{
+					player->sendCancel("You are already in war with that guild.");
+					return true;
+				}
+
+				if(!IOGuild::getInstance()->getWarDeclaration(guildId, player->getGuildId()))
+				{
+					player->sendCancel("There is no war declaration from that guild.");
+					return true;
+				}
+
+				IOGuild::getInstance()->startWar(guildId, player->getGuildId());
+
+				std::ostringstream ss;
+				ss << "You have accepted a war against: " << IOGuild::getInstance()->getGuildNameById(guildId) << ".";
+				guildChannel->sendToAll(ss.str(), SPEAK_CHANNEL_R1);
+			}
 			else if(text == "!commands")
-				player->sendToChannel(player, SPEAK_CHANNEL_R1, "The guild commands are: <!disband>, <!invite playerName>, <!leave>, <!kick playerName>, <!revoke playerName>, <!demote playerName>, <!promote playerName>, <!passleadership playerName>, <!nick playerName, nick>, <!setrankname oldRankName, newRankName>, <!setmotd newMotd>, <!guildonline> and <!clearmotd>.", CHANNEL_GUILD);
+				player->sendToChannel(player, SPEAK_CHANNEL_R1, "The guild commands are: <!disband>, <!invite playerName>, <!leave>, <!kick playerName>, <!revoke playerName>, <!demote playerName>, <!promote playerName>, <!passleadership playerName>, <!nick playerName, nick>, <!setrankname oldRankName, newRankName>, <!setmotd newMotd>, <!guildonline>, <!clearmotd>, <!startwar>, <!stopwar> and <!acceptwar>.", CHANNEL_GUILD);
 
 			return true;
 		}
